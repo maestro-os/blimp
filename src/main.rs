@@ -11,6 +11,9 @@ use std::process::exit;
 /// The software's current version.
 const VERSION: &str = "0.1";
 
+// TODO Add lock file
+// TODO Add a command to clear the cache
+
 /// Prints command line usage.
 fn print_usage(bin: &String) {
     eprintln!("blimp package manager version {}", VERSION);
@@ -63,11 +66,14 @@ fn install(names: &[String]) -> bool {
         return false;
     }
 
+    println!("Resolving dependencies...");
+
     // The list of all packages, dependencies included
     let mut total_packages = packages.clone();
     // Changed to `false` if a dependency problem is found
     let mut valid = true;
 
+    // TODO Also use already installed packages to check for conflicts
     // Resolving dependencies
     for (_, package) in &packages {
         if !package.resolve_dependencies(&mut total_packages) {
@@ -79,8 +85,30 @@ fn install(names: &[String]) -> bool {
         return false;
     }
 
+    println!("Packages to be installed:");
+    // The total download size in bytes
+    let mut total_size = 0;
+    for (name, package) in &total_packages {
+        println!("\t- {} ({})", name, package.get_version());
+
+        if package.is_in_cache() {
+            total_size += package.get_size();
+        }
+    }
+    println!("Download size: {} bytes", total_size); // TODO Format to be human readable
+
     // TODO Ask for confirmation
-    // TODO If yes, install all
+
+    println!("Downloading packages...");
+    // TODO Add progress bar
+    // TODO Download in async
+    for (name, package) in &total_packages {
+        if !package.is_in_cache() {
+            package.download();
+        } else {
+            println!("`{}` is in cache.", name);
+        }
+    }
 
     true
 }
@@ -121,7 +149,9 @@ fn main() {
                 exit(1);
             }
 
-            install(names);
+            if !install(names) {
+                exit(1);
+            }
         },
 
         "update" => {

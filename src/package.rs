@@ -4,6 +4,10 @@
 use crate::version::Version;
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::path::Path;
+
+/// The directory containing cached packages.
+const CACHE_DIR: &str = "/usr/lib/blimp/cache";
 
 /// Structure representing a package dependency.
 #[derive(Clone, Eq)]
@@ -60,6 +64,8 @@ pub struct Package {
     /// The package's version.
     version: Version,
 
+    /// The number of bytes to download for this package.
+    size: u64,
     /// The package's description.
     description: String,
 
@@ -116,6 +122,11 @@ impl Package {
         todo!();
     }
 
+    /// Returns the download size of the package.
+    pub fn get_size(&self) -> u64 {
+        self.size
+    }
+
     /// Tells whether the package is installed on the system.
     pub fn is_installed(&self) -> bool {
         self.installed
@@ -149,12 +160,14 @@ impl Package {
         for d in &self.run_deps {
             // Checking for version conflict if the package is already in the list
             if let Some(p) = packages.get(d.get_name()) {
+                // If versions don't correspond, error
                 if d.get_version() != p.get_version() {
                     eprintln!("Conflicting version `{}` and `{}` on `{}`!",
                         d.get_version(), p.get_version(), d.get_name());
                     valid = false;
                 }
             } else {
+                // Resolving the package, then resolving its dependencies
                 if let Some(p) = d.get_package() {
                     p.resolve_dependencies(packages);
                     packages.insert(p.get_name().clone(), p);
@@ -167,5 +180,25 @@ impl Package {
         }
 
         valid
+    }
+
+    /// Returns the path to the cache file for this package.
+    pub fn get_cache_path(&self) -> String {
+        format!("{}/{}-{}", CACHE_DIR, self.name, self.version)
+    }
+
+    /// Tells whether the package is in cache.
+    pub fn is_in_cache(&self) -> bool {
+        Path::new(&self.get_cache_path()).exists()
+    }
+
+    // TODO Make async
+    /// Downloads the package. If the package is already in cache, the function does nothing.
+    pub fn download(&self) {
+        if self.is_in_cache() {
+            return;
+        }
+
+        // TODO
     }
 }
