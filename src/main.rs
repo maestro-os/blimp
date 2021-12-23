@@ -2,9 +2,9 @@ mod package;
 mod remote;
 mod version;
 
-use package::Dependency;
 use package::Package;
 use remote::Remote;
+use std::collections::HashMap;
 use std::env;
 use std::process::exit;
 
@@ -39,16 +39,18 @@ specify a version");
 }
 
 /// Installs the given list of packages.
-fn install(names: &[String]) {
+/// On success, the function returns `true`. On failure, it returns `false`.
+fn install(names: &[String]) -> bool {
     // The list of packages to install
-    let mut packages = Vec::<Package>::new();
-
+    let mut packages = HashMap::<String, Package>::new();
     // Changed to `true` if at least one package is missing
     let mut not_found = false;
 
     for p in names {
-        match Package::get(&p.clone()) {
-            Some(package) => packages.push(package),
+        match Package::get_latest(&p.clone()) {
+            Some(package) => {
+                packages.insert(package.get_name().clone(), package);
+            },
 
             None => {
                 eprintln!("Package `{}` not found!", p);
@@ -58,17 +60,29 @@ fn install(names: &[String]) {
     }
 
     if not_found {
-        exit(1);
+        return false;
     }
 
-    let mut deps = Vec::<Dependency>::new();
-    for p in packages {
-        let mut d: Vec<Dependency> = p.get_run_deps().clone();
-        deps.append(&mut d);
+    // The list of all packages, dependencies included
+    let mut total_packages = packages.clone();
+    // Changed to `false` if a dependency problem is found
+    let mut valid = true;
+
+    // Resolving dependencies
+    for (_, package) in &packages {
+        if !package.resolve_dependencies(&mut total_packages) {
+            valid = false;
+        }
     }
 
-    deps.sort();
-    // TODO Check for conflicts
+    if !valid {
+        return false;
+    }
+
+    // TODO Ask for confirmation
+    // TODO If yes, install all
+
+    true
 }
 
 fn main() {

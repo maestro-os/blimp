@@ -1,7 +1,10 @@
-//! TODO doc
+//! The version structure represents the version of a package.
 
 use std::cmp::Ordering;
 use std::cmp::min;
+use std::fmt::Display;
+use std::fmt::Formatter;
+use std::fmt;
 
 /// Structure representing a version.
 #[derive(Clone, Eq)]
@@ -37,5 +40,19 @@ impl PartialOrd for Version {
 impl PartialEq for Version {
     fn eq(&self, other: &Self) -> bool {
         self.cmp(other) == Ordering::Equal
+    }
+}
+
+impl Display for Version {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+	    for i in 0..self.numbers.len() {
+            write!(f, "{}", self.numbers[i])?;
+
+	        if i + 1 < self.numbers.len() {
+                write!(f, ".")?;
+	        }
+	    }
+
+	    Ok(())
     }
 }
