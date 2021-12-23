@@ -1,5 +1,9 @@
+mod package;
 mod remote;
+mod version;
 
+use package::Dependency;
+use package::Package;
 use remote::Remote;
 use std::env;
 use std::process::exit;
@@ -34,6 +38,39 @@ specify a version");
     eprintln!("\tSYSROOT: Specifies the path to the system's root");
 }
 
+/// Installs the given list of packages.
+fn install(names: &[String]) {
+    // The list of packages to install
+    let mut packages = Vec::<Package>::new();
+
+    // Changed to `true` if at least one package is missing
+    let mut not_found = false;
+
+    for p in names {
+        match Package::get(&p.clone()) {
+            Some(package) => packages.push(package),
+
+            None => {
+                eprintln!("Package `{}` not found!", p);
+                not_found = true;
+            },
+        }
+    }
+
+    if not_found {
+        exit(1);
+    }
+
+    let mut deps = Vec::<Dependency>::new();
+    for p in packages {
+        let mut d: Vec<Dependency> = p.get_run_deps().clone();
+        deps.append(&mut d);
+    }
+
+    deps.sort();
+    // TODO Check for conflicts
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     // The name of the binary file
@@ -64,13 +101,13 @@ fn main() {
         },
 
         "install" => {
-            let packages = &args[2..];
-            if packages.len() == 0 {
+            let names = &args[2..];
+            if names.len() == 0 {
                 eprintln!("Please specify one or several packages");
                 exit(1);
             }
 
-            // TODO
+            install(names);
         },
 
         "update" => {
@@ -94,7 +131,10 @@ fn main() {
         },
 
         "remote-list" => {
-            let remotes = Remote::list();
+            let remotes = Remote::list().unwrap_or_else(| _ | {
+                eprintln!("IO error :(");
+                exit(1);
+            });
 
             println!("Remotes list:");
             for r in remotes {

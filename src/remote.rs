@@ -1,5 +1,13 @@
 //! A remote is a remote host from which packages can be downloaded.
 
+use std::fs::File;
+use std::io::BufReader;
+use std::io::BufRead;
+use std::io;
+
+/// The file which contains the list of remotes.
+const REMOTES_FILE: &str = "/usr/lib/blimp/remotes_list";
+
 /// Structure representing a remote host.
 pub struct Remote {
     /// The host's address and port (optional).
@@ -15,11 +23,17 @@ impl Remote {
     }
 
     /// Returns the list of remote hosts.
-    pub fn list() -> Vec<Self> {
-        let v = Vec::new();
-        // TODO Read from file
+    pub fn list() -> io::Result<Vec<Self>> {
+        let mut v = Vec::new();
 
-        v
+        let file = File::open(REMOTES_FILE)?;
+        let reader = BufReader::new(file);
+
+        for l in reader.lines() {
+            v.push(Self::new(l?));
+        }
+
+        Ok(v)
     }
 
     /// Returns the host for the remote.
