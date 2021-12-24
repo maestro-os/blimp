@@ -1,3 +1,4 @@
+mod lockfile;
 mod package;
 mod remote;
 mod version;
@@ -28,6 +29,7 @@ fn print_usage(bin: &String) {
     eprintln!("\tupgrade [package...]: Upgrades the given package(s). If no package is specified, \
 the package manager updates every packages that are not up to date");
     eprintln!("\tremove <package...>: Removes the given package(s)");
+    eprintln!("\tclean: Clean the cache");
     eprintln!("\tremote-list: Lists remote servers");
     eprintln!("\tremote-add <remote>: Adds a remote server");
     eprintln!("\tremote-remove <remote>: Removes a remote server");
@@ -39,6 +41,8 @@ specify a version");
     eprintln!();
     eprintln!("ENVIRONMENT VARIABLES:");
     eprintln!("\tSYSROOT: Specifies the path to the system's root");
+    eprintln!("\tLOCAL_REPOSITORY: Specifies pathes separated by `:` at which packages are stored \
+locally");
 }
 
 /// Installs the given list of packages.
@@ -113,7 +117,7 @@ fn install(names: &[String]) -> bool {
     true
 }
 
-fn main() {
+fn main_() -> bool {
     let args: Vec<String> = env::args().collect();
     // The name of the binary file
     let bin = {
@@ -127,7 +131,7 @@ fn main() {
     // If no argument is specified, print usage
     if args.len() <= 1 {
         print_usage(&bin);
-        exit(1);
+        return false;
     }
 
     // Matching command
@@ -136,7 +140,7 @@ fn main() {
             let packages = &args[2..];
             if packages.len() == 0 {
                 eprintln!("Please specify one or several packages");
-                exit(1);
+                return false;
             }
 
             // TODO
@@ -146,11 +150,11 @@ fn main() {
             let names = &args[2..];
             if names.len() == 0 {
                 eprintln!("Please specify one or several packages");
-                exit(1);
+                return false;
             }
 
             if !install(names) {
-                exit(1);
+                return false;
             }
         },
 
@@ -168,17 +172,23 @@ fn main() {
             let packages = &args[2..];
             if packages.len() == 0 {
                 eprintln!("Please specify one or several packages");
-                exit(1);
+                return false;
             }
 
             // TODO
         },
 
+        "clean" => {
+            // TODO
+        },
+
         "remote-list" => {
-            let remotes = Remote::list().unwrap_or_else(| _ | {
+            let remotes = Remote::list();
+            if remotes.is_err() {
                 eprintln!("IO error :(");
-                exit(1);
-            });
+                return false;
+            }
+            let remotes = remotes.unwrap();
 
             println!("Remotes list:");
             for r in remotes {
@@ -203,7 +213,25 @@ fn main() {
             eprintln!("Command `{}` doesn't exist", args[1]);
             eprintln!();
             print_usage(&bin);
-            exit(1);
+            return false;
         },
+    }
+
+    true
+}
+
+fn main() {
+    // Creating a lock file if possible
+    if !lockfile::lock() {
+        eprintln!("Error: lockfile already exists");
+        exit(1);
+    }
+
+    let success = main_();
+
+    lockfile::unlock();
+
+    if !success {
+        exit(1);
     }
 }
