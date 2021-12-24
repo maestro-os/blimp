@@ -150,32 +150,39 @@ impl Package {
     // TODO Move printing out of this function
     /// Resolves the dependencies of the package and inserts them into the given HashMap
     /// `packages`.
-    /// The function makes use of packages that are already in the HashMap to determine if there is
-    /// a dependency error.
+    /// The function makes use of packages that are already in the HashMap and those which are
+    /// already installed to determine if there is a dependency error.
     /// If an error occurs, the function returns `false`.
     pub fn resolve_dependencies(&self, packages: &mut HashMap<String, Self>) -> bool {
         // Tells whether dependencies are valid
         let mut valid = true;
 
         for d in &self.run_deps {
-            // Checking for version conflict if the package is already in the list
-            if let Some(p) = packages.get(d.get_name()) {
+            // Getting the package. Either in the installation list or already installed
+            let pkg = Self::get_installed(d.get_name()).or_else(|| {
+               Some(packages.get(d.get_name())?.clone())
+            });
+
+            // Checking for version conflict
+            if let Some(p) = pkg {
                 // If versions don't correspond, error
                 if d.get_version() != p.get_version() {
                     eprintln!("Conflicting version `{}` and `{}` on `{}`!",
                         d.get_version(), p.get_version(), d.get_name());
                     valid = false;
                 }
+
+                continue;
+            }
+
+            // Resolving the package, then resolving its dependencies
+            if let Some(p) = d.get_package() {
+                p.resolve_dependencies(packages); // FIXME Possible stack overflow
+                packages.insert(p.get_name().clone(), p);
             } else {
-                // Resolving the package, then resolving its dependencies
-                if let Some(p) = d.get_package() {
-                    p.resolve_dependencies(packages);
-                    packages.insert(p.get_name().clone(), p);
-                } else {
-                    eprintln!("Unresolved dependency `{}` version `{}`!",
-                        d.get_name(), d.get_version());
-                    valid = false;
-                }
+                eprintln!("Unresolved dependency `{}` version `{}`!",
+                    d.get_name(), d.get_version());
+                valid = false;
             }
         }
 
@@ -196,6 +203,20 @@ impl Package {
     /// Downloads the package. If the package is already in cache, the function does nothing.
     pub fn download(&self) {
         if self.is_in_cache() {
+            return;
+        }
+
+        // TODO
+    }
+
+    /// Builds the package.
+    pub fn build(&self) {
+        // TODO
+    }
+
+    /// Installs the package. If the package is already installed, the function does nothing.
+    pub fn install(&self) {
+        if self.is_installed() {
             return;
         }
 

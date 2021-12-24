@@ -48,10 +48,11 @@ locally");
 /// Installs the given list of packages.
 /// On success, the function returns `true`. On failure, it returns `false`.
 fn install(names: &[String]) -> bool {
+    // Changed to `false` if a problem is found
+    let mut valid = true;
+
     // The list of packages to install
     let mut packages = HashMap::<String, Package>::new();
-    // Changed to `true` if at least one package is missing
-    let mut not_found = false;
 
     for p in names {
         match Package::get_latest(&p.clone()) {
@@ -61,12 +62,12 @@ fn install(names: &[String]) -> bool {
 
             None => {
                 eprintln!("Package `{}` not found!", p);
-                not_found = true;
+                valid = false;
             },
         }
     }
 
-    if not_found {
+    if !valid {
         return false;
     }
 
@@ -74,10 +75,7 @@ fn install(names: &[String]) -> bool {
 
     // The list of all packages, dependencies included
     let mut total_packages = packages.clone();
-    // Changed to `false` if a dependency problem is found
-    let mut valid = true;
 
-    // TODO Also use already installed packages to check for conflicts
     // Resolving dependencies
     for (_, package) in &packages {
         if !package.resolve_dependencies(&mut total_packages) {
