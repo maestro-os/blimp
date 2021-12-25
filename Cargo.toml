@@ -5,5 +5,16 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[[bin]]
+name ="blimp"
+path ="src/main.rs"
+
+[[bin]]
+name ="blimp_server"
+path ="src/server/main.rs"
+
 [dependencies]
+actix-web = "3"
 reqwest = { version = "0.11", features = ["blocking", "json"] }
+serde = "1.0.132"
+serde_json = "1.0.73"

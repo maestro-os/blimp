@@ -1,3 +1,4 @@
+mod confirm;
 mod lockfile;
 mod package;
 mod remote;
@@ -11,9 +12,6 @@ use std::process::exit;
 
 /// The software's current version.
 const VERSION: &str = "0.1";
-
-// TODO Add lock file
-// TODO Add a command to clear the cache
 
 /// Prints command line usage.
 fn print_usage(bin: &String) {
@@ -99,7 +97,10 @@ fn install(names: &[String]) -> bool {
     }
     println!("Download size: {} bytes", total_size); // TODO Format to be human readable
 
-    // TODO Ask for confirmation
+    if !confirm::prompt() {
+        println!("Aborting.");
+        return false;
+    }
 
     println!("Downloading packages...");
     // TODO Add progress bar
@@ -115,6 +116,7 @@ fn install(names: &[String]) -> bool {
     true
 }
 
+// TODO Parse options
 fn main_() -> bool {
     let args: Vec<String> = env::args().collect();
     // The name of the binary file
@@ -221,7 +223,7 @@ fn main_() -> bool {
 fn main() {
     // Creating a lock file if possible
     if !lockfile::lock() {
-        eprintln!("Error: lockfile already exists");
+        eprintln!("Error: failed to acquire lockfile");
         exit(1);
     }
 
