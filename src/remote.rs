@@ -43,7 +43,7 @@ impl Remote {
 
     /// Returns the remote's motd.
     pub fn get_motd(&self) -> Result<String, ()> {
-        let url = "https://".to_owned() + &self.host + "/motd";
+        let url = "http://".to_owned() + &self.host + "/motd";
         let resp = reqwest::blocking::get(url).ok().ok_or(())?;
 
         match resp.status() {

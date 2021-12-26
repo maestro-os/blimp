@@ -2,15 +2,23 @@
 //! Packages are usualy downloaded from a remote host.
 
 use crate::version::Version;
+use serde::Deserialize;
+use serde::Serialize;
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::fs::File;
+use std::fs;
+use std::io::BufReader;
 use std::path::Path;
 
 /// The directory containing cached packages.
 const CACHE_DIR: &str = "/usr/lib/blimp/cache";
 
+/// The directory storing packages' descriptions on the serverside.
+const SERVER_PACKAGES_DIR: &str = "packages";
+
 /// Structure representing a package dependency.
-#[derive(Clone, Eq)]
+#[derive(Clone, Eq, Deserialize, Serialize)]
 pub struct Dependency {
     /// The dependency's name.
     name: String,
@@ -57,20 +65,15 @@ impl PartialEq for Dependency {
 }
 
 /// Structure representing a package.
-#[derive(Clone)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct Package {
     /// The package's name.
     name: String,
     /// The package's version.
     version: Version,
 
-    /// The number of bytes to download for this package.
-    size: u64,
     /// The package's description.
     description: String,
-
-    /// Tells whether the package is installed.
-    installed: bool,
 
     /// Dependencies required to build the package.
     build_deps: Vec<Dependency>,
@@ -79,6 +82,23 @@ pub struct Package {
 }
 
 impl Package {
+    /// Lists available packages on the server. If not on a server, the function is undefined.
+    pub fn server_list() -> Vec<Self> {
+        let mut packages = Vec::new();
+
+        let files = fs::read_dir(SERVER_PACKAGES_DIR).unwrap(); // TODO Handle error
+        for p in files {
+            let path = p.unwrap().path();
+
+            // TODO Handle error
+            let file = File::open(path).unwrap();
+            let reader = BufReader::new(file);
+            packages.push(serde_json::from_reader(reader).unwrap());
+        }
+
+        packages
+    }
+
     /// Returns the package with name `name` and version `version`.
     /// If the package doesn't exist, the function returns None.
     pub fn get(_name: &String, _version: &Version) -> Option<Self> {
@@ -124,12 +144,14 @@ impl Package {
 
     /// Returns the download size of the package.
     pub fn get_size(&self) -> u64 {
-        self.size
+        // TODO
+        todo!();
     }
 
     /// Tells whether the package is installed on the system.
     pub fn is_installed(&self) -> bool {
-        self.installed
+        // TODO
+        todo!();
     }
 
     /// Tells whether the package is up to date.

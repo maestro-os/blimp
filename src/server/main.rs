@@ -1,7 +1,18 @@
 mod config;
 
-use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{
+    get,
+    http::header::ContentType,
+    middleware,
+    web,
+    App,
+    HttpResponse,
+    HttpServer,
+    Responder
+};
+use common::package::Package;
 use config::Config;
+use serde_json::json;
 use std::sync::Mutex;
 
 /// The server's version.
@@ -27,8 +38,15 @@ async fn motd(data: web::Data<Mutex<GlobalData>>) -> impl Responder {
 
 #[get("/package")]
 async fn package_list() -> impl Responder {
-    HttpResponse::Ok().body("TODO")
+    let json = json!({
+        "packages": Package::server_list(),
+    });
+
+    HttpResponse::Ok().set(ContentType::json()).body(json.to_string())
 }
+
+// TODO Add endpoint to get details on a specific package/version
+// TODO Add endpoint to download the package with the given version
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -45,8 +63,13 @@ async fn main() -> std::io::Result<()> {
         config,
     }));
 
+    // Enabling logging
+    std::env::set_var("RUST_LOG", "actix_web=info");
+    env_logger::init();
+
     HttpServer::new(move || {
         App::new()
+            .wrap(middleware::Logger::new("[%t] %a: %r - Response: %s (in %D ms)"))
             .app_data(data.clone())
             .service(root)
             .service(motd)

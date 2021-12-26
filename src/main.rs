@@ -1,10 +1,8 @@
 mod confirm;
 mod lockfile;
-mod package;
 mod remote;
-mod version;
 
-use package::Package;
+use common::package::Package;
 use remote::Remote;
 use std::collections::HashMap;
 use std::env;
