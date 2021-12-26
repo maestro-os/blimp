@@ -142,6 +142,7 @@ fn main_() -> bool {
             }
 
             // TODO
+            todo!();
         },
 
         "install" => {
@@ -158,12 +159,14 @@ fn main_() -> bool {
 
         "update" => {
             // TODO
+            todo!();
         },
 
         "upgrade" => {
             let packages = &args[2..];
 
             // TODO
+            todo!();
         },
 
         "remove" => {
@@ -174,10 +177,12 @@ fn main_() -> bool {
             }
 
             // TODO
+            todo!();
         },
 
         "clean" => {
             // TODO
+            todo!();
         },
 
         "remote-list" => {
@@ -201,10 +206,12 @@ fn main_() -> bool {
 
         "remote-add" => {
             // TODO
+            todo!();
         },
 
         "remote-remove" => {
             // TODO
+            todo!();
         },
 
         _ => {

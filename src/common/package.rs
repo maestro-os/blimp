@@ -1,8 +1,8 @@
 //! A package is a software that can be installed using the package manager.
 //! Packages are usualy downloaded from a remote host.
 
+use crate::util;
 use crate::version::Version;
-use flate2::read::GzDecoder;
 use serde::Deserialize;
 use serde::Serialize;
 use std::cmp::Ordering;
@@ -12,7 +12,6 @@ use std::fs;
 use std::io::BufReader;
 use std::io;
 use std::path::Path;
-use tar::Archive;
 
 /// The directory containing cached packages.
 const CACHE_DIR: &str = "/usr/lib/blimp/cache";
@@ -246,77 +245,79 @@ impl Package {
         }
 
         // TODO
+        todo!();
     }
 
     /// Installs the package. If the package is already installed, the function does nothing.
-    pub fn install(&self) {
+    /// `sysroot` is the root of the system at which the package is to be installed.
+    /// The function assumes the running dependencies of the package are already installed.
+    pub fn install(&self, sysroot: String) -> io::Result<()> {
         if self.is_installed() {
-            return;
+            return Ok(());
         }
 
-        // TODO
-    }
-}
+        // Uncompressing the package
+        util::uncompress_wrap(&self.get_cache_path(), | tmp_dir | {
+            // Running the pre-install hook
+            let hook_path = format!("{}/pre-install-hook", tmp_dir);
+            if !util::run_hook(&hook_path, &sysroot)? {
+                return Err(io::Error::new(io::ErrorKind::Other, "Pre-install hook failed!"));
+            }
 
-/// The package builder allows to build or install a package.
-pub struct PackageBuilder {
-    /// The path to the package.
-    path: String,
+            // TODO Uncompress inner data at sysroot
 
-    /// The path of the directory to create in which the package will be built.
-    build_path: String,
-}
+            let hook_path = format!("{}/post-install-hook", tmp_dir);
+            if !util::run_hook(&hook_path, &sysroot)? {
+                return Err(io::Error::new(io::ErrorKind::Other, "Post-install hook failed!"));
+            }
 
-impl PackageBuilder {
-    /// Creates a new instance for the package at path `path`.
-    /// `build_path` is the path of a directory to create to build the package into.
-    pub fn new(path: String, build_path: String) -> Self {
-        Self {
-            path,
-
-            build_path,
-        }
+            Ok(())
+        })?
     }
 
-    /// Prepares the package for building.
-    pub fn prepare(&self) -> io::Result<()> {
-        let tar_gz = File::open(self.path.clone())?;
-        let tar = GzDecoder::new(tar_gz);
-        let mut archive = Archive::new(tar);
-        archive.unpack(self.build_path.clone())?;
+    /// Removes the package.
+    /// `sysroot` is the root of the system at which the package is to be removed.
+    pub fn update(&self, sysroot: String) -> io::Result<()> {
+        // Uncompressing the package
+        util::uncompress_wrap(&self.get_cache_path(), | tmp_dir | {
+            // Running the pre-update hook
+            let hook_path = format!("{}/pre-update-hook", tmp_dir);
+            if !util::run_hook(&hook_path, &sysroot)? {
+                return Err(io::Error::new(io::ErrorKind::Other, "Pre-update hook failed!"));
+            }
 
-        // TODO Check integrity
+            // TODO Patch files corresponding to the ones in inner data archive
 
-        // TODO Add isolation?
+            // Running the post-update hook
+            let hook_path = format!("{}/post-update-hook", tmp_dir);
+            if !util::run_hook(&hook_path, &sysroot)? {
+                return Err(io::Error::new(io::ErrorKind::Other, "Post-update hook failed!"));
+            }
 
-        Ok(())
+            Ok(())
+        })?
     }
 
-    // TODO Function to get the package
+    /// Removes the package.
+    /// `sysroot` is the root of the system at which the package is to be removed.
+    pub fn remove(&self, sysroot: String) -> io::Result<()> {
+        // Uncompressing the package
+        util::uncompress_wrap(&self.get_cache_path(), | tmp_dir | {
+            // Running the pre-remove hook
+            let hook_path = format!("{}/pre-update-hook", tmp_dir);
+            if !util::run_hook(&hook_path, &sysroot)? {
+                return Err(io::Error::new(io::ErrorKind::Other, "Pre-remove hook failed!"));
+            }
 
-    /// Builds the package. This function assumes the build dependencies of the package are already
-    /// installed.
-    pub fn build(&mut self) {
-        let build_file = format!("{}/build", self.path);
-        let install_dir = format!("{}/install", self.path);
+            // TODO Remove files corresponding to the ones in inner data archive
 
-        // TODO Create the install directory
+            // Running the post-remove hook
+            let hook_path = format!("{}/post-remove-hook", tmp_dir);
+            if !util::run_hook(&hook_path, &sysroot)? {
+                return Err(io::Error::new(io::ErrorKind::Other, "Post-remove hook failed!"));
+            }
 
-        // TODO
-        //Command::new(build_file)
-        //    .env("SYSROOT", "/") // TODO
-    }
-
-    /// Cleans the build directory.
-    pub fn clean(&self) -> io::Result<()> {
-        // TODO Remove the build directory
-
-        Ok(())
-    }
-}
-
-impl Drop for PackageBuilder {
-    fn drop(&mut self) {
-        let _ = self.clean();
+            Ok(())
+        })?
     }
 }
