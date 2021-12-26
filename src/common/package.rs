@@ -1,6 +1,7 @@
 //! A package is a software that can be installed using the package manager.
 //! Packages are usualy downloaded from a remote host.
 
+use crate::request::PackageSizeResponse;
 use crate::util;
 use crate::version::Version;
 use serde::Deserialize;
@@ -158,12 +159,6 @@ impl Package {
         todo!();
     }
 
-    /// Returns the download size of the package.
-    pub fn get_size(&self) -> u64 {
-        // TODO
-        todo!();
-    }
-
     /// Tells whether the package is installed on the system.
     pub fn is_installed(&self) -> bool {
         // TODO
@@ -237,15 +232,35 @@ impl Package {
         Path::new(&self.get_cache_path()).exists()
     }
 
-    // TODO Make async
+    /// Returns the download size of the package in bytes.
+    /// `host` is the host from which the package will be downloaded.
+    pub async fn get_size(&self, host: &str) -> Result<u64, String> {
+        let url = format!("http://{}/package/{}/version/{}/size", host, self.name, self.version);
+        let response = reqwest::get(url).await.or(Err("HTTP request failed"))?;
+        let content = response.text().await.or(Err("HTTP request failed"))?;
+
+        let json: PackageSizeResponse = serde_json::from_str(&content)
+            .or(Err("Failed to parse JSON response"))?;
+        Ok(json.size)
+    }
+
+    // TODO Do not keep the whole file in RAM before writting
     /// Downloads the package. If the package is already in cache, the function does nothing.
-    pub fn download(&self) {
+    /// `host` is the host from which the package will be downloaded.
+    pub async fn download(&self, host: &str) -> Result<(), String> {
         if self.is_in_cache() {
-            return;
+            return Ok(());
         }
 
-        // TODO
-        todo!();
+        let url = format!("http://{}/package/{}/version/{}/archive",
+            host, self.name, self.version);
+        let response = reqwest::get(url).await.or(Err("HTTP request failed"))?;
+        let content = response.text().await.or(Err("HTTP request failed"))?;
+
+        let mut file = File::create(self.get_cache_path()).or(Err("Failed to create cache file"))?;
+        io::copy(&mut content.as_bytes(), &mut file).or(Err("IO error"))?;
+
+        Ok(())
     }
 
     /// Installs the package. If the package is already installed, the function does nothing.
@@ -264,7 +279,9 @@ impl Package {
                 return Err(io::Error::new(io::ErrorKind::Other, "Pre-install hook failed!"));
             }
 
-            // TODO Uncompress inner data at sysroot
+            // Uncompresses data at sysroot, installing the package
+            let data_path = format!("{}/data.tar.gz", tmp_dir);
+            util::uncompress(&data_path, &sysroot)?;
 
             let hook_path = format!("{}/post-install-hook", tmp_dir);
             if !util::run_hook(&hook_path, &sysroot)? {

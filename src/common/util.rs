@@ -33,7 +33,9 @@ pub fn uncompress(src: &str, dest: &str) -> io::Result<()> {
     archive.unpack(dest)
 }
 
-/// TODO doc
+/// Uncompresses the given .tar.gz file `archive` into a temporary directory, executes the given
+/// function `f` with the path to the temporary directory as argument, then removes the directory
+/// and returns the result of the call to `f`.
 pub fn uncompress_wrap<T, F: FnOnce(&str) -> T>(archive: &str, f: F) -> io::Result<T> {
     // Uncompressing
     let tmp_dir = create_tmp_dir()?;
@@ -42,7 +44,7 @@ pub fn uncompress_wrap<T, F: FnOnce(&str) -> T>(archive: &str, f: F) -> io::Resu
     let v = f(&tmp_dir);
 
     // Removing temporary directory
-    // TODO rm
+    fs::remove_dir_all(&tmp_dir)?;
 
     Ok(v)
 }

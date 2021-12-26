@@ -90,7 +90,7 @@ fn install(names: &[String]) -> bool {
         println!("\t- {} ({})", name, package.get_version());
 
         if package.is_in_cache() {
-            total_size += package.get_size();
+            // TODO Run in async: total_size += package.get_size();
         }
     }
     println!("Download size: {} bytes", total_size); // TODO Format to be human readable
@@ -105,7 +105,7 @@ fn install(names: &[String]) -> bool {
     // TODO Download in async
     for (name, package) in &total_packages {
         if !package.is_in_cache() {
-            package.download();
+            // TODO Run in async: package.download();
         } else {
             println!("`{}` is in cache.", name);
         }
