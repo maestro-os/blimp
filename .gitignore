@@ -1,4 +1,5 @@
 /target
 
 config.json
-packages/
+public_desc/
+public_packages/

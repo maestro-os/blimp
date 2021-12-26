@@ -2,6 +2,7 @@
 //! Packages are usualy downloaded from a remote host.
 
 use crate::version::Version;
+use flate2::read::GzDecoder;
 use serde::Deserialize;
 use serde::Serialize;
 use std::cmp::Ordering;
@@ -9,13 +10,17 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::fs;
 use std::io::BufReader;
+use std::io;
 use std::path::Path;
+use tar::Archive;
 
 /// The directory containing cached packages.
 const CACHE_DIR: &str = "/usr/lib/blimp/cache";
 
 /// The directory storing packages' descriptions on the serverside.
-const SERVER_PACKAGES_DIR: &str = "packages";
+pub const SERVER_PACKAGES_DESC_DIR: &str = "public_desc";
+/// The directory storing packages' archives on the serverside.
+pub const SERVER_PACKAGES_DIR: &str = "public_packages";
 
 /// Structure representing a package dependency.
 #[derive(Clone, Eq, Deserialize, Serialize)]
@@ -83,27 +88,39 @@ pub struct Package {
 
 impl Package {
     /// Lists available packages on the server. If not on a server, the function is undefined.
-    pub fn server_list() -> Vec<Self> {
+    pub fn server_list() -> io::Result<Vec<Self>> {
         let mut packages = Vec::new();
 
-        let files = fs::read_dir(SERVER_PACKAGES_DIR).unwrap(); // TODO Handle error
+        let files = fs::read_dir(SERVER_PACKAGES_DESC_DIR)?;
         for p in files {
-            let path = p.unwrap().path();
+            let path = p?.path();
 
-            // TODO Handle error
-            let file = File::open(path).unwrap();
+            let file = File::open(path)?;
             let reader = BufReader::new(file);
-            packages.push(serde_json::from_reader(reader).unwrap());
+            packages.push(serde_json::from_reader(reader)?);
         }
 
-        packages
+        Ok(packages)
     }
 
     /// Returns the package with name `name` and version `version`.
+    /// `server` tells whether the function runs on serverside.
     /// If the package doesn't exist, the function returns None.
-    pub fn get(_name: &String, _version: &Version) -> Option<Self> {
-        // TODO
-        None
+    pub fn get(name: &String, version: &Version, server: bool) -> io::Result<Option<Self>> {
+        if server {
+            let desc_path = SERVER_PACKAGES_DESC_DIR.to_owned() + "/" + name + "-"
+                + &version.to_string();
+
+            if let Ok(file) = File::open(desc_path) {
+                let reader = BufReader::new(file);
+                Ok(Some(serde_json::from_reader(reader)?))
+            } else {
+                Ok(None)
+            }
+        } else {
+            // TODO
+            Ok(None)
+        }
     }
 
     /// Returns the latest version of the package with name `name`.
@@ -231,11 +248,6 @@ impl Package {
         // TODO
     }
 
-    /// Builds the package.
-    pub fn build(&self) {
-        // TODO
-    }
-
     /// Installs the package. If the package is already installed, the function does nothing.
     pub fn install(&self) {
         if self.is_installed() {
@@ -243,5 +255,68 @@ impl Package {
         }
 
         // TODO
+    }
+}
+
+/// The package builder allows to build or install a package.
+pub struct PackageBuilder {
+    /// The path to the package.
+    path: String,
+
+    /// The path of the directory to create in which the package will be built.
+    build_path: String,
+}
+
+impl PackageBuilder {
+    /// Creates a new instance for the package at path `path`.
+    /// `build_path` is the path of a directory to create to build the package into.
+    pub fn new(path: String, build_path: String) -> Self {
+        Self {
+            path,
+
+            build_path,
+        }
+    }
+
+    /// Prepares the package for building.
+    pub fn prepare(&self) -> io::Result<()> {
+        let tar_gz = File::open(self.path.clone())?;
+        let tar = GzDecoder::new(tar_gz);
+        let mut archive = Archive::new(tar);
+        archive.unpack(self.build_path.clone())?;
+
+        // TODO Check integrity
+
+        // TODO Add isolation?
+
+        Ok(())
+    }
+
+    // TODO Function to get the package
+
+    /// Builds the package. This function assumes the build dependencies of the package are already
+    /// installed.
+    pub fn build(&mut self) {
+        let build_file = format!("{}/build", self.path);
+        let install_dir = format!("{}/install", self.path);
+
+        // TODO Create the install directory
+
+        // TODO
+        //Command::new(build_file)
+        //    .env("SYSROOT", "/") // TODO
+    }
+
+    /// Cleans the build directory.
+    pub fn clean(&self) -> io::Result<()> {
+        // TODO Remove the build directory
+
+        Ok(())
+    }
+}
+
+impl Drop for PackageBuilder {
+    fn drop(&mut self) {
+        let _ = self.clean();
     }
 }
