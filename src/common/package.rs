@@ -292,23 +292,23 @@ impl Package {
         })?
     }
 
-    /// Removes the package.
+    /// Upgrades the package.
     /// `sysroot` is the root of the system at which the package is to be removed.
-    pub fn update(&self, sysroot: String) -> io::Result<()> {
+    pub fn upgrade(&self, sysroot: String) -> io::Result<()> {
         // Uncompressing the package
         util::uncompress_wrap(&self.get_cache_path(), | tmp_dir | {
-            // Running the pre-update hook
-            let hook_path = format!("{}/pre-update-hook", tmp_dir);
+            // Running the pre-upgrade hook
+            let hook_path = format!("{}/pre-upgrade-hook", tmp_dir);
             if !util::run_hook(&hook_path, &sysroot)? {
-                return Err(io::Error::new(io::ErrorKind::Other, "Pre-update hook failed!"));
+                return Err(io::Error::new(io::ErrorKind::Other, "Pre-upgrade hook failed!"));
             }
 
             // TODO Patch files corresponding to the ones in inner data archive
 
-            // Running the post-update hook
-            let hook_path = format!("{}/post-update-hook", tmp_dir);
+            // Running the post-upgrade hook
+            let hook_path = format!("{}/post-upgrade-hook", tmp_dir);
             if !util::run_hook(&hook_path, &sysroot)? {
-                return Err(io::Error::new(io::ErrorKind::Other, "Post-update hook failed!"));
+                return Err(io::Error::new(io::ErrorKind::Other, "Post-upgrade hook failed!"));
             }
 
             Ok(())
@@ -321,7 +321,7 @@ impl Package {
         // Uncompressing the package
         util::uncompress_wrap(&self.get_cache_path(), | tmp_dir | {
             // Running the pre-remove hook
-            let hook_path = format!("{}/pre-update-hook", tmp_dir);
+            let hook_path = format!("{}/pre-remove-hook", tmp_dir);
             if !util::run_hook(&hook_path, &sysroot)? {
                 return Err(io::Error::new(io::ErrorKind::Other, "Pre-remove hook failed!"));
             }

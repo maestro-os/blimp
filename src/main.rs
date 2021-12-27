@@ -158,12 +158,31 @@ fn main_() -> bool {
         },
 
         "update" => {
-            // TODO
-            todo!();
+            if let Ok(remotes) = Remote::list() {
+                println!("Updating from remotes...");
+
+                // TODO async?
+                for r in remotes {
+                    let host = r.get_host();
+
+                    println!("Updating from {}...", host);
+
+                    match r.get_all() {
+                        Ok(packages) => {
+                            // TODO Save
+                        },
+
+                        Err(e) => eprintln!("{}", e),
+                    }
+                }
+            } else {
+                eprintln!("IO error");
+                return false;
+            }
         },
 
         "upgrade" => {
-            let packages = &args[2..];
+            let _packages = &args[2..];
 
             // TODO
             todo!();
@@ -186,21 +205,20 @@ fn main_() -> bool {
         },
 
         "remote-list" => {
-            let remotes = Remote::list();
-            if remotes.is_err() {
-                eprintln!("IO error :(");
-                return false;
-            }
-            let remotes = remotes.unwrap();
+            if let Ok(remotes) = Remote::list() {
+                println!("Remotes list:");
 
-            println!("Remotes list:");
-            for r in remotes {
-                let host = r.get_host();
+                for r in remotes {
+                    let host = r.get_host();
 
-                match r.get_motd() {
-                    Ok(m) => println!("- {} (status: UP): {}", host, m),
-                    Err(_) => println!("- {} (status: DOWN)", host),
+                    match r.get_motd() {
+                        Ok(m) => println!("- {} (status: UP): {}", host, m),
+                        Err(_) => println!("- {} (status: DOWN)", host),
+                    }
                 }
+            } else {
+                eprintln!("IO error");
+                return false;
             }
         },
 

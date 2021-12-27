@@ -15,6 +15,7 @@ use actix_web::{
 };
 use common::package::Package;
 use common::package;
+use common::request::PackageListResponse;
 use common::version::Version;
 use config::Config;
 use global_data::GlobalData;
@@ -44,10 +45,10 @@ async fn package_list(data: web::Data<Mutex<GlobalData>>) -> impl Responder {
 
     match packages {
         Ok(packages) => {
-            let json = json!({
-                "packages": packages,
-            });
-            HttpResponse::Ok().set(ContentType::json()).body(json.to_string())
+            let json = serde_json::to_string(&PackageListResponse {
+                packages: packages.to_vec(),
+            }).unwrap();
+            HttpResponse::Ok().set(ContentType::json()).body(&json)
         },
 
         Err(e) => {
