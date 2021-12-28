@@ -1,7 +1,6 @@
 //! A package is a software that can be installed using the package manager.
 //! Packages are usualy downloaded from a remote host.
 
-use crate::request::PackageSizeResponse;
 use crate::util;
 use crate::version::Version;
 use serde::Deserialize;
@@ -40,12 +39,6 @@ impl Dependency {
     /// Returns the version of the package.
     pub fn get_version(&self) -> &Version {
         &self.version
-    }
-
-    /// Returns the package corresponding to the dependency.
-    pub fn get_package(&self) -> Option<Package> {
-        // TODO
-        todo!();
     }
 }
 
@@ -123,13 +116,6 @@ impl Package {
         }
     }
 
-    /// Returns the latest version of the package with name `name`.
-    /// If the package doesn't exist, the function returns None.
-    pub fn get_latest(_name: &String) -> Option<Self> {
-        // TODO
-        None
-    }
-
     /// Returns the installed package with name `name`.
     /// If the package isn't installed, the function returns None.
     pub fn get_installed(_name: &String) -> Option<Self> {
@@ -183,17 +169,20 @@ impl Package {
     // TODO Move printing out of this function
     /// Resolves the dependencies of the package and inserts them into the given HashMap
     /// `packages`.
+    /// `f` is a function used to get a package from its name and version. If the package doesn't
+    /// exist, the function returns None.
     /// The function makes use of packages that are already in the HashMap and those which are
     /// already installed to determine if there is a dependency error.
     /// If an error occurs, the function returns `false`.
-    pub fn resolve_dependencies(&self, packages: &mut HashMap<String, Self>) -> bool {
+    pub fn resolve_dependencies<F>(&self, packages: &mut HashMap<String, Self>, f: &mut F) -> bool
+        where F: FnMut(String, Version) -> Option<Self> {
         // Tells whether dependencies are valid
         let mut valid = true;
 
         for d in &self.run_deps {
             // Getting the package. Either in the installation list or already installed
             let pkg = Self::get_installed(d.get_name()).or_else(|| {
-               Some(packages.get(d.get_name())?.clone())
+                Some(packages.get(d.get_name())?.clone())
             });
 
             // Checking for version conflict
@@ -209,8 +198,8 @@ impl Package {
             }
 
             // Resolving the package, then resolving its dependencies
-            if let Some(p) = d.get_package() {
-                p.resolve_dependencies(packages); // FIXME Possible stack overflow
+            if let Some(p) = f(d.get_name().clone(), d.get_version().clone()) {
+                p.resolve_dependencies(packages, f); // FIXME Possible stack overflow
                 packages.insert(p.get_name().clone(), p);
             } else {
                 eprintln!("Unresolved dependency `{}` version `{}`!",
@@ -232,37 +221,6 @@ impl Package {
         Path::new(&self.get_cache_path()).exists()
     }
 
-    /// Returns the download size of the package in bytes.
-    /// `host` is the host from which the package will be downloaded.
-    pub async fn get_size(&self, host: &str) -> Result<u64, String> {
-        let url = format!("http://{}/package/{}/version/{}/size", host, self.name, self.version);
-        let response = reqwest::get(url).await.or(Err("HTTP request failed"))?;
-        let content = response.text().await.or(Err("HTTP request failed"))?;
-
-        let json: PackageSizeResponse = serde_json::from_str(&content)
-            .or(Err("Failed to parse JSON response"))?;
-        Ok(json.size)
-    }
-
-    // TODO Do not keep the whole file in RAM before writting
-    /// Downloads the package. If the package is already in cache, the function does nothing.
-    /// `host` is the host from which the package will be downloaded.
-    pub async fn download(&self, host: &str) -> Result<(), String> {
-        if self.is_in_cache() {
-            return Ok(());
-        }
-
-        let url = format!("http://{}/package/{}/version/{}/archive",
-            host, self.name, self.version);
-        let response = reqwest::get(url).await.or(Err("HTTP request failed"))?;
-        let content = response.text().await.or(Err("HTTP request failed"))?;
-
-        let mut file = File::create(self.get_cache_path()).or(Err("Failed to create cache file"))?;
-        io::copy(&mut content.as_bytes(), &mut file).or(Err("IO error"))?;
-
-        Ok(())
-    }
-
     /// Installs the package. If the package is already installed, the function does nothing.
     /// `sysroot` is the root of the system at which the package is to be installed.
     /// The function assumes the running dependencies of the package are already installed.
@@ -274,8 +232,7 @@ impl Package {
         // Uncompressing the package
         util::uncompress_wrap(&self.get_cache_path(), | tmp_dir | {
             // Running the pre-install hook
-            let hook_path = format!("{}/pre-install-hook", tmp_dir);
-            if !util::run_hook(&hook_path, &sysroot)? {
+            if !util::run_hook(&format!("{}/pre-install-hook", tmp_dir), &sysroot)? {
                 return Err(io::Error::new(io::ErrorKind::Other, "Pre-install hook failed!"));
             }
 
@@ -283,8 +240,7 @@ impl Package {
             let data_path = format!("{}/data.tar.gz", tmp_dir);
             util::uncompress(&data_path, &sysroot)?;
 
-            let hook_path = format!("{}/post-install-hook", tmp_dir);
-            if !util::run_hook(&hook_path, &sysroot)? {
+            if !util::run_hook(&format!("{}/post-install-hook", tmp_dir), &sysroot)? {
                 return Err(io::Error::new(io::ErrorKind::Other, "Post-install hook failed!"));
             }
 
@@ -298,16 +254,14 @@ impl Package {
         // Uncompressing the package
         util::uncompress_wrap(&self.get_cache_path(), | tmp_dir | {
             // Running the pre-upgrade hook
-            let hook_path = format!("{}/pre-upgrade-hook", tmp_dir);
-            if !util::run_hook(&hook_path, &sysroot)? {
+            if !util::run_hook(&format!("{}/pre-upgrade-hook", tmp_dir), &sysroot)? {
                 return Err(io::Error::new(io::ErrorKind::Other, "Pre-upgrade hook failed!"));
             }
 
             // TODO Patch files corresponding to the ones in inner data archive
 
             // Running the post-upgrade hook
-            let hook_path = format!("{}/post-upgrade-hook", tmp_dir);
-            if !util::run_hook(&hook_path, &sysroot)? {
+            if !util::run_hook(&format!("{}/post-upgrade-hook", tmp_dir), &sysroot)? {
                 return Err(io::Error::new(io::ErrorKind::Other, "Post-upgrade hook failed!"));
             }
 
@@ -321,16 +275,14 @@ impl Package {
         // Uncompressing the package
         util::uncompress_wrap(&self.get_cache_path(), | tmp_dir | {
             // Running the pre-remove hook
-            let hook_path = format!("{}/pre-remove-hook", tmp_dir);
-            if !util::run_hook(&hook_path, &sysroot)? {
+            if !util::run_hook(&format!("{}/pre-remove-hook", tmp_dir), &sysroot)? {
                 return Err(io::Error::new(io::ErrorKind::Other, "Pre-remove hook failed!"));
             }
 
             // TODO Remove files corresponding to the ones in inner data archive
 
             // Running the post-remove hook
-            let hook_path = format!("{}/post-remove-hook", tmp_dir);
-            if !util::run_hook(&hook_path, &sysroot)? {
+            if !util::run_hook(&format!("{}/post-remove-hook", tmp_dir), &sysroot)? {
                 return Err(io::Error::new(io::ErrorKind::Other, "Post-remove hook failed!"));
             }
 

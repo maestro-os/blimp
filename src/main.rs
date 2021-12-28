@@ -1,12 +1,18 @@
+//! TODO doc
+
+#![feature(async_closure)]
+
 mod confirm;
 mod lockfile;
 mod remote;
 
 use common::package::Package;
+use common::version::Version;
 use remote::Remote;
 use std::collections::HashMap;
 use std::env;
 use std::process::exit;
+use tokio::runtime::Runtime;
 
 /// The software's current version.
 const VERSION: &str = "0.1";
@@ -41,6 +47,22 @@ specify a version");
 locally");
 }
 
+/// Downloads the package `package` from remote `remote`.
+async fn download_package(remote: &Remote, package: &Package) -> bool {
+    match remote.download(package).await {
+        Ok(_) => {
+            println!("Downloaded `{}`", package.get_name());
+            true
+        },
+
+        Err(e) => {
+            eprintln!("Failed to download `{}`: {}", package.get_name(), e);
+            false
+        },
+    }
+}
+
+// TODO Clean
 /// Installs the given list of packages.
 /// On success, the function returns `true`. On failure, it returns `false`.
 fn install(names: &[String]) -> bool {
@@ -49,11 +71,15 @@ fn install(names: &[String]) -> bool {
 
     // The list of packages to install
     let mut packages = HashMap::<String, Package>::new();
+    // The list of remotes for each packages
+    let mut remotes = HashMap::<String, Remote>::new();
 
     for p in names {
-        match Package::get_latest(&p.clone()) {
-            Some(package) => {
-                packages.insert(package.get_name().clone(), package);
+        match Remote::get_latest(&p.clone()).unwrap() { // TODO Handle error
+            Some((remote, package)) => {
+                let name = package.get_name().clone();
+                packages.insert(name.clone(), package);
+                remotes.insert(name, remote);
             },
 
             None => {
@@ -74,7 +100,20 @@ fn install(names: &[String]) -> bool {
 
     // Resolving dependencies
     for (_, package) in &packages {
-        if !package.resolve_dependencies(&mut total_packages) {
+        // Closure to get a package
+        let mut get_package = | name: String, version: Version | {
+            if let Ok(r) = Remote::get_package(&name, &version) {
+                let (remote, package) = r?;
+                remotes.insert(remote.get_host().to_string(), remote);
+
+                Some(package)
+            } else {
+                // TODO Print error
+                None
+            }
+        };
+
+        if !package.resolve_dependencies(&mut total_packages, &mut get_package) {
             valid = false;
         }
     }
@@ -83,15 +122,34 @@ fn install(names: &[String]) -> bool {
         return false;
     }
 
+    // Creating the async runtime
+    let rt = Runtime::new().unwrap();
+    let mut futures = Vec::new();
+
     println!("Packages to be installed:");
-    // The total download size in bytes
-    let mut total_size = 0;
     for (name, package) in &total_packages {
         println!("\t- {} ({})", name, package.get_version());
 
-        if package.is_in_cache() {
-            // TODO Run in async: total_size += package.get_size();
+        if !package.is_in_cache() {
+            let remote = &remotes[package.get_name()];
+            futures.push(remote.get_size(package));
         }
+    }
+
+    // The total download size in bytes
+    let mut total_size = 0;
+    for f in futures {
+        match rt.block_on(f) {
+            Ok(size) => total_size += size,
+            Err(e) => {
+                eprintln!("Failed to retrieve package size: {}", e);
+                valid = false;
+            },
+        }
+    }
+
+    if !valid {
+        return false;
     }
     println!("Download size: {} bytes", total_size); // TODO Format to be human readable
 
@@ -101,17 +159,31 @@ fn install(names: &[String]) -> bool {
     }
 
     println!("Downloading packages...");
-    // TODO Add progress bar
-    // TODO Download in async
+    let mut futures = Vec::new();
+
     for (name, package) in &total_packages {
         if !package.is_in_cache() {
-            // TODO Run in async: package.download();
+            let remote = &remotes[package.get_name()];
+            futures.push(download_package(remote, package));
         } else {
             println!("`{}` is in cache.", name);
         }
     }
 
-    true
+    // TODO Add progress bar
+    for f in futures {
+        if !rt.block_on(f) {
+            valid = false;
+        }
+    }
+
+    if !valid {
+        return false;
+    }
+
+    // TODO Install packages
+
+    valid
 }
 
 // TODO Parse options
@@ -167,11 +239,8 @@ fn main_() -> bool {
 
                     println!("Updating from {}...", host);
 
-                    match r.get_all() {
-                        Ok(packages) => {
-                            // TODO Save
-                        },
-
+                    match r.fetch_all(true) {
+                        Ok(packages) => println!("Found {} package(s).", packages.len()),
                         Err(e) => eprintln!("{}", e),
                     }
                 }

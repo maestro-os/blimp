@@ -52,7 +52,13 @@ pub fn uncompress_wrap<T, F: FnOnce(&str) -> T>(archive: &str, f: F) -> io::Resu
 /// Run the hook at the given path.
 /// `sysroot` is the sysroot.
 /// If the hook succeeded, the function returns `true`. If it didn't, it returns `false`.
+/// If the hook doesn't exist, the function does nothing and returns successfully.
 pub fn run_hook(hook_path: &str, sysroot: &str) -> io::Result<bool> {
+    if !Path::new(hook_path).exists() {
+        return Ok(true);
+    }
+
+    // Runs the hook
     let status = Command::new(hook_path)
         .env("SYSROOT", sysroot)
         .status()?;

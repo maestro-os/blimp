@@ -1,6 +1,7 @@
 //! This module implements a confirmation prompt.
 
 use std::io::BufRead;
+use std::io::Write;
 use std::io;
 
 /// Asks for confirmation. If yes, true is returned. Else, false is returned.
@@ -15,6 +16,8 @@ pub fn prompt() -> bool {
         } else {
             print!("Please type `y` or `n`. ");
         }
+
+        let _ = io::stdout().flush();
 
         // Waiting for an input line
         let input = stdin.lock().lines().next().unwrap().unwrap();

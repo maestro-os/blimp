@@ -16,10 +16,12 @@ use actix_web::{
 use common::package::Package;
 use common::package;
 use common::request::PackageListResponse;
+use common::request::PackageSizeResponse;
 use common::version::Version;
 use config::Config;
 use global_data::GlobalData;
 use serde_json::json;
+use std::fs::File;
 use std::sync::Mutex;
 
 /// The server's version.
@@ -83,6 +85,37 @@ async fn package_info(req: HttpRequest) -> impl Responder {
     }
 }
 
+#[get("/package/{name}/version/{version}/size")]
+async fn package_size(req: HttpRequest) -> impl Responder {
+    let name = req.match_info().get("name").unwrap();
+    let version = Version::from_string(req.match_info().get("version").unwrap()).unwrap(); // TODO Handle error
+
+    // Getting package
+    let package = Package::get(&name.to_owned(), &version, true).unwrap(); // TODO Handle error
+
+    match package {
+        Some(_) => {
+            let archive_path = format!("{}/{}-{}", package::SERVER_PACKAGES_DIR, name, version);
+            let file = File::open(archive_path).unwrap(); // TODO Handle error
+            let size = file.metadata().unwrap().len(); // TODO Handle error
+
+            let size = PackageSizeResponse {
+                size,
+            };
+
+            let json: String = serde_json::to_string(&size).unwrap(); // TODO Handle error
+            HttpResponse::Ok().set(ContentType::json()).body(json)
+        },
+
+        None => {
+            let json = json!({
+                "error": format!("Package `{}` with version `{}` not found", name, version),
+            });
+            HttpResponse::NotFound().set(ContentType::json()).body(json)
+        },
+    }
+}
+
 #[get("/package/{name}/version/{version}/archive")]
 async fn package_archive(req: HttpRequest) -> impl Responder {
     let name = req.match_info().get("name").unwrap();
@@ -117,6 +150,7 @@ async fn main() -> std::io::Result<()> {
             .service(motd)
             .service(package_list)
             .service(package_info)
+            .service(package_size)
             .service(package_archive)
     })
     .bind(format!("127.0.0.1:{}", port))?
