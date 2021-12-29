@@ -1,6 +1,7 @@
 //! A package is a software that can be installed using the package manager.
 //! Packages are usualy downloaded from a remote host.
 
+use crate::request::PackageListResponse;
 use crate::util;
 use crate::version::Version;
 use serde::Deserialize;
@@ -15,6 +16,8 @@ use std::path::Path;
 
 /// The directory containing cached packages.
 const CACHE_DIR: &str = "/usr/lib/blimp/cache";
+/// The path to the file storing the list of installed packages.
+const INSTALLED_FILE: &str = "/usr/lib/blimp/installed";
 
 /// The directory storing packages' descriptions on the serverside.
 pub const SERVER_PACKAGES_DESC_DIR: &str = "public_desc";
@@ -98,29 +101,36 @@ impl Package {
 
     /// Returns the package with name `name` and version `version` on serverside.
     /// If the package doesn't exist, the function returns None.
-    pub fn get(name: &String, version: &Version) -> io::Result<Option<Self>> {
-        let desc_path = SERVER_PACKAGES_DESC_DIR.to_owned() + "/" + name + "-"
-            + &version.to_string();
+    pub fn get(name: &str, version: &Version) -> io::Result<Option<Self>> {
+        let desc_path = format!("{}/{}-{}", SERVER_PACKAGES_DESC_DIR, name, &version);
 
         if let Ok(file) = File::open(desc_path) {
             let reader = BufReader::new(file);
-            Ok(Some(serde_json::from_reader(reader)?))
+            let package: Self = serde_json::from_reader(reader)?;
+
+            Ok(Some(package))
         } else {
             Ok(None)
         }
     }
 
     /// Returns the installed package with name `name`.
+    /// `sysroot` is the path to the system's root.
     /// If the package isn't installed, the function returns None.
-    pub fn get_installed(_name: &String) -> Option<Self> {
-        // TODO
-        todo!();
-    }
+    pub fn get_installed(sysroot: &str, name: &str) -> io::Result<Option<Self>> {
+        let path = format!("{}/{}", sysroot, INSTALLED_FILE);
 
-    /// Returns the latest version for the current package.
-    pub fn get_latest_version(&self) -> Version {
-        // TODO
-        todo!();
+        let file = File::open(path)?;
+        let reader = BufReader::new(file);
+        let json: PackageListResponse = serde_json::from_reader(reader)?;
+
+        for p in json.packages {
+            if p.get_name() == name {
+                return Ok(Some(p));
+            }
+        }
+
+        Ok(None)
     }
 
     /// Returns the name of the package.
@@ -139,10 +149,17 @@ impl Package {
         todo!();
     }
 
-    /// Tells whether the package is installed on the system.
-    pub fn is_installed(&self) -> bool {
+    /// Returns the latest version available for the current package.
+    pub fn get_latest_version(&self) -> Version {
         // TODO
         todo!();
+    }
+
+    /// Tells whether the package is installed on the system.
+    /// `sysroot` is the path to the system's root.
+    /// This function doesn't check if the version of the package is the same.
+    pub fn is_installed(&self, sysroot: &str) -> bool {
+        Self::get_installed(sysroot, &self.name).unwrap_or(None).is_some()
     }
 
     /// Tells whether the package is up to date.
@@ -163,19 +180,20 @@ impl Package {
     // TODO Move printing out of this function
     /// Resolves the dependencies of the package and inserts them into the given HashMap
     /// `packages`.
+    /// `sysroot` is the path to the system's root.
     /// `f` is a function used to get a package from its name and version. If the package doesn't
     /// exist, the function returns None.
     /// The function makes use of packages that are already in the HashMap and those which are
     /// already installed to determine if there is a dependency error.
     /// If an error occurs, the function returns `false`.
-    pub fn resolve_dependencies<F>(&self, packages: &mut HashMap<String, Self>, f: &mut F) -> bool
-        where F: FnMut(String, Version) -> Option<Self> {
+    pub fn resolve_dependencies<F>(&self, sysroot: &str, packages: &mut HashMap<String, Self>,
+        f: &mut F) -> io::Result<bool> where F: FnMut(String, Version) -> Option<Self> {
         // Tells whether dependencies are valid
         let mut valid = true;
 
         for d in &self.run_deps {
             // Getting the package. Either in the installation list or already installed
-            let pkg = Self::get_installed(d.get_name()).or_else(|| {
+            let pkg = Self::get_installed(sysroot, d.get_name())?.or_else(|| {
                 Some(packages.get(d.get_name())?.clone())
             });
 
@@ -193,7 +211,7 @@ impl Package {
 
             // Resolving the package, then resolving its dependencies
             if let Some(p) = f(d.get_name().clone(), d.get_version().clone()) {
-                p.resolve_dependencies(packages, f); // FIXME Possible stack overflow
+                p.resolve_dependencies(sysroot, packages, f)?; // FIXME Possible stack overflow
                 packages.insert(p.get_name().clone(), p);
             } else {
                 eprintln!("Unresolved dependency `{}` version `{}`!",
@@ -202,7 +220,7 @@ impl Package {
             }
         }
 
-        valid
+        Ok(valid)
     }
 
     /// Returns the path to the cache file for this package.
@@ -221,7 +239,7 @@ impl Package {
     /// `sysroot` is the path to the system's root.
     /// The function assumes the running dependencies of the package are already installed.
     pub fn install(&self, sysroot: &str) -> io::Result<()> {
-        if self.is_installed() {
+        if self.is_installed(sysroot) {
             return Ok(());
         }
 
@@ -241,7 +259,11 @@ impl Package {
             }
 
             Ok(())
-        })?
+        })??;
+
+        // TODO Add to install list
+
+        Ok(())
     }
 
     /// Upgrades the package.
@@ -262,7 +284,11 @@ impl Package {
             }
 
             Ok(())
-        })?
+        })??;
+
+        // TODO Update in install list
+
+        Ok(())
     }
 
     /// Removes the package.
@@ -283,6 +309,10 @@ impl Package {
             }
 
             Ok(())
-        })?
+        })??;
+
+        // TODO Remove from install list
+
+        Ok(())
     }
 }

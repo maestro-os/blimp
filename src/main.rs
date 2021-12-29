@@ -68,9 +68,8 @@ async fn download_package(sysroot: &str, remote: &Remote, package: &Package) -> 
 /// Installs the given list of packages.
 /// `sysroot` is the path to the root of the system on which the packages will be installed.
 /// On success, the function returns `true`. On failure, it returns `false`.
-fn install(names: &[String], sysroot: &str) -> bool {
-    // Changed to `false` if a problem is found
-    let mut valid = true;
+fn install(names: &[String], sysroot: &str) -> Result<(), ()> {
+    let mut err: Result<(), ()> = Ok(());
 
     // The list of packages to install
     let mut packages = HashMap::<String, Package>::new();
@@ -78,12 +77,10 @@ fn install(names: &[String], sysroot: &str) -> bool {
     let mut remotes = HashMap::<String, Remote>::new();
 
     for p in names {
-        let r = Remote::get_latest(sysroot, &p.clone());
-        if let Err(e) = r {
-            println!("IO error: {}", e);
-            return false;
-        }
-        let r = r.unwrap();
+        let r = Remote::get_latest(sysroot, &p.clone()).or_else(| e | {
+            eprintln!("IO error: {}", e);
+            Err(())
+        })?;
 
         match r {
             Some((remote, package)) => {
@@ -94,14 +91,12 @@ fn install(names: &[String], sysroot: &str) -> bool {
 
             None => {
                 eprintln!("Package `{}` not found!", p);
-                valid = false;
+                err = Err(());
             },
         }
     }
 
-    if !valid {
-        return false;
-    }
+    err?;
 
     println!("Resolving dependencies...");
 
@@ -112,25 +107,28 @@ fn install(names: &[String], sysroot: &str) -> bool {
     for (_, package) in &packages {
         // Closure to get a package
         let mut get_package = | name: String, version: Version | {
-            if let Ok(r) = Remote::get_package(sysroot, &name, &version) {
-                let (remote, package) = r?;
-                remotes.insert(remote.get_host().to_string(), remote);
+            let r = Remote::get_package(sysroot, &name, &version).or_else(| e | {
+                eprintln!("IO error: {}", e);
+                Err(())
+            }).ok()?;
+            let (remote, package) = r?;
+            remotes.insert(remote.get_host().to_string(), remote);
 
-                Some(package)
-            } else {
-                // TODO Print error
-                None
-            }
+            Some(package)
         };
 
-        if !package.resolve_dependencies(&mut total_packages, &mut get_package) {
-            valid = false;
+        let valid = package.resolve_dependencies(sysroot, &mut total_packages, &mut get_package)
+            .or_else(| e | {
+                eprintln!("IO error: {}", e);
+                Err(())
+            })?;
+
+        if !valid {
+            err = Err(());
         }
     }
 
-    if !valid {
-        return false;
-    }
+    err?;
 
     // Creating the async runtime
     let rt = Runtime::new().unwrap();
@@ -153,25 +151,22 @@ fn install(names: &[String], sysroot: &str) -> bool {
     // The total download size in bytes
     let mut total_size = 0;
     for f in futures {
-        match rt.block_on(f) {
-            Ok(size) => total_size += size,
-            Err(e) => {
-                eprintln!("Failed to retrieve package size: {}", e);
-                valid = false;
-            },
-        }
-    }
+        let size = rt.block_on(f).or_else(| e | {
+            eprintln!("Failed to retrieve package size: {}", e);
+            Err(())
+        })?;
 
-    if !valid {
-        return false;
+        total_size += size;
     }
+    err?;
+
     print!("Download size: ");
     util::print_size(total_size);
     println!();
 
     if !confirm::prompt() {
         println!("Aborting.");
-        return false;
+        return Err(());
     }
 
     println!("Downloading packages...");
@@ -189,13 +184,11 @@ fn install(names: &[String], sysroot: &str) -> bool {
     // TODO Add progress bar
     for f in futures {
         if !rt.block_on(f) {
-            valid = false;
+            err = Err(());
         }
     }
 
-    if !valid {
-        return false;
-    }
+    err?;
     println!();
 
     println!("Installing packages...");
@@ -206,13 +199,13 @@ fn install(names: &[String], sysroot: &str) -> bool {
 
         if let Err(e) = package.install(sysroot) {
             eprintln!("Failed to install `{}`: {}", name, e);
-            valid = false;
+            err = Err(());
         }
     }
 
     println!();
 
-    valid
+    err
 }
 
 /// Updates the packages list.
@@ -307,7 +300,7 @@ fn main_(sysroot: &str) -> bool {
                 return false;
             }
 
-            install(names, &sysroot)
+            install(names, &sysroot).is_ok()
         },
 
         "update" => update(sysroot),
