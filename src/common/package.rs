@@ -96,22 +96,16 @@ impl Package {
         Ok(packages)
     }
 
-    /// Returns the package with name `name` and version `version`.
-    /// `server` tells whether the function runs on serverside.
+    /// Returns the package with name `name` and version `version` on serverside.
     /// If the package doesn't exist, the function returns None.
-    pub fn get(name: &String, version: &Version, server: bool) -> io::Result<Option<Self>> {
-        if server {
-            let desc_path = SERVER_PACKAGES_DESC_DIR.to_owned() + "/" + name + "-"
-                + &version.to_string();
+    pub fn get(name: &String, version: &Version) -> io::Result<Option<Self>> {
+        let desc_path = SERVER_PACKAGES_DESC_DIR.to_owned() + "/" + name + "-"
+            + &version.to_string();
 
-            if let Ok(file) = File::open(desc_path) {
-                let reader = BufReader::new(file);
-                Ok(Some(serde_json::from_reader(reader)?))
-            } else {
-                Ok(None)
-            }
+        if let Ok(file) = File::open(desc_path) {
+            let reader = BufReader::new(file);
+            Ok(Some(serde_json::from_reader(reader)?))
         } else {
-            // TODO
             Ok(None)
         }
     }
@@ -120,7 +114,7 @@ impl Package {
     /// If the package isn't installed, the function returns None.
     pub fn get_installed(_name: &String) -> Option<Self> {
         // TODO
-        None
+        todo!();
     }
 
     /// Returns the latest version for the current package.
@@ -212,25 +206,27 @@ impl Package {
     }
 
     /// Returns the path to the cache file for this package.
-    pub fn get_cache_path(&self) -> String {
-        format!("{}/{}-{}", CACHE_DIR, self.name, self.version)
+    /// `sysroot` is the path to the system's root.
+    pub fn get_cache_path(&self, sysroot: &str) -> String {
+        format!("{}/{}/{}-{}", sysroot, CACHE_DIR, self.name, self.version)
     }
 
     /// Tells whether the package is in cache.
-    pub fn is_in_cache(&self) -> bool {
-        Path::new(&self.get_cache_path()).exists()
+    /// `sysroot` is the path to the system's root.
+    pub fn is_in_cache(&self, sysroot: &str) -> bool {
+        Path::new(&self.get_cache_path(sysroot)).exists()
     }
 
     /// Installs the package. If the package is already installed, the function does nothing.
-    /// `sysroot` is the root of the system at which the package is to be installed.
+    /// `sysroot` is the path to the system's root.
     /// The function assumes the running dependencies of the package are already installed.
-    pub fn install(&self, sysroot: String) -> io::Result<()> {
+    pub fn install(&self, sysroot: &str) -> io::Result<()> {
         if self.is_installed() {
             return Ok(());
         }
 
         // Uncompressing the package
-        util::uncompress_wrap(&self.get_cache_path(), | tmp_dir | {
+        util::uncompress_wrap(&self.get_cache_path(sysroot), | tmp_dir | {
             // Running the pre-install hook
             if !util::run_hook(&format!("{}/pre-install-hook", tmp_dir), &sysroot)? {
                 return Err(io::Error::new(io::ErrorKind::Other, "Pre-install hook failed!"));
@@ -249,10 +245,10 @@ impl Package {
     }
 
     /// Upgrades the package.
-    /// `sysroot` is the root of the system at which the package is to be removed.
-    pub fn upgrade(&self, sysroot: String) -> io::Result<()> {
+    /// `sysroot` is the path to the system's root.
+    pub fn upgrade(&self, sysroot: &str) -> io::Result<()> {
         // Uncompressing the package
-        util::uncompress_wrap(&self.get_cache_path(), | tmp_dir | {
+        util::uncompress_wrap(&self.get_cache_path(sysroot), | tmp_dir | {
             // Running the pre-upgrade hook
             if !util::run_hook(&format!("{}/pre-upgrade-hook", tmp_dir), &sysroot)? {
                 return Err(io::Error::new(io::ErrorKind::Other, "Pre-upgrade hook failed!"));
@@ -270,10 +266,10 @@ impl Package {
     }
 
     /// Removes the package.
-    /// `sysroot` is the root of the system at which the package is to be removed.
-    pub fn remove(&self, sysroot: String) -> io::Result<()> {
+    /// `sysroot` is the path to the system's root.
+    pub fn remove(&self, sysroot: &str) -> io::Result<()> {
         // Uncompressing the package
-        util::uncompress_wrap(&self.get_cache_path(), | tmp_dir | {
+        util::uncompress_wrap(&self.get_cache_path(sysroot), | tmp_dir | {
             // Running the pre-remove hook
             if !util::run_hook(&format!("{}/pre-remove-hook", tmp_dir), &sysroot)? {
                 return Err(io::Error::new(io::ErrorKind::Other, "Pre-remove hook failed!"));

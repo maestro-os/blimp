@@ -9,13 +9,16 @@ const LOCKFILE_PATH: &str = "/usr/lib/blimp/.lock";
 
 /// Creates the lock file if not present. If the file was successfuly created, the function returns
 /// `true`. Else, it returns `false`.
-pub fn lock() -> bool {
+pub fn lock(sysroot: &str) -> bool {
+    let path = format!("{}/{}", sysroot, LOCKFILE_PATH);
+
     // Trying to create the file and failing if it already exist, allowing to avoid TOCTOU race
     // conditions
-    OpenOptions::new().write(true).create_new(true).open(LOCKFILE_PATH).is_ok()
+    OpenOptions::new().write(true).create_new(true).open(path).is_ok()
 }
 
 /// Removes the lock file.
-pub fn unlock() {
-    let _ = fs::remove_file(LOCKFILE_PATH);
+pub fn unlock(sysroot: &str) {
+    let path = format!("{}/{}", sysroot, LOCKFILE_PATH);
+    let _ = fs::remove_file(path);
 }

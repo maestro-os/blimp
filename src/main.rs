@@ -1,4 +1,4 @@
-//! TODO doc
+//! Blimp is a simple package manager for Unix systems.
 
 #![feature(async_closure)]
 
@@ -7,6 +7,7 @@ mod lockfile;
 mod remote;
 
 use common::package::Package;
+use common::util;
 use common::version::Version;
 use remote::Remote;
 use std::collections::HashMap;
@@ -48,8 +49,9 @@ locally");
 }
 
 /// Downloads the package `package` from remote `remote`.
-async fn download_package(remote: &Remote, package: &Package) -> bool {
-    match remote.download(package).await {
+/// `sysroot` is the path to the system's root.
+async fn download_package(sysroot: &str, remote: &Remote, package: &Package) -> bool {
+    match remote.download(sysroot, package).await {
         Ok(_) => {
             println!("Downloaded `{}`", package.get_name());
             true
@@ -64,8 +66,9 @@ async fn download_package(remote: &Remote, package: &Package) -> bool {
 
 // TODO Clean
 /// Installs the given list of packages.
+/// `sysroot` is the path to the root of the system on which the packages will be installed.
 /// On success, the function returns `true`. On failure, it returns `false`.
-fn install(names: &[String]) -> bool {
+fn install(names: &[String], sysroot: &str) -> bool {
     // Changed to `false` if a problem is found
     let mut valid = true;
 
@@ -75,7 +78,14 @@ fn install(names: &[String]) -> bool {
     let mut remotes = HashMap::<String, Remote>::new();
 
     for p in names {
-        match Remote::get_latest(&p.clone()).unwrap() { // TODO Handle error
+        let r = Remote::get_latest(sysroot, &p.clone());
+        if let Err(e) = r {
+            println!("IO error: {}", e);
+            return false;
+        }
+        let r = r.unwrap();
+
+        match r {
             Some((remote, package)) => {
                 let name = package.get_name().clone();
                 packages.insert(name.clone(), package);
@@ -102,7 +112,7 @@ fn install(names: &[String]) -> bool {
     for (_, package) in &packages {
         // Closure to get a package
         let mut get_package = | name: String, version: Version | {
-            if let Ok(r) = Remote::get_package(&name, &version) {
+            if let Ok(r) = Remote::get_package(sysroot, &name, &version) {
                 let (remote, package) = r?;
                 remotes.insert(remote.get_host().to_string(), remote);
 
@@ -128,9 +138,13 @@ fn install(names: &[String]) -> bool {
 
     println!("Packages to be installed:");
     for (name, package) in &total_packages {
-        println!("\t- {} ({})", name, package.get_version());
+        if package.is_in_cache(sysroot) {
+            println!("\t- {} ({}) - cached", name, package.get_version());
+        } else {
+            println!("\t- {} ({})", name, package.get_version());
+        }
 
-        if !package.is_in_cache() {
+        if !package.is_in_cache(sysroot) {
             let remote = &remotes[package.get_name()];
             futures.push(remote.get_size(package));
         }
@@ -151,7 +165,9 @@ fn install(names: &[String]) -> bool {
     if !valid {
         return false;
     }
-    println!("Download size: {} bytes", total_size); // TODO Format to be human readable
+    print!("Download size: ");
+    util::print_size(total_size);
+    println!();
 
     if !confirm::prompt() {
         println!("Aborting.");
@@ -162,9 +178,9 @@ fn install(names: &[String]) -> bool {
     let mut futures = Vec::new();
 
     for (name, package) in &total_packages {
-        if !package.is_in_cache() {
+        if !package.is_in_cache(sysroot) {
             let remote = &remotes[package.get_name()];
-            futures.push(download_package(remote, package));
+            futures.push(download_package(sysroot, remote, package));
         } else {
             println!("`{}` is in cache.", name);
         }
@@ -180,14 +196,81 @@ fn install(names: &[String]) -> bool {
     if !valid {
         return false;
     }
+    println!();
 
-    // TODO Install packages
+    println!("Installing packages...");
+
+    // Installing all packages
+    for (name, package) in total_packages {
+        println!("Installing `{}`...", name);
+
+        if let Err(e) = package.install(sysroot) {
+            eprintln!("Failed to install `{}`: {}", name, e);
+            valid = false;
+        }
+    }
+
+    println!();
 
     valid
 }
 
+/// Updates the packages list.
+/// `sysroot` is the path to the root of the system.
+fn update(sysroot: &str) -> bool {
+    match Remote::list(sysroot) {
+        Ok(remotes) => {
+            println!("Updating from remotes...");
+
+            // TODO async?
+            for r in remotes {
+                let host = r.get_host();
+
+                println!("Updating from {}...", host);
+
+                match r.fetch_all(true, &sysroot) {
+                    Ok(packages) => println!("Found {} package(s).", packages.len()),
+                    Err(e) => eprintln!("{}", e),
+                }
+            }
+
+            true
+        },
+
+        Err(e) => {
+            eprintln!("IO error: {}", e);
+            false
+        },
+    }
+}
+
+/// Lists remotes.
+/// `sysroot` is the path to the root of the system.
+fn remote_list(sysroot: &str) -> bool {
+    match Remote::list(sysroot) {
+        Ok(remotes) => {
+            println!("Remotes list:");
+
+            for r in remotes {
+                let host = r.get_host();
+
+                match r.get_motd() {
+                    Ok(m) => println!("- {} (status: UP): {}", host, m),
+                    Err(_) => println!("- {} (status: DOWN)", host),
+                }
+            }
+
+            true
+        },
+        Err(e) => {
+            eprintln!("IO error: {}", e);
+            false
+        },
+    }
+}
+
 // TODO Parse options
-fn main_() -> bool {
+fn main_(sysroot: &str) -> bool {
     let args: Vec<String> = env::args().collect();
     // The name of the binary file
     let bin = {
@@ -224,31 +307,10 @@ fn main_() -> bool {
                 return false;
             }
 
-            if !install(names) {
-                return false;
-            }
+            install(names, &sysroot)
         },
 
-        "update" => {
-            if let Ok(remotes) = Remote::list() {
-                println!("Updating from remotes...");
-
-                // TODO async?
-                for r in remotes {
-                    let host = r.get_host();
-
-                    println!("Updating from {}...", host);
-
-                    match r.fetch_all(true) {
-                        Ok(packages) => println!("Found {} package(s).", packages.len()),
-                        Err(e) => eprintln!("{}", e),
-                    }
-                }
-            } else {
-                eprintln!("IO error");
-                return false;
-            }
-        },
+        "update" => update(sysroot),
 
         "upgrade" => {
             let _packages = &args[2..];
@@ -273,23 +335,7 @@ fn main_() -> bool {
             todo!();
         },
 
-        "remote-list" => {
-            if let Ok(remotes) = Remote::list() {
-                println!("Remotes list:");
-
-                for r in remotes {
-                    let host = r.get_host();
-
-                    match r.get_motd() {
-                        Ok(m) => println!("- {} (status: UP): {}", host, m),
-                        Err(_) => println!("- {} (status: DOWN)", host),
-                    }
-                }
-            } else {
-                eprintln!("IO error");
-                return false;
-            }
-        },
+        "remote-list" => remote_list(sysroot),
 
         "remote-add" => {
             // TODO
@@ -305,23 +351,25 @@ fn main_() -> bool {
             eprintln!("Command `{}` doesn't exist", args[1]);
             eprintln!();
             print_usage(&bin);
-            return false;
+
+            false
         },
     }
-
-    true
 }
 
 fn main() {
+    // Getting the sysroot
+    let sysroot = env::var("SYSROOT").unwrap_or("/".to_string());
+
     // Creating a lock file if possible
-    if !lockfile::lock() {
+    if !lockfile::lock(&sysroot) {
         eprintln!("Error: failed to acquire lockfile");
         exit(1);
     }
 
-    let success = main_();
+    let success = main_(&sysroot);
 
-    lockfile::unlock();
+    lockfile::unlock(&sysroot);
 
     if !success {
         exit(1);

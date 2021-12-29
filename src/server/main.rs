@@ -68,7 +68,7 @@ async fn package_info(req: HttpRequest) -> impl Responder {
     let version = Version::from_string(req.match_info().get("version").unwrap()).unwrap(); // TODO Handle error
 
     // Getting package
-    let package = Package::get(&name.to_owned(), &version, true).unwrap(); // TODO Handle error
+    let package = Package::get(&name.to_owned(), &version).unwrap(); // TODO Handle error
 
     match package {
         Some(p) => {
@@ -91,7 +91,7 @@ async fn package_size(req: HttpRequest) -> impl Responder {
     let version = Version::from_string(req.match_info().get("version").unwrap()).unwrap(); // TODO Handle error
 
     // Getting package
-    let package = Package::get(&name.to_owned(), &version, true).unwrap(); // TODO Handle error
+    let package = Package::get(&name.to_owned(), &version).unwrap(); // TODO Handle error
 
     match package {
         Some(_) => {

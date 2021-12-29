@@ -69,3 +69,26 @@ pub fn run_hook(hook_path: &str, sysroot: &str) -> io::Result<bool> {
         Ok(false)
     }
 }
+
+/// Prints the given size in bytes into a human-readable form.
+pub fn print_size(mut size: u64) {
+    let mut level = 0;
+    while level < 6 && size > 1024 {
+        size /= 1024;
+        level += 1;
+    }
+
+    let suffix = match level {
+        0 => " bytes",
+        1 => " KiB",
+        2 => " MiB",
+        3 => " GiB",
+        4 => " TiB",
+        5 => " PiB",
+        6 => " EiB",
+
+        _ => return,
+    };
+
+    print!("{}{}", size, suffix);
+}

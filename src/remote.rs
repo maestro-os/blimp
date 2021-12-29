@@ -32,10 +32,12 @@ impl Remote {
     }
 
     /// Returns the list of remote hosts.
-    pub fn list() -> io::Result<Vec<Self>> {
+    /// `sysroot` is the path to the system's root.
+    pub fn list(sysroot: &str) -> io::Result<Vec<Self>> {
         let mut v = Vec::new();
 
-        let file = File::open(REMOTES_FILE)?;
+        let path = format!("{}/{}", sysroot, REMOTES_FILE);
+        let file = File::open(path)?;
         let reader = BufReader::new(file);
 
         for l in reader.lines() {
@@ -51,8 +53,9 @@ impl Remote {
     }
 
     /// Returns the path to the remote's package database.
-    pub fn get_database_path(&self) -> String {
-        format!("{}/{}", DATABASE_PATH, self.get_host())
+    /// `sysroot` is the path to the system's root.
+    pub fn get_database_path(&self, sysroot: &str) -> String {
+        format!("{}/{}/{}", sysroot, DATABASE_PATH, self.get_host())
     }
 
     /// Returns the remote's motd.
@@ -74,7 +77,8 @@ impl Remote {
     /// Fetches the list of all the packages from the remote.
     /// `save` tells whether the result of the request must be saved in the database if the request
     /// succeeded.
-    pub fn fetch_all(&self, save: bool) -> Result<Vec<Package>, String> {
+    /// `sysroot` is the path to the system's root.
+    pub fn fetch_all(&self, save: bool, sysroot: &str) -> Result<Vec<Package>, String> {
         let url = format!("http://{}/package", &self.host);
         let response = reqwest::blocking::get(url).or(Err("HTTP request failed"))?;
         let status = response.status();
@@ -86,7 +90,7 @@ impl Remote {
                     .or(Err("Failed to parse JSON response"))?;
 
                 if save {
-                    let file = File::create(self.get_database_path()).or(Err("TODO"))?; // TODO
+                    let file = File::create(self.get_database_path(sysroot)).or(Err("TODO"))?; // TODO
                     let writer = BufWriter::new(file);
                     serde_json::to_writer_pretty(writer, &json).or(Err("TODO"))?; // TODO
                 }
@@ -100,10 +104,12 @@ impl Remote {
 
     /// Returns the package with the given name `name` and version `version`.
     /// If the package doesn't exist on the remote, the function returns None.
-    pub fn get_package(name: &str, version: &Version) -> io::Result<Option<(Self, Package)>> {
+    /// `sysroot` is the path to the system's root.
+    pub fn get_package(sysroot: &str, name: &str, version: &Version)
+        -> io::Result<Option<(Self, Package)>> {
         // Iterating over remotes
-        for r in Remote::list()? {
-            let file = File::open(r.get_database_path())?;
+        for r in Remote::list(sysroot)? {
+            let file = File::open(r.get_database_path(sysroot))?;
             let reader = BufReader::new(file);
 
             let json: PackageListResponse = serde_json::from_reader(reader)?;
@@ -121,10 +127,11 @@ impl Remote {
 
     /// Returns the latest version of the package with name `name`.
     /// If the package doesn't exist, the function returns None.
-    pub fn get_latest(name: &String) -> io::Result<Option<(Self, Package)>> {
+    /// `sysroot` is the path to the system's root.
+    pub fn get_latest(sysroot: &str, name: &String) -> io::Result<Option<(Self, Package)>> {
         // Iterating over remotes
-        for r in Remote::list()? {
-            let file = File::open(r.get_database_path())?;
+        for r in Remote::list(sysroot)? {
+            let file = File::open(r.get_database_path(sysroot))?;
             let reader = BufReader::new(file);
 
             let json: PackageListResponse = serde_json::from_reader(reader)?;
@@ -155,13 +162,14 @@ impl Remote {
 
     // TODO Do not keep the whole file in RAM before writting
     /// Downloads the package `package` and writes it in cache.
-    pub async fn download(&self, package: &Package) -> Result<(), String> {
+    /// `sysroot` is the path to the system's root.
+    pub async fn download(&self, sysroot: &str, package: &Package) -> Result<(), String> {
         let url = format!("http://{}/package/{}/version/{}/archive",
             self.host, package.get_name(), package.get_version());
         let response = reqwest::get(url).await.or(Err("HTTP request failed"))?;
         let content = response.bytes().await.or(Err("HTTP request failed"))?;
 
-        let mut file = File::create(package.get_cache_path())
+        let mut file = File::create(package.get_cache_path(sysroot))
             .or(Err("Failed to create cache file"))?;
         file.write(&content).or(Err("IO error"))?;
 
