@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::fs;
 use std::io::BufReader;
+use std::io::Write;
 use std::io;
 use std::path::Path;
 
@@ -131,6 +132,51 @@ impl Package {
         }
 
         Ok(None)
+    }
+
+    /// Inserts the current package in the list of installed packages.
+    pub fn insert_installed(&self, sysroot: &str) -> io::Result<()> {
+        let path = format!("{}/{}", sysroot, INSTALLED_FILE);
+
+		// Reading the file
+        let file = File::open(path.clone())?;
+        let reader = BufReader::new(file);
+        let mut json: PackageListResponse = serde_json::from_reader(reader)?;
+
+		// Removing the entry
+        json.packages.push(self.clone());
+
+		// Writing the file
+		let s = serde_json::to_string_pretty(&json)?;
+        let mut file = File::open(path)?;
+        file.write(s.as_bytes())?;
+        Ok(())
+    }
+
+	/// Removes the current package from the list of installed packages.
+    pub fn remove_installed(&self, sysroot: &str) -> io::Result<()> {
+        let path = format!("{}/{}", sysroot, INSTALLED_FILE);
+
+		// Reading the file
+        let file = File::open(path.clone())?;
+        let reader = BufReader::new(file);
+        let mut json: PackageListResponse = serde_json::from_reader(reader)?;
+
+		// Removing the entry
+		let mut i = 0;
+		while i < json.packages.len() {
+			if json.packages[i].get_name() == self.get_name() {
+				json.packages.remove(i);
+			}
+
+			i += 1;
+		}
+
+		// Writing the file
+		let s = serde_json::to_string_pretty(&json)?;
+        let mut file = File::open(path)?;
+        file.write(s.as_bytes())?;
+        Ok(())
     }
 
     /// Returns the name of the package.
@@ -261,7 +307,7 @@ impl Package {
             Ok(())
         })??;
 
-        // TODO Add to install list
+        self.insert_installed(sysroot)?;
 
         Ok(())
     }
@@ -286,7 +332,8 @@ impl Package {
             Ok(())
         })??;
 
-        // TODO Update in install list
+        self.remove_installed(sysroot)?;
+        self.insert_installed(sysroot)?;
 
         Ok(())
     }
@@ -311,7 +358,7 @@ impl Package {
             Ok(())
         })??;
 
-        // TODO Remove from install list
+        self.remove_installed(sysroot)?;
 
         Ok(())
     }

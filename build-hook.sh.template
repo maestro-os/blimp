@@ -1,0 +1,7 @@
+#!/bin/sh
+
+./configure --prefix=/usr \
+	--host=$HOST \
+	--target=$TARGET
+make
+make DESTDIR=$SYSROOT install
