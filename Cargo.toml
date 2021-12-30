@@ -10,12 +10,16 @@ name = "common"
 path = "src/common/lib.rs"
 
 [[bin]]
-name ="blimp"
-path ="src/main.rs"
+name = "blimp"
+path = "src/main.rs"
 
 [[bin]]
-name ="blimp_server"
-path ="src/server/main.rs"
+name = "blimp_server"
+path = "src/server/main.rs"
+
+[[bin]]
+name = "blimp_builder"
+path = "src/builder/main.rs"
 
 [dependencies]
 actix-files = "0.5.0"

@@ -1,5 +1,7 @@
 /target
 
+*.swp
+
 config.json
 public_desc/
 public_packages/
