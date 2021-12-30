@@ -21,7 +21,7 @@ pub fn create_tmp_dir() -> io::Result<String> {
 
         let path = Path::new(&s);
         if !path.exists() {
-            fs::create_dir(path)?;
+            fs::create_dir(path)?; // TODO Race condition
             return Ok(s);
         }
 
@@ -102,8 +102,10 @@ pub fn read_json<T: for<'a> Deserialize<'a>>(file: &str) -> io::Result<T> {
     let file = File::open(file)?;
     let reader = BufReader::new(file);
 
-	let err = Err(io::Error::new(io::ErrorKind::Other, "JSON deserializing failed"));
-    serde_json::from_reader(reader).or(err)
+    serde_json::from_reader(reader).or_else(|e| {
+    	let msg = format!("JSON deserializing failed: {}", e);
+		Err(io::Error::new(io::ErrorKind::Other, msg))
+    })
 }
 
 /// Writes a JSON file.
@@ -111,6 +113,8 @@ pub fn write_json<T: Serialize>(file: &str, data: &T) -> io::Result<()> {
     let file = File::create(file)?;
     let writer = BufWriter::new(file);
 
-	let err = Err(io::Error::new(io::ErrorKind::Other, "JSON serializing failed"));
-    serde_json::to_writer_pretty(writer, &data).or(err)
+    serde_json::to_writer_pretty(writer, &data).or_else(|e| {
+    	let msg = format!("JSON serializing failed: {}", e);
+		Err(io::Error::new(io::ErrorKind::Other, msg))
+    })
 }

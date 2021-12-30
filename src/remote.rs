@@ -70,7 +70,7 @@ impl Remote {
                 Ok(content)
             },
 
-            _ => Err("TODO".to_string()), // TODO
+            _ => Err(format!("Failed to retrieve motd: {}", status)),
         }
     }
 
@@ -90,15 +90,17 @@ impl Remote {
                     .or(Err("Failed to parse JSON response"))?;
 
                 if save {
-                    let file = File::create(self.get_database_path(sysroot)).or(Err("TODO"))?; // TODO
+                    let file = File::create(self.get_database_path(sysroot))
+                    	.or_else(| e | Err(format!("File to create file: {}", e)))?;
                     let writer = BufWriter::new(file);
-                    serde_json::to_writer_pretty(writer, &json).or(Err("TODO"))?; // TODO
+                    serde_json::to_writer_pretty(writer, &json)
+						.or_else(| e | Err(format!("IO error: {}", e)))?;
                 }
 
                 Ok(json.packages)
             },
 
-            _ => Err("TODO".to_string()), // TODO
+            _ => Err(format!("Failed to retrieve packages list from remote: {}", status)),
         }
     }
 
@@ -152,29 +154,32 @@ impl Remote {
     pub async fn get_size(&self, package: &Package) -> Result<u64, String> {
         let url = format!("http://{}/package/{}/version/{}/size",
             self.host, package.get_name(), package.get_version());
-        let response = reqwest::get(url).await.or(Err("HTTP request failed"))?;
-        let content = response.text().await.or(Err("HTTP request failed"))?;
+        let response = reqwest::get(url).await
+        	.or_else(| e | Err(format!("HTTP request failed: {}", e)))?;
+        let content = response.text().await
+        	.or_else(| e | Err(format!("HTTP request failed: {}", e)))?;
 
         let json: PackageSizeResponse = serde_json::from_str(&content)
-            .or(Err("Failed to parse JSON response"))?;
+            .or_else(| e | Err(format!("Failed to parse JSON response: {}", e)))?;
         Ok(json.size)
     }
 
-    // TODO Do not keep the whole file in RAM before writting
+    // TODO Do not keep the whole file in RAM before writing
     /// Downloads the package `package` and writes it in cache.
     /// `sysroot` is the path to the system's root.
     pub async fn download(&self, sysroot: &str, package: &Package) -> Result<(), String> {
         let url = format!("http://{}/package/{}/version/{}/archive",
             self.host, package.get_name(), package.get_version());
-        let response = reqwest::get(url).await.or(Err("HTTP request failed"))?;
-        let content = response.bytes().await.or(Err("HTTP request failed"))?;
+        let response = reqwest::get(url).await
+        	.or_else(| e | Err(format!("HTTP request failed: {}", e)))?;
+        let content = response.bytes().await
+        	.or_else(| e | Err(format!("HTTP request failed: {}", e)))?;
 
         let mut file = File::create(package.get_cache_path(sysroot))
-            .or(Err("Failed to create cache file"))?;
-        file.write(&content).or(Err("IO error"))?;
+            .or_else(| e | Err(format!("Failed to create file: {}", e)))?;
+        file.write(&content).or(Err("IO error"))
+            .or_else(| e | Err(format!("IO error: {}", e)))?;
 
         Ok(())
     }
-
-    // TODO serialize function
 }

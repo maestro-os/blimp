@@ -1,7 +1,5 @@
 //! Blimp is a simple package manager for Unix systems.
 
-#![feature(async_closure)]
-
 mod confirm;
 mod install;
 mod lockfile;

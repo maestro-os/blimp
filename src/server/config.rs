@@ -1,10 +1,8 @@
 //! This module handles the server's configuration file.
 
+use common::util;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fs::File;
-use std::io::BufReader;
-use std::io::BufWriter;
 use std::io;
 use std::path::Path;
 
@@ -29,19 +27,11 @@ impl Config {
 
     /// Reads the configuration from file.
     pub fn read() -> io::Result<Self> {
-        let file = File::open(CONFIG_FILE)?;
-        let reader = BufReader::new(file);
-
-        Ok(serde_json::from_reader(reader)?)
+    	util::read_json(CONFIG_FILE)
     }
 
     pub fn write(&self) -> io::Result<()> {
-        let file = File::create(CONFIG_FILE)?;
-        let writer = BufWriter::new(file);
-
-        serde_json::to_writer_pretty(writer, self)?;
-
-        Ok(())
+    	util::write_json(CONFIG_FILE, self)
     }
 }
 
