@@ -47,6 +47,17 @@ fn main() {
     	}
     };
 
-	// TODO
+	let build_desc_path = format!("{}/package.json", from);
+    let build_hook_path = format!("{}/build-hook", from);
+
+    let desc_path = format!("{}/package.json", to);
+    let archive_path = format!("{}/archive.tar.gz", to);
+
+	// TODO Read the build desc
+	// TODO Get data from the source in build desc
+	// TODO Uncompress the data in /tmp (?)
+	// TODO cd to the data and run the build hook (set SYSROOT env var with the path to the data dir)
+	// TODO Write the package desc
+	// TODO Compress the archive
 	todo!();
 }
