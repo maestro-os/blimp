@@ -1,8 +1,12 @@
 //! This module implements utility functions.
 
 use flate2::read::GzDecoder;
+use serde::Deserialize;
+use serde::Serialize;
 use std::fs::File;
 use std::fs;
+use std::io::BufReader;
+use std::io::BufWriter;
 use std::io;
 use std::path::Path;
 use std::process::Command;
@@ -91,4 +95,22 @@ pub fn print_size(mut size: u64) {
     };
 
     print!("{}{}", size, suffix);
+}
+
+/// Reads a JSON file.
+pub fn read_json<T: for<'a> Deserialize<'a>>(file: &str) -> io::Result<T> {
+    let file = File::open(file)?;
+    let reader = BufReader::new(file);
+
+	let err = Err(io::Error::new(io::ErrorKind::Other, "JSON deserializing failed"));
+    serde_json::from_reader(reader).or(err)
+}
+
+/// Writes a JSON file.
+pub fn write_json<T: Serialize>(file: &str, data: &T) -> io::Result<()> {
+    let file = File::create(file)?;
+    let writer = BufWriter::new(file);
+
+	let err = Err(io::Error::new(io::ErrorKind::Other, "JSON serializing failed"));
+    serde_json::to_writer_pretty(writer, &data).or(err)
 }

@@ -1,6 +1,12 @@
 //! The Blimp builder is a tool allowing to build a package.
 
+mod build_desc;
+
+use build_desc::BuildDescriptor;
+use common::util;
 use std::env;
+use std::path::Path;
+use std::process::Command;
 use std::process::exit;
 
 /// The software's current version.
@@ -53,11 +59,70 @@ fn main() {
     let desc_path = format!("{}/package.json", to);
     let archive_path = format!("{}/archive.tar.gz", to);
 
-	// TODO Read the build desc
-	// TODO Get data from the source in build desc
+	// If destination files already exist, fail
+    if Path::new(&desc_path).exists() {
+    	eprintln!("{}: File exists", desc_path);
+    	exit(1);
+    }
+    if Path::new(&archive_path).exists() {
+    	eprintln!("{}: File exists", archive_path);
+    	exit(1);
+    }
+
+	// Reading the build descriptor
+	let build_desc = util::read_json::<BuildDescriptor>(&build_desc_path).unwrap_or_else(| e | {
+		eprintln!("Failed to read the build descriptor: {}", e);
+		exit(1);
+	});
+
+	// Fetch sources
+	build_desc.fetch_all().unwrap_or_else(| e | {
+		eprintln!("Failed to fetch sources: {}", e);
+		exit(1);
+	});
+
+	// The root of the build directory
+	let build_dir = "TODO"; // TODO
+
 	// TODO Uncompress the data in /tmp (?)
+
+	// The fake sysroot on which the package will be installed
+	let sysroot = "TODO"; // TODO
+	// The recommended number of jobs available to build this package
+	let jobs = 4; // TODO
+
+	// Executing the build hook
 	// TODO cd to the data and run the build hook (set SYSROOT env var with the path to the data dir)
-	// TODO Write the package desc
+    let status = Command::new(build_hook_path)
+        .env("SYSROOT", sysroot)
+        .env("JOBS", format!("{}", jobs))
+        .current_dir(build_dir)
+        .status().unwrap_or_else(| e | {
+			eprintln!("Failed to execute build hook: {}", e);
+			exit(1);
+		});
+	
+	// Tells whether the process succeeded
+    let success = {
+		if let Some(code) = status.code() {
+        	code == 0
+    	} else {
+        	false
+    	}
+    };
+
+	// On fail, exit
+    if !success {
+    	eprintln!("Build hook failed!");
+    	exit(1);
+    }
+
+	// Writing the package descriptor
+	util::write_json(&desc_path, &build_desc.get_package()).unwrap_or_else(| e | {
+		eprintln!("Failed to write descriptor file: {}", e);
+		exit(1);
+	});
+
 	// TODO Compress the archive
 	todo!();
 }
