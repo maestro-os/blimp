@@ -4,9 +4,14 @@ mod build_desc;
 
 use build_desc::BuildDescriptor;
 use common::util;
+use flate2::Compression;
+use flate2::write::GzEncoder;
 use std::env;
+use std::fs::File;
 use std::fs;
+use std::io;
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 use std::process::exit;
 use std::str;
@@ -46,8 +51,14 @@ BLIMP_DEBUG, allowing to keep the files after building to investigate problems")
 /// `target` is the target triplet.
 fn run_build_hook(hook_path: &str, build_dir: &str, sysroot: &str, jobs: u32, host: &str,
 	target: &str) {
+	// TODO Pipe stdout and stderr into log files
+
+	// TODO Clean
+	let absolute_hook_path = fs::canonicalize(&PathBuf::from(hook_path)).unwrap().into_os_string()
+		.into_string().unwrap();
+
 	// Executing the build hook
-	let status = Command::new(hook_path)
+	let status = Command::new(absolute_hook_path)
 		.env("HOST", host)
 		.env("TARGET", target)
 		.env("SYSROOT", sysroot)
@@ -86,6 +97,21 @@ fn get_jobs_count() -> u32 {
 	}
 }
 
+/// Creates the archive.
+fn create_archive(archive_path: &str, desc_path: &str, sysroot_path: &str) -> io::Result<()> {
+	println!("A");
+	let tar_gz = File::create(archive_path)?;
+    let enc = GzEncoder::new(tar_gz, Compression::default());
+    let mut tar = tar::Builder::new(enc);
+	println!("B: {}", desc_path);
+    tar.append_path_with_name(desc_path, "package.json")?;
+	println!("C: {}", sysroot_path);
+    tar.append_dir_all("data", sysroot_path)?;
+	println!("D");
+
+	tar.finish()
+}
+
 /// Returns the triplet of the host on which the package is to be built.
 fn get_host_triplet() -> String {
 	env::var("HOST").unwrap_or_else(| _ | {
@@ -95,7 +121,7 @@ fn get_host_triplet() -> String {
 
 		if let Ok(out) = output {
 			if let Ok(triplet) = str::from_utf8(&out.stdout) {
-				return triplet.to_owned();
+				return triplet.trim().to_owned();
 			}
 		}
 
@@ -105,6 +131,7 @@ fn get_host_triplet() -> String {
 	})
 }
 
+// TODO Clean up on error
 /// Builds the package.
 /// `from` and `to` correspond to the command line arguments.
 fn build(from: &str, to: &str) {
@@ -112,7 +139,7 @@ fn build(from: &str, to: &str) {
 	let build_hook_path = format!("{}/build-hook", from);
 
 	let desc_path = format!("{}/package.json", to);
-	let archive_path = format!("{}/archive.tar.gz", to);
+	let archive_path = format!("{}/package.tar.gz", to);
 
 	// If destination files already exist, fail
 	if Path::new(&desc_path).exists() {
@@ -130,11 +157,11 @@ fn build(from: &str, to: &str) {
 		exit(1);
 	});
 
-	// Fetch sources
-	build_desc.fetch_all().unwrap_or_else(| e | {
-		eprintln!("Failed to fetch sources: {}", e);
-		exit(1);
-	});
+	// The package
+	let package = build_desc.get_package();
+
+	println!("Building the package `{}` version `{}`...",
+		package.get_name(), package.get_version());
 
 	// The root of the build directory
 	let build_dir = util::create_tmp_dir().unwrap_or_else(| e | {
@@ -147,21 +174,28 @@ fn build(from: &str, to: &str) {
 		exit(1);
 	});
 
-	// TODO Uncompress the data in build_dir
+	println!("Fetching sources...");
+
+	for s in build_desc.get_sources() {
+		println!("Fetching {}", s.get_url());
+
+		s.fetch(&build_dir).unwrap_or_else(| e | {
+			eprintln!("Failed to fetch sources: {}", e);
+			exit(1);
+		});
+	}
 
 	// Retrieving parameters from environment variables
 	let jobs = get_jobs_count();
 	let host = get_host_triplet();
 	let target = env::var("TARGET").unwrap_or(host.clone());
 
-	// The package
-	let package = build_desc.get_package();
-
 	println!("Jobs: {}; Host: {}; Target: {}", jobs, host, target);
-	println!("Building the package `{}` version `{}`...",
-		package.get_name(), package.get_version());
+	println!();
 
 	run_build_hook(&build_hook_path, &build_dir, &sysroot, jobs, &host, &target);
+
+	println!("Writing built package...");
 
 	// Writing the package descriptor
 	util::write_json(&desc_path, package).unwrap_or_else(| e | {
@@ -169,12 +203,18 @@ fn build(from: &str, to: &str) {
 		exit(1);
 	});
 
-	// TODO Compress the archive
+	// Creating the archive
+	create_archive(&archive_path, &desc_path, &sysroot).unwrap_or_else(| e | {
+		eprintln!("Failed to create archive: {}", e);
+		exit(1);
+	});
 
 	if env::var("BLIMP_DEBUG").unwrap_or("0".to_owned()) == "1" {
 		println!("[DEBUG] The build directory is located at: {}", build_dir);
 		println!("[DEBUG] The fake sysroot directory is located at: {}", sysroot);
 	} else {
+		println!("Cleaning up...");
+
 		// Removing temporary directory
 		let _ = fs::remove_dir_all(&sysroot);
 		let _ = fs::remove_dir_all(&build_dir);
@@ -188,7 +228,7 @@ fn main() {
 	// The name of the binary file
 	let bin = {
 		if args.len() == 0 {
-			String::from("blimp")
+			String::from("blimp-builder")
 		} else {
 			args[0].clone()
 		}

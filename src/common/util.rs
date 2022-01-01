@@ -4,6 +4,7 @@ use flate2::read::GzDecoder;
 use serde::Deserialize;
 use serde::Serialize;
 use std::fs::File;
+use std::fs::OpenOptions;
 use std::fs;
 use std::io::BufReader;
 use std::io::BufWriter;
@@ -11,30 +12,51 @@ use std::io;
 use std::path::Path;
 use std::process::Command;
 use tar::Archive;
+use xz2::read::XzDecoder;
 
+// TODO Add a maximum try count
 /// Creates a temporary directory. The function returns the path to the directory.
 pub fn create_tmp_dir() -> io::Result<String> {
     let mut i = 0;
 
     loop {
-        let s = format!("/tmp/blimp-{}", i);
-
-        let path = Path::new(&s);
-        if !path.exists() {
-            fs::create_dir(path)?; // TODO Race condition
-            return Ok(s);
+        let path = format!("/tmp/blimp-{}", i);
+        if fs::create_dir(&path).is_ok() {
+            return Ok(path);
         }
 
         i += 1;
     }
 }
 
-/// Uncompresses the given .tar.gz file `src` to the given location `dest`.
+// TODO Add a maximum try count
+/// Creates a temporary file. The function returns the path to the file and the file itself.
+pub fn create_tmp_file() -> io::Result<(String, File)> {
+    let mut i = 0;
+
+    loop {
+        let path = format!("/tmp/blimp-{}", i);
+        if let Ok(file) = OpenOptions::new().write(true).create_new(true).open(path.clone()) {
+            return Ok((path, file));
+        }
+
+        i += 1;
+    }
+}
+
+/// Uncompresses the given archive file `src` to the given location `dest`.
 pub fn uncompress(src: &str, dest: &str) -> io::Result<()> {
-    let tar_gz = File::open(src)?;
-    let tar = GzDecoder::new(tar_gz);
+	// Trying to uncompress .tar.gz
+    let file = File::open(src)?;
+    let tar = GzDecoder::new(file);
     let mut archive = Archive::new(tar);
-    archive.unpack(dest)
+    archive.unpack(dest).or_else(| _ | {
+		// Trying to uncompress .tar.xz
+    	let file = File::open(src)?;
+    	let tar = XzDecoder::new(file);
+    	let mut archive = Archive::new(tar);
+    	archive.unpack(dest)
+    })
 }
 
 /// Uncompresses the given .tar.gz file `archive` into a temporary directory, executes the given
