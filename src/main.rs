@@ -135,7 +135,12 @@ fn main_(sysroot: &str) -> bool {
                 return false;
             }
 
-            install(names, &sysroot).is_ok()
+            if install(names, &sysroot).is_ok() {
+    			println!("Done! :)");
+    			true
+           	} else {
+           		false
+           	}
         },
 
         "update" => update(sysroot),

@@ -103,7 +103,7 @@ fn create_archive(archive_path: &str, desc_path: &str, sysroot_path: &str) -> io
     let enc = GzEncoder::new(tar_gz, Compression::default());
     let mut tar = tar::Builder::new(enc);
     tar.append_path_with_name(desc_path, "package.json")?;
-    tar.append_dir_all("data", sysroot_path)?;
+    tar.append_dir_all("data", sysroot_path)?; // TODO Do not follow symlinks
 
 	tar.finish()
 }

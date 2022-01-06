@@ -139,17 +139,18 @@ impl Package {
         let path = format!("{}/{}", sysroot, INSTALLED_FILE);
 
 		// Reading the file
-        let file = File::open(path.clone())?;
-        let reader = BufReader::new(file);
-        let mut json: PackageListResponse = serde_json::from_reader(reader)?;
+		let mut json: PackageListResponse = {
+        	let file = File::open(path.clone())?;
+        	let reader = BufReader::new(file);
+        	serde_json::from_reader(reader)?
+		};
 
 		// Removing the entry
         json.packages.push(self.clone());
 
 		// Writing the file
-		let s = serde_json::to_string_pretty(&json)?;
-        let mut file = File::open(path)?;
-        file.write(s.as_bytes())?;
+        let mut file = File::create(path)?;
+        file.write_all(serde_json::to_string_pretty(&json)?.as_bytes())?;
         Ok(())
     }
 
@@ -296,9 +297,9 @@ impl Package {
                 return Err(io::Error::new(io::ErrorKind::Other, "Pre-install hook failed!"));
             }
 
-            // Uncompresses data at sysroot, installing the package
-            let data_path = format!("{}/data.tar.gz", tmp_dir);
-            util::uncompress(&data_path, &sysroot)?;
+            // Installing the package's files
+            let data_path = format!("{}/data", tmp_dir);
+            util::recursive_copy(&data_path, &sysroot)?;
 
             if !util::run_hook(&format!("{}/post-install-hook", tmp_dir), &sysroot)? {
                 return Err(io::Error::new(io::ErrorKind::Other, "Post-install hook failed!"));

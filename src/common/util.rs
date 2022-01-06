@@ -96,6 +96,24 @@ pub fn run_hook(hook_path: &str, sysroot: &str) -> io::Result<bool> {
     }
 }
 
+/// Copies the content of the directory `src` to the directory `dst` recursively.
+pub fn recursive_copy(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result<()> {
+	for entry in fs::read_dir(src)? {
+        let entry = entry?;
+
+        let to = dst.as_ref().join(entry.file_name());
+
+        if entry.file_type()?.is_dir() {
+        	fs::create_dir_all(&to)?;
+            recursive_copy(entry.path(), &to)?;
+        } else {
+            fs::copy(entry.path(), &to)?;
+        }
+    }
+
+	Ok(())
+}
+
 /// Prints the given size in bytes into a human-readable form.
 pub fn print_size(mut size: u64) {
     let mut level = 0;
