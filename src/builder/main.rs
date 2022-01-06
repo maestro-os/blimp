@@ -99,15 +99,11 @@ fn get_jobs_count() -> u32 {
 
 /// Creates the archive.
 fn create_archive(archive_path: &str, desc_path: &str, sysroot_path: &str) -> io::Result<()> {
-	println!("A");
 	let tar_gz = File::create(archive_path)?;
     let enc = GzEncoder::new(tar_gz, Compression::default());
     let mut tar = tar::Builder::new(enc);
-	println!("B: {}", desc_path);
     tar.append_path_with_name(desc_path, "package.json")?;
-	println!("C: {}", sysroot_path);
     tar.append_dir_all("data", sysroot_path)?;
-	println!("D");
 
 	tar.finish()
 }
