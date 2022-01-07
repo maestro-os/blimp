@@ -47,16 +47,24 @@ pub fn create_tmp_file() -> io::Result<(String, File)> {
 /// Uncompresses the given archive file `src` to the given location `dest`.
 pub fn uncompress(src: &str, dest: &str) -> io::Result<()> {
 	// Trying to uncompress .tar.gz
-    let file = File::open(src)?;
-    let tar = GzDecoder::new(file);
-    let mut archive = Archive::new(tar);
-    archive.unpack(dest).or_else(| _ | {
+    {
+    	let file = File::open(src)?;
+    	let tar = GzDecoder::new(file);
+    	let mut archive = Archive::new(tar);
+
+    	if let Ok(a) = archive.unpack(dest) {
+    		return Ok(a);
+    	}
+    }
+
+    {
 		// Trying to uncompress .tar.xz
     	let file = File::open(src)?;
     	let tar = XzDecoder::new(file);
     	let mut archive = Archive::new(tar);
+
     	archive.unpack(dest)
-    })
+    }
 }
 
 /// Uncompresses the given .tar.gz file `archive` into a temporary directory, executes the given
