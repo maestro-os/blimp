@@ -22,10 +22,16 @@ impl Source {
 		&self.url
 	}
 
-	// TODO Do not keep the whole file in RAM before writing
 	/// Fetches the file from the URL and uncompresses it into the build directory `build_dir`.
 	pub fn fetch(&self, build_dir: &str) -> Result<(), String> {
-		let response = reqwest::blocking::get(&self.url)
+		// TODO Do not keep the whole file in RAM before writing
+		/*let client = reqwest::blocking::Client::builder()
+			.connect_timeout(None)
+			.pool_idle_timeout(None)
+			.timeout(None)
+			.build()
+			.or_else(| e | Err(format!("HTTP request failed: {}", e)))?;
+		let response = client.get(&self.url).send()
 			.or_else(| e | Err(format!("HTTP request failed: {}", e)))?;
 		let content = response.bytes()
 			.or_else(| e | Err(format!("HTTP request failed: {}", e)))?;
@@ -33,7 +39,15 @@ impl Source {
 		let (path, mut file) = util::create_tmp_file().or_else(| e | {
 			Err(format!("Failed to create file: {}", e))
 		})?;
-		file.write(&content).or_else(| e | Err(format!("IO error: {}", e)))?;
+		file.write(&content).or_else(| e | Err(format!("IO error: {}", e)))?;*/
+
+ 	 	// TODO Find a cleaner solution
+		let (path, _) = util::create_tmp_file().or_else(| e | {
+			Err(format!("Failed to create file: {}", e))
+		})?;
+		let _ = std::process::Command::new("wget")
+			.args(["-O", &path, &self.url])
+			.status();
 
 		// Uncompressing the archive
 		util::uncompress(&path, &build_dir)

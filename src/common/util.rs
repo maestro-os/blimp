@@ -47,16 +47,24 @@ pub fn create_tmp_file() -> io::Result<(String, File)> {
 /// Uncompresses the given archive file `src` to the given location `dest`.
 pub fn uncompress(src: &str, dest: &str) -> io::Result<()> {
 	// Trying to uncompress .tar.gz
-    let file = File::open(src)?;
-    let tar = GzDecoder::new(file);
-    let mut archive = Archive::new(tar);
-    archive.unpack(dest).or_else(| _ | {
+    {
+    	let file = File::open(src)?;
+    	let tar = GzDecoder::new(file);
+    	let mut archive = Archive::new(tar);
+
+    	if let Ok(a) = archive.unpack(dest) {
+    		return Ok(a);
+    	}
+    }
+
+    {
 		// Trying to uncompress .tar.xz
     	let file = File::open(src)?;
     	let tar = XzDecoder::new(file);
     	let mut archive = Archive::new(tar);
+
     	archive.unpack(dest)
-    })
+    }
 }
 
 /// Uncompresses the given .tar.gz file `archive` into a temporary directory, executes the given
@@ -94,6 +102,24 @@ pub fn run_hook(hook_path: &str, sysroot: &str) -> io::Result<bool> {
     } else {
         Ok(false)
     }
+}
+
+/// Copies the content of the directory `src` to the directory `dst` recursively.
+pub fn recursive_copy(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result<()> {
+	for entry in fs::read_dir(src)? {
+        let entry = entry?;
+
+        let to = dst.as_ref().join(entry.file_name());
+
+        if entry.file_type()?.is_dir() {
+        	fs::create_dir_all(&to)?;
+            recursive_copy(entry.path(), &to)?;
+        } else {
+            fs::copy(entry.path(), &to)?;
+        }
+    }
+
+	Ok(())
 }
 
 /// Prints the given size in bytes into a human-readable form.
