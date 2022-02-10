@@ -1,7 +1,7 @@
 #!/bin/sh
 
 ./configure --prefix=/usr \
-	--host=$HOST \
-	--target=$TARGET
-make
+	--host=$TARGET \
+	--build=$HOST
+make -j${JOBS}
 make DESTDIR=$SYSROOT install
