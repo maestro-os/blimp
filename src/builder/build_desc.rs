@@ -1,11 +1,11 @@
 //! This module implements the build descriptor structure.
 
+use common::download;
 use common::package::Package;
 use common::util;
 use serde::Deserialize;
 use serde::Serialize;
 use std::error::Error;
-use std::io::Write;
 use std::process::Command;
 
 /// Structure representing the location of sources and where to unpack them.
@@ -51,7 +51,7 @@ pub enum Source {
 impl Source {
 	/// Fetches files from the source and uncompresses them if necessary.
 	/// Files are placed into the build directory `build_dir` according to the location.
-	pub fn fetch(&self, build_dir: &str) -> Result<(), Box<dyn Error>> {
+	pub async fn fetch(&self, build_dir: &str) -> Result<(), Box<dyn Error>> {
 		match self {
 			Self::Url {
 				location,
@@ -62,18 +62,8 @@ impl Source {
 			} => {
 				println!("Fetching `{}`...", url);
 
-				let client = reqwest::blocking::Client::builder()
-					.connect_timeout(None)
-					.pool_idle_timeout(None)
-					.timeout(None)
-					.build()?;
-				let response = client.get(url).send()?;
-				let content = response.bytes()?;
-
-				let (path, mut file) = util::create_tmp_file().or_else(| e | {
-					Err(format!("Failed to create file: {}", e))
-				})?;
-				file.write(&content).or_else(| e | Err(format!("IO error: {}", e)))?;
+				let (path, _) = util::create_tmp_file()?;
+				download::download_file(url, &path).await?;
 
 				let dest_path = format!("{}/{}", build_dir, location);
 				// Uncompressing the archive

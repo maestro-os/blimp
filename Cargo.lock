@@ -392,6 +392,7 @@ dependencies = [
  "env_logger",
  "flate2",
  "futures",
+ "futures-util",
  "reqwest",
  "serde",
  "serde_json",
@@ -1556,6 +1557,7 @@ dependencies = [
  "serde_urlencoded",
  "tokio 1.19.0",
  "tokio-native-tls",
+ "tokio-util 0.6.10",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -2014,6 +2016,20 @@ dependencies = [
  "log",
  "pin-project-lite 0.1.12",
  "tokio 0.2.25",
+]
+
+[[package]]
+name = "tokio-util"
+version = "0.6.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36943ee01a6d67977dd3f84a5a1d2efeb4ada3a1ae771cadfaa535d9d9fc6507"
+dependencies = [
+ "bytes 1.1.0",
+ "futures-core",
+ "futures-sink",
+ "log",
+ "pin-project-lite 0.2.9",
+ "tokio 1.19.0",
 ]
 
 [[package]]

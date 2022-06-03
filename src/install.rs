@@ -27,9 +27,12 @@ async fn download_package(sysroot: &str, remote: &Remote, package: &Package) -> 
 
 // TODO Clean
 /// Installs the given list of packages.
+/// `names` is the list of packages to install.
 /// `sysroot` is the path to the root of the system on which the packages will be installed.
+/// `local_repos` is the list of paths to local package repositories.
 /// On success, the function returns `true`. On failure, it returns `false`.
-pub fn install(names: &[String], sysroot: &str) -> Result<(), Box<dyn Error>> {
+pub fn install(names: &[String], sysroot: &str, local_repos: &[String])
+	-> Result<(), Box<dyn Error>> {
     let mut failed = false;
 
     // The list of packages to install
@@ -38,9 +41,10 @@ pub fn install(names: &[String], sysroot: &str) -> Result<(), Box<dyn Error>> {
     let mut remotes = HashMap::<String, Remote>::new();
 
     for p in names {
-        let r = Remote::get_latest(sysroot, &p.clone())?;
+		// TODO Look in local repos
 
-        match r {
+		// Looking in remote repositories
+        match Remote::get_latest(sysroot, &p.clone())? {
             Some((remote, package)) => {
                 let name = package.get_name().clone();
                 packages.insert(name.clone(), package);

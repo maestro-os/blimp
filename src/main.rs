@@ -93,6 +93,7 @@ fn remote_list(sysroot: &str) -> bool {
 
             true
         },
+
         Err(e) => {
             eprintln!("IO error: {}", e);
             false
@@ -136,7 +137,7 @@ fn main_(sysroot: &str) -> Result<bool, Box<dyn Error>> {
                 return Ok(false);
             }
 
-            install(names, &sysroot)?;
+            install(names, &sysroot, &[])?; // TODO local repos
 			println!("Done! :)");
 			Ok(true)
         }, sysroot).flatten(),

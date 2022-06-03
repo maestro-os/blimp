@@ -1,15 +1,18 @@
 //! A remote is a remote host from which packages can be downloaded.
 
+use common::download;
 use common::package::Package;
 use common::request::PackageListResponse;
 use common::request::PackageSizeResponse;
 use common::version::Version;
+use std::error::Error;
 use std::fs::File;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::BufWriter;
-use std::io::Write;
 use std::io;
+
+// TODO Use https
 
 /// The file which contains the list of remotes.
 const REMOTES_FILE: &str = "/usr/lib/blimp/remotes_list";
@@ -48,7 +51,7 @@ impl Remote {
     }
 
     /// Returns the host for the remote.
-    pub fn get_host(&self) -> &String {
+    pub fn get_host(&self) -> &str {
         &self.host
     }
 
@@ -78,29 +81,26 @@ impl Remote {
     /// `save` tells whether the result of the request must be saved in the database if the request
     /// succeeded.
     /// `sysroot` is the path to the system's root.
-    pub fn fetch_all(&self, save: bool, sysroot: &str) -> Result<Vec<Package>, String> {
+    pub fn fetch_all(&self, save: bool, sysroot: &str) -> Result<Vec<Package>, Box<dyn Error>> {
         let url = format!("http://{}/package", &self.host);
-        let response = reqwest::blocking::get(url).or(Err("HTTP request failed"))?;
+        let response = reqwest::blocking::get(url)?;
         let status = response.status();
-        let content = response.text().or(Err("HTTP request failed"))?;
+        let content = response.text()?;
 
         match status {
             reqwest::StatusCode::OK => {
-                let json: PackageListResponse = serde_json::from_str(&content)
-                    .or(Err("Failed to parse JSON response"))?;
+                let json: PackageListResponse = serde_json::from_str(&content)?;
 
                 if save {
-                    let file = File::create(self.get_database_path(sysroot))
-                    	.or_else(| e | Err(format!("File to create file: {}", e)))?;
+                    let file = File::create(self.get_database_path(sysroot))?;
                     let writer = BufWriter::new(file);
-                    serde_json::to_writer_pretty(writer, &json)
-						.or_else(| e | Err(format!("IO error: {}", e)))?;
+                    serde_json::to_writer_pretty(writer, &json)?;
                 }
 
                 Ok(json.packages)
             },
 
-            _ => Err(format!("Failed to retrieve packages list from remote: {}", status)),
+            _ => Err(format!("Failed to retrieve packages list from remote: {}", status).into()),
         }
     }
 
@@ -167,19 +167,9 @@ impl Remote {
     // TODO Do not keep the whole file in RAM before writing
     /// Downloads the package `package` and writes it in cache.
     /// `sysroot` is the path to the system's root.
-    pub async fn download(&self, sysroot: &str, package: &Package) -> Result<(), String> {
+    pub async fn download(&self, sysroot: &str, package: &Package) -> Result<(), Box<dyn Error>> {
         let url = format!("http://{}/package/{}/version/{}/archive",
             self.host, package.get_name(), package.get_version());
-        let response = reqwest::get(url).await
-        	.or_else(| e | Err(format!("HTTP request failed: {}", e)))?;
-        let content = response.bytes().await
-        	.or_else(| e | Err(format!("HTTP request failed: {}", e)))?;
-
-        let mut file = File::create(package.get_cache_path(sysroot))
-            .or_else(| e | Err(format!("Failed to create file: {}", e)))?;
-        file.write(&content).or(Err("IO error"))
-            .or_else(| e | Err(format!("IO error: {}", e)))?;
-
-        Ok(())
+		download::download_file(&url, &package.get_cache_path(sysroot)).await
     }
 }

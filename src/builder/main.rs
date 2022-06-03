@@ -15,6 +15,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::process::exit;
 use std::str;
+use tokio::runtime::Runtime;
 
 /// The software's current version.
 const VERSION: &str = "0.1";
@@ -175,12 +176,20 @@ fn build(from: &str, to: &str) {
 
 	println!("Fetching sources...");
 
+    // Creating the async runtime
+    let rt = Runtime::new().unwrap();
+    let mut futures = Vec::new();
+
 	for s in build_desc.get_sources() {
-		s.fetch(&build_dir).unwrap_or_else(| e | {
+		futures.push(s.fetch(&build_dir));
+	}
+
+    for f in futures {
+        rt.block_on(f).unwrap_or_else(| e | {
 			eprintln!("Failed to fetch sources: {}", e);
 			exit(1);
 		});
-	}
+    }
 
 	// Retrieving parameters from environment variables
 	let jobs = get_jobs_count();
