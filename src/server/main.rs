@@ -1,4 +1,5 @@
 mod config;
+mod dashboard;
 mod global_data;
 
 use actix_files::NamedFile;
@@ -46,19 +47,13 @@ async fn package_list(data: web::Data<Mutex<GlobalData>>) -> impl Responder {
     let packages = data.get_packages();
 
     match packages {
-        Ok(packages) => {
-            let json = serde_json::to_string(&PackageListResponse {
-                packages: packages.to_vec(),
-            }).unwrap();
-            HttpResponse::Ok().set(ContentType::json()).body(&json)
-        },
+        Ok(packages) => HttpResponse::Ok().json(PackageListResponse {
+			packages: packages.to_vec(),
+		}),
 
-        Err(e) => {
-            let json = json!({
-                "error": e.to_string(),
-            });
-            HttpResponse::InternalServerError().set(ContentType::json()).body(json.to_string())
-        },
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+			"error": e.to_string(),
+		})),
     }
 }
 
@@ -71,17 +66,11 @@ async fn package_info(req: HttpRequest) -> impl Responder {
     let package = Package::get(&name.to_owned(), &version).unwrap(); // TODO Handle error
 
     match package {
-        Some(p) => {
-            let json: String = serde_json::to_string(&p).unwrap(); // TODO Handle error
-            HttpResponse::Ok().set(ContentType::json()).body(json)
-        },
+        Some(p) => HttpResponse::Ok().json(p),
 
-        None => {
-            let json = json!({
-                "error": format!("Package `{}` with version `{}` not found", name, version),
-            });
-            HttpResponse::NotFound().set(ContentType::json()).body(json)
-        },
+        None => HttpResponse::NotFound().json(json!({
+			"error": format!("Package `{}` with version `{}` not found", name, version),
+		})),
     }
 }
 
@@ -99,12 +88,9 @@ async fn package_size(req: HttpRequest) -> impl Responder {
             let file = File::open(archive_path).unwrap(); // TODO Handle error
             let size = file.metadata().unwrap().len(); // TODO Handle error
 
-            let size = PackageSizeResponse {
+            HttpResponse::Ok().json(PackageSizeResponse {
                 size,
-            };
-
-            let json: String = serde_json::to_string(&size).unwrap(); // TODO Handle error
-            HttpResponse::Ok().set(ContentType::json()).body(json)
+            })
         },
 
         None => {
@@ -152,6 +138,8 @@ async fn main() -> std::io::Result<()> {
             .service(package_info)
             .service(package_size)
             .service(package_archive)
+            .service(dashboard::build_logs)
+            .service(dashboard::home)
     })
     .bind(format!("127.0.0.1:{}", port))?
     .run()
