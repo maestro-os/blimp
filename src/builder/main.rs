@@ -176,8 +176,6 @@ fn build(from: &str, to: &str) {
 	println!("Fetching sources...");
 
 	for s in build_desc.get_sources() {
-		println!("Fetching {}", s.get_url());
-
 		s.fetch(&build_dir).unwrap_or_else(| e | {
 			eprintln!("Failed to fetch sources: {}", e);
 			exit(1);

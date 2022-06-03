@@ -1,5 +1,7 @@
 //! Blimp is a simple package manager for Unix systems.
 
+#![feature(result_flattening)]
+
 mod confirm;
 mod install;
 mod lockfile;
@@ -8,6 +10,7 @@ mod remote;
 use install::install;
 use remote::Remote;
 use std::env;
+use std::error::Error;
 use std::process::exit;
 
 /// The software's current version.
@@ -98,21 +101,19 @@ fn remote_list(sysroot: &str) -> bool {
 }
 
 // TODO Parse options
-fn main_(sysroot: &str) -> bool {
+fn main_(sysroot: &str) -> Result<bool, Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
     // The name of the binary file
-    let bin = {
-        if args.len() == 0 {
-            String::from("blimp")
-        } else {
-            args[0].clone()
-        }
+    let bin = if args.len() == 0 {
+		"blimp".to_owned()
+	} else {
+		args[0].clone()
     };
 
     // If no argument is specified, print usage
     if args.len() <= 1 {
         print_usage(&bin);
-        return false;
+        return Ok(false);
     }
 
     // Matching command
@@ -121,38 +122,37 @@ fn main_(sysroot: &str) -> bool {
             let packages = &args[2..];
             if packages.len() == 0 {
                 eprintln!("Please specify one or several packages");
-                return false;
+                return Ok(false);
             }
 
             // TODO
             todo!();
         },
 
-        "install" => {
+        "install" => lockfile::lock_wrap(|| {
             let names = &args[2..];
             if names.len() == 0 {
                 eprintln!("Please specify one or several packages");
-                return false;
+                return Ok(false);
             }
 
-            if install(names, &sysroot).is_ok() {
-    			println!("Done! :)");
-    			true
-           	} else {
-           		false
-           	}
-        },
+            install(names, &sysroot)?;
+			println!("Done! :)");
+			Ok(true)
+        }, sysroot).flatten(),
 
-        "update" => update(sysroot),
+        "update" => lockfile::lock_wrap(|| {
+			update(sysroot)
+		}, sysroot),
 
-        "upgrade" => {
+        "upgrade" => lockfile::lock_wrap(|| {
             let _packages = &args[2..];
 
             // TODO
             todo!();
-        },
+		}, sysroot),
 
-        "remove" => {
+        "remove" => lockfile::lock_wrap(|| {
             let packages = &args[2..];
             if packages.len() == 0 {
                 eprintln!("Please specify one or several packages");
@@ -161,31 +161,33 @@ fn main_(sysroot: &str) -> bool {
 
             // TODO
             todo!();
-        },
+		}, sysroot),
 
-        "clean" => {
+        "clean" => lockfile::lock_wrap(|| {
             // TODO
             todo!();
-        },
+		}, sysroot),
 
-        "remote-list" => remote_list(sysroot),
+        "remote-list" => lockfile::lock_wrap(|| {
+			remote_list(sysroot)
+		}, sysroot),
 
-        "remote-add" => {
+        "remote-add" => lockfile::lock_wrap(|| {
             // TODO
             todo!();
-        },
+		}, sysroot),
 
-        "remote-remove" => {
+        "remote-remove" => lockfile::lock_wrap(|| {
             // TODO
             todo!();
-        },
+		}, sysroot),
 
         _ => {
             eprintln!("Command `{}` doesn't exist", args[1]);
             eprintln!();
             print_usage(&bin);
 
-            false
+            Ok(false)
         },
     }
 }
@@ -194,17 +196,14 @@ fn main() {
     // Getting the sysroot
     let sysroot = env::var("SYSROOT").unwrap_or("/".to_string());
 
-    // Creating a lock file if possible
-    if !lockfile::lock(&sysroot) {
-        eprintln!("Error: failed to acquire lockfile");
-        exit(1);
-    }
+	match main_(&sysroot) {
+		Ok(success) => if !success {
+			exit(1);
+		},
 
-    let success = main_(&sysroot);
-
-    lockfile::unlock(&sysroot);
-
-    if !success {
-        exit(1);
-    }
+		Err(e) => {
+			eprintln!("Error: {}", e);
+			exit(1);
+		},
+	}
 }

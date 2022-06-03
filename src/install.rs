@@ -6,6 +6,7 @@ use common::version::Version;
 use crate::confirm;
 use crate::remote::Remote;
 use std::collections::HashMap;
+use std::error::Error;
 use tokio::runtime::Runtime;
 
 /// Downloads the package `package` from remote `remote`.
@@ -28,8 +29,8 @@ async fn download_package(sysroot: &str, remote: &Remote, package: &Package) -> 
 /// Installs the given list of packages.
 /// `sysroot` is the path to the root of the system on which the packages will be installed.
 /// On success, the function returns `true`. On failure, it returns `false`.
-pub fn install(names: &[String], sysroot: &str) -> Result<(), ()> {
-    let mut err: Result<(), ()> = Ok(());
+pub fn install(names: &[String], sysroot: &str) -> Result<(), Box<dyn Error>> {
+    let mut failed = false;
 
     // The list of packages to install
     let mut packages = HashMap::<String, Package>::new();
@@ -37,10 +38,7 @@ pub fn install(names: &[String], sysroot: &str) -> Result<(), ()> {
     let mut remotes = HashMap::<String, Remote>::new();
 
     for p in names {
-        let r = Remote::get_latest(sysroot, &p.clone()).or_else(| e | {
-            eprintln!("IO error: {}", e);
-            Err(())
-        })?;
+        let r = Remote::get_latest(sysroot, &p.clone())?;
 
         match r {
             Some((remote, package)) => {
@@ -51,12 +49,14 @@ pub fn install(names: &[String], sysroot: &str) -> Result<(), ()> {
 
             None => {
                 eprintln!("Package `{}` not found!", p);
-                err = Err(());
+                failed = true;
             },
         }
     }
 
-    err?;
+	if failed {
+		return Ok(());
+	}
 
     println!("Resolving dependencies...");
 
@@ -77,18 +77,16 @@ pub fn install(names: &[String], sysroot: &str) -> Result<(), ()> {
             Some(package)
         };
 
-        let valid = package.resolve_dependencies(sysroot, &mut total_packages, &mut get_package)
-            .or_else(| e | {
-                eprintln!("IO error: {}", e);
-                Err(())
-            })?;
+        let valid = package.resolve_dependencies(sysroot, &mut total_packages, &mut get_package)?;
 
         if !valid {
-            err = Err(());
+            failed = true;
         }
     }
 
-    err?;
+	if failed {
+		return Ok(());
+	}
 
     // Creating the async runtime
     let rt = Runtime::new().unwrap();
@@ -111,14 +109,8 @@ pub fn install(names: &[String], sysroot: &str) -> Result<(), ()> {
     // The total download size in bytes
     let mut total_size = 0;
     for f in futures {
-        let size = rt.block_on(f).or_else(| e | {
-            eprintln!("Failed to retrieve package size: {}", e);
-            Err(())
-        })?;
-
-        total_size += size;
+        total_size += rt.block_on(f)?;
     }
-    err?;
 
     print!("Download size: ");
     util::print_size(total_size);
@@ -126,7 +118,7 @@ pub fn install(names: &[String], sysroot: &str) -> Result<(), ()> {
 
     if !confirm::prompt() {
         println!("Aborting.");
-        return Err(());
+        return Ok(());
     }
 
     println!("Downloading packages...");
@@ -144,11 +136,13 @@ pub fn install(names: &[String], sysroot: &str) -> Result<(), ()> {
     // TODO Add progress bar
     for f in futures {
         if !rt.block_on(f) {
-            err = Err(());
+            failed = true;
         }
     }
 
-    err?;
+    if failed {
+		return Ok(());
+	}
     println!();
 
     println!("Installing packages...");
@@ -159,11 +153,9 @@ pub fn install(names: &[String], sysroot: &str) -> Result<(), ()> {
 
         if let Err(e) = package.install(sysroot) {
             eprintln!("Failed to install `{}`: {}", name, e);
-            err = Err(());
         }
     }
 
     println!();
-
-    err
+	Ok(())
 }

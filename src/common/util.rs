@@ -45,7 +45,8 @@ pub fn create_tmp_file() -> io::Result<(String, File)> {
 }
 
 /// Uncompresses the given archive file `src` to the given location `dest`.
-pub fn uncompress(src: &str, dest: &str) -> io::Result<()> {
+/// `unwrap` tells whether the tarball shall be unwrapped. TODO: explain what unwrapping is
+pub fn uncompress(src: &str, dest: &str, _unwrap: bool) -> io::Result<()> {
 	// Trying to uncompress .tar.gz
     {
     	let file = File::open(src)?;
@@ -73,7 +74,7 @@ pub fn uncompress(src: &str, dest: &str) -> io::Result<()> {
 pub fn uncompress_wrap<T, F: FnOnce(&str) -> T>(archive: &str, f: F) -> io::Result<T> {
     // Uncompressing
     let tmp_dir = create_tmp_dir()?;
-    uncompress(archive, &tmp_dir)?;
+    uncompress(archive, &tmp_dir, false)?;
 
     let v = f(&tmp_dir);
 
