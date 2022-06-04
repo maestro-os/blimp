@@ -11,91 +11,47 @@ use std::fs;
 use std::sync::Mutex;
 
 // TODO login
-// TODO clean body
 
 #[get("/dashboard")]
 async fn home(data: web::Data<Mutex<GlobalData>>) -> impl Responder {
     let mut data = data.lock().unwrap();
     let packages = data.get_packages();
 
-	let mut body = "Available packages:\n".to_string();
+	let mut body = include_str!("../../assets/pages/home.html").to_owned();
 
     match packages {
         Ok(packages) => {
-			for p in packages {
-				body = format!("{}- {}\n", body, p.get_name());
-			}
+			let available_packages = if packages.len() == 0 {
+				"<p><b>No available packages</b></p>".to_owned()
+			} else {
+				let mut available_packages = String::new();
+
+				for p in packages {
+					available_packages += &format!("<li>{}</li>\n", &p.get_name());
+					available_packages += "<ul>\n";
+
+					for v in p.get_versions() {
+						available_packages += &format!("<li><a href=\"/dashboard/package/{}/version/{}\">{}</a></li>\n", p.get_name(), v, v);
+					}
+
+					available_packages += "</ul>\n";
+				}
+
+				available_packages
+			};
+
+			body = body.replace("{available_packages}", &available_packages);
 		},
 
         Err(e) => return HttpResponse::InternalServerError()
 			.body(format!("Error: {}", e.to_string())),
     }
 
-	body = format!("{}Available package descriptors:\n", body);
-	// TODO
-
 	HttpResponse::Ok().body(body)
 }
 
-/// Structure representing the query for a request which returns the build logs of a package.
-#[derive(Deserialize)]
-struct BuildLogsQuery {
-	/// The name of the package.
-	name: String,
-	/// The version of the package.
-	version: String,
-}
-
-#[get("/dashboard/build_logs")]
-async fn build_logs(
-	data: web::Data<Mutex<GlobalData>>,
-	web::Query(query): web::Query<BuildLogsQuery>,
-) -> impl Responder {
-	// TODO Put build logs directory name in constant
-	// TODO Check names and versions (security)
-	let path = format!("build_logs/{}_{}.log", query.name, query.version);
-
-	fs::read_to_string(&path).unwrap() // TODO Handle error
-}
-
-#[get("/dashboard/job")]
-async fn job_list(
-	data: web::Data<Mutex<GlobalData>>,
-) -> impl Responder {
-	// TODO
-	HttpResponse::Ok().body("TODO")
-}
-
-/// Structure representing the query for a request which starts a build job.
-#[derive(Deserialize)]
-struct JobStartQuery {
-	/// The name of the package to build.
-	name: String,
-	/// The version of the package to build.
-	version: String,
-}
-
-#[post("/dashboard/job/start")]
-async fn job_start(
-	data: web::Data<Mutex<GlobalData>>,
-	web::Query(query): web::Query<JobStartQuery>,
-) -> impl Responder {
-	// TODO
-	HttpResponse::Ok().body("TODO")
-}
-
-/// Structure representing the query for a request which stops a build job.
-#[derive(Deserialize)]
-struct JobStopQuery {
-	/// The job's ID.
-	id: String,
-}
-
-#[post("/dashboard/job/stop")]
-async fn job_stop(
-	data: web::Data<Mutex<GlobalData>>,
-	web::Query(query): web::Query<JobStopQuery>,
-) -> impl Responder {
-	// TODO
-	HttpResponse::Ok().body("TODO")
+// TODO Check for a better solution
+#[get("/assets/css/style.css")]
+async fn style_css() -> impl Responder {
+	include_str!("../../assets/css/style.css")
 }

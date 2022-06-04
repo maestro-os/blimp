@@ -1,7 +1,7 @@
 <html>
 	<head>
 		<title>Blimp dasboard</title>
-		<link rel="stylesheet" href="../css/style.css"></link>
+		<link rel="stylesheet" href="/assets/css/style.css"></link>
 	</head>
 
 	<body>
@@ -16,10 +16,7 @@
 				</p>
 
 				<ul>
-					<li>package name</li>
-					<ul>
-						<li><a href="#">package version</a></li>
-					</ul>
+					{available_packages}
 				</ul>
 			</div>
 
@@ -31,10 +28,7 @@
 				</p>
 
 				<ul>
-					<li>package name</li>
-					<ul>
-						<li><a href="#">package version</a></li>
-					</ul>
+					{packages}
 				</ul>
 			</div>
 
@@ -47,30 +41,13 @@
 
 				<table>
 					<tbody>
-						<tr>
-							<td><a href="#">#ID</a></td>
-							<td>package name</td>
-							<td>package version</td>
-							<td class="status-progress">In progress</td>
-						</tr>
-						<tr>
-							<td><a href="#">#ID</a></td>
-							<td>package name</td>
-							<td>package version</td>
-							<td class="status-success">Success</td>
-						</tr>
-						<tr>
-							<td><a href="#">#ID</a></td>
-							<td>package name</td>
-							<td>package version</td>
-							<td class="status-fail">Failure</td>
-						</tr>
+						{jobs}
 					</tbody>
 				</table>
 			</div>
 
 			<div class="box">
-				<h2><a class="button" href="#">Dependencies graph</a></h2>
+				<h2><a class="button" href="/dashboard/dependency_graph">Dependencies graph</a></h2>
 			</div>
 		</div>
 	</body>

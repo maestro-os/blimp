@@ -1,6 +1,7 @@
 mod config;
 mod dashboard;
 mod global_data;
+mod job;
 
 use actix_files::NamedFile;
 use actix_web::{
@@ -58,9 +59,11 @@ async fn package_list(data: web::Data<Mutex<GlobalData>>) -> impl Responder {
 }
 
 #[get("/package/{name}/version/{version}")]
-async fn package_info(req: HttpRequest) -> impl Responder {
-    let name = req.match_info().get("name").unwrap();
-    let version = Version::from_string(req.match_info().get("version").unwrap()).unwrap(); // TODO Handle error
+async fn package_info(
+	req: HttpRequest,
+	web::Path((name, version)): web::Path<(String, String)>,
+) -> impl Responder {
+    let version = Version::from_string(&version).unwrap(); // TODO Handle error
 
     // Getting package
     let package = Package::get(&name.to_owned(), &version).unwrap(); // TODO Handle error
@@ -75,9 +78,11 @@ async fn package_info(req: HttpRequest) -> impl Responder {
 }
 
 #[get("/package/{name}/version/{version}/size")]
-async fn package_size(req: HttpRequest) -> impl Responder {
-    let name = req.match_info().get("name").unwrap();
-    let version = Version::from_string(req.match_info().get("version").unwrap()).unwrap(); // TODO Handle error
+async fn package_size(
+	req: HttpRequest,
+	web::Path((name, version)): web::Path<(String, String)>,
+) -> impl Responder {
+    let version = Version::from_string(&version).unwrap(); // TODO Handle error
 
     // Getting package
     let package = Package::get(&name.to_owned(), &version).unwrap(); // TODO Handle error
@@ -103,9 +108,11 @@ async fn package_size(req: HttpRequest) -> impl Responder {
 }
 
 #[get("/package/{name}/version/{version}/archive")]
-async fn package_archive(req: HttpRequest) -> impl Responder {
-    let name = req.match_info().get("name").unwrap();
-    let version = Version::from_string(req.match_info().get("version").unwrap()).unwrap(); // TODO Handle error
+async fn package_archive(
+	req: HttpRequest,
+	web::Path((name, version)): web::Path<(String, String)>,
+) -> impl Responder {
+    let version = Version::from_string(&version).unwrap(); // TODO Handle error
 
     let archive_path = format!("{}/{}-{}", package::SERVER_PACKAGES_DIR, name, version);
     NamedFile::open(archive_path) // TODO Make the error message cleaner
@@ -138,8 +145,13 @@ async fn main() -> std::io::Result<()> {
             .service(package_info)
             .service(package_size)
             .service(package_archive)
-            .service(dashboard::build_logs)
             .service(dashboard::home)
+            .service(dashboard::style_css)
+			.service(job::job_list)
+			.service(job::job_get)
+			.service(job::job_logs)
+			.service(job::job_start)
+			.service(job::job_stop)
     })
     .bind(format!("127.0.0.1:{}", port))?
     .run()
