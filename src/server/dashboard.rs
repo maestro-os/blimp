@@ -27,9 +27,11 @@ async fn home(data: web::Data<Mutex<GlobalData>>) -> impl Responder {
 					html += &format!("<li>{}</li>\n", &p.get_name());
 					html += "<ul>\n";
 
-					for v in p.get_versions() {
+					// TODO
+					/*for v in p.get_versions() {
 						html += &format!("<li><a href=\"/dashboard/package/{}/version/{}\">{}</a></li>\n", p.get_name(), v, v);
-					}
+					}*/
+					html += &format!("<li><a href=\"/dashboard/package/{}/version/{}\">{}</a></li>\n", p.get_name(), p.get_version(), p.get_version());
 
 					html += "</ul>\n";
 				}
@@ -58,9 +60,11 @@ async fn home(data: web::Data<Mutex<GlobalData>>) -> impl Responder {
 					html += &format!("<li>{}</li>\n", &p.get_name());
 					html += "<ul>\n";
 
-					for v in p.get_versions() {
+					// TODO
+					/*for v in p.get_versions() {
 						html += &format!("<li><a href=\"/dashboard/package_desc/{}/version/{}\">{}</a></li>\n", p.get_name(), v, v);
-					}
+					}*/
+					html += &format!("<li><a href=\"/dashboard/package_desc/{}/version/{}\">{}</a></li>\n", p.get_name(), p.get_version(), p.get_version());
 
 					html += "</ul>\n";
 				}

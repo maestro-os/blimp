@@ -191,12 +191,6 @@ impl Package {
         &self.version
     }
 
-    /// Returns the list of available versions for the current package.
-    pub fn get_versions(&self) -> Vec<Version> {
-        // TODO
-        todo!();
-    }
-
     /// Returns the latest version available for the current package.
     pub fn get_latest_version(&self) -> Version {
         // TODO
