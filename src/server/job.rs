@@ -128,8 +128,8 @@ async fn job_start(
 	HttpResponse::Ok().json(job)
 }
 
-#[post("/dashboard/job/{id}/stop")]
-async fn job_stop(
+#[post("/dashboard/job/{id}/abort")]
+async fn job_abort(
 	data: web::Data<Mutex<GlobalData>>,
 	web::Path(id): web::Path<String>,
 ) -> impl Responder {

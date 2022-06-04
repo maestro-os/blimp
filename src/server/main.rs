@@ -63,7 +63,7 @@ async fn main() -> std::io::Result<()> {
 			.service(job::job_get)
 			.service(job::job_logs)
 			.service(job::job_start)
-			.service(job::job_stop)
+			.service(job::job_abort)
             .service(package::list)
             .service(package::info)
             .service(package::size)
