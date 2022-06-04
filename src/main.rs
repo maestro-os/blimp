@@ -101,6 +101,23 @@ fn remote_list(sysroot: &str) -> bool {
     }
 }
 
+/// Adds a remote.
+/// `sysroot` is the path to the root of the system.
+/// `remote` is the remote to add.
+fn remote_add(sysroot: &str, remote: &str) -> bool {
+    match Remote::add(sysroot, remote) {
+        Ok(()) => {
+			println!("Added remote `{}`", remote);
+            true
+        },
+
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            false
+        },
+    }
+}
+
 // TODO Parse options
 fn main_(sysroot: &str) -> Result<bool, Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
@@ -174,8 +191,12 @@ fn main_(sysroot: &str) -> Result<bool, Box<dyn Error>> {
 		}, sysroot),
 
         "remote-add" => lockfile::lock_wrap(|| {
-            // TODO
-            todo!();
+            if args.len() <= 2 {
+                eprintln!("Please specify a remote to add");
+                return false;
+            }
+
+			remote_add(sysroot, &args[2])
 		}, sysroot),
 
         "remote-remove" => lockfile::lock_wrap(|| {

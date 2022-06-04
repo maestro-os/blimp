@@ -7,9 +7,11 @@ use common::request::PackageSizeResponse;
 use common::version::Version;
 use std::error::Error;
 use std::fs::File;
+use std::fs::OpenOptions;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::BufWriter;
+use std::io::Write;
 use std::io;
 
 // TODO Use https
@@ -49,6 +51,22 @@ impl Remote {
 
         Ok(v)
     }
+
+	/// Adds a new remote.
+    /// `sysroot` is the path to the system's root.
+	/// `remote` is the remote to add.
+	pub fn add(sysroot: &str, remote: &str) -> io::Result<()> {
+        let path = format!("{}/{}", sysroot, REMOTES_FILE);
+        let file = OpenOptions::new()
+			.read(true)
+			.write(true)
+			.create(true)
+			.open(path)?;
+        let mut writer = BufWriter::new(file);
+
+		writer.write(remote.as_bytes())?;
+		Ok(())
+	}
 
     /// Returns the host for the remote.
     pub fn get_host(&self) -> &str {

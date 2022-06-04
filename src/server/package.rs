@@ -3,7 +3,6 @@ use actix_web::{
     get,
     http::header::ContentType,
     web,
-    HttpRequest,
     HttpResponse,
     Responder
 };

@@ -68,7 +68,7 @@ async fn main() -> std::io::Result<()> {
             .service(package::size)
             .service(package::archive)
     })
-    .bind(format!("127.0.0.1:{}", port))?
+    .bind(format!("0.0.0.0:{}", port))?
     .run()
     .await
 }
