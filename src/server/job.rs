@@ -57,11 +57,29 @@ impl Job {
 		};
 
 		format!("<tr>
-			<td><a href=\"/dashboard/job/{id}\">#ID</a></td>
+			<td><a href=\"/dashboard/job/{id}\">#{id}</a></td>
 			<td>{package}</td>
 			<td>{version}</td>
 			{status_html}
 		</tr>")
+	}
+
+	/// Runs the job.
+	pub fn run(&mut self) {
+		if !matches!(self.status, JobStatus::Pending) {
+			return;
+		}
+
+		// TODO
+	}
+
+	/// Aborts the job.
+	pub fn abort(&mut self) {
+		if matches!(self.status, JobStatus::Success | JobStatus::Failed) {
+			return;
+		}
+
+		// TODO
 	}
 }
 
@@ -72,11 +90,15 @@ async fn job_get(
 ) -> impl Responder {
 	let data = data.lock().unwrap();
 
-	let _job = data.get_jobs()
+	let job = data.get_jobs()
 		.iter()
 		.filter(| j | {
 			j.id == id
 		}).next();
+	let job = match job {
+		Some(job) => job,
+		None => return HttpResponse::NotFound().finish(),
+	};
 
 	// TODO
 	HttpResponse::Ok().body("TODO")
@@ -113,7 +135,7 @@ async fn job_start(
 	web::Query(query): web::Query<JobStartQuery>,
 ) -> impl Responder {
 	let mut data = data.lock().unwrap();
-	let id = "TODO".to_owned(); // TODO Generate a random ID
+	let id = data.new_job_id();
 
 	let job = Job {
 		id,
@@ -124,6 +146,8 @@ async fn job_start(
 		status: JobStatus::Pending,
 	};
 
+	// TODO If there is not constraint, run the job
+
 	data.get_jobs_mut().push(job.clone());
 	HttpResponse::Ok().json(job)
 }
@@ -133,6 +157,18 @@ async fn job_abort(
 	data: web::Data<Mutex<GlobalData>>,
 	web::Path(id): web::Path<String>,
 ) -> impl Responder {
-	// TODO
-	HttpResponse::Ok().body("TODO")
+	let mut data = data.lock().unwrap();
+
+	let job = data.get_jobs_mut()
+		.iter_mut()
+		.filter(| j | {
+			j.id == id
+		}).next();
+	let job = match job {
+		Some(job) => job,
+		None => return HttpResponse::NotFound().finish(),
+	};
+
+	job.abort();
+	HttpResponse::Ok().finish()
 }

@@ -39,4 +39,10 @@ impl GlobalData {
 	pub fn get_jobs_mut(&mut self) -> &mut Vec<Job> {
 		&mut self.jobs
 	}
+
+	/// Returns an unused ID for a new job.
+	pub fn new_job_id(&self) -> String {
+		// TODO
+		"TODO".to_owned()
+	}
 }
