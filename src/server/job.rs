@@ -7,6 +7,7 @@ use actix_web::post;
 use actix_web::web;
 use common::version::Version;
 use crate::global_data::GlobalData;
+use crate::util;
 use serde::Deserialize;
 use std::fs;
 use std::sync::Mutex;
@@ -84,11 +85,15 @@ async fn job_logs(
 	data: web::Data<Mutex<GlobalData>>,
 	web::Path(id): web::Path<String>,
 ) -> impl Responder {
-	// TODO Put build logs directory name in constant
-	// TODO Check name (security)
+	if util::is_correct_job_id(&id) {
+		// TODO Put build logs directory name in constant
+		let path = format!("job_logs/{}.log", id);
+		let logs = fs::read_to_string(&path).unwrap(); // TODO Handle error
 
-	let path = format!("job_logs/{}.log", id);
-	fs::read_to_string(&path).unwrap() // TODO Handle error
+		HttpResponse::Ok().body(logs)
+	} else {
+		HttpResponse::NotFound().finish()
+	}
 }
 
 /// Structure representing the query for a request which starts a build job.

@@ -1,10 +1,11 @@
 use actix_files::NamedFile;
 use actix_web::{
+	HttpRequest,
+    HttpResponse,
+    Responder,
     get,
     http::header::ContentType,
     web,
-    HttpResponse,
-    Responder
 };
 use common::package::Package;
 use common::package;
@@ -12,6 +13,7 @@ use common::request::PackageListResponse;
 use common::request::PackageSizeResponse;
 use common::version::Version;
 use crate::GlobalData;
+use crate::util;
 use serde_json::json;
 use std::fs::File;
 use std::sync::Mutex;
@@ -35,6 +37,9 @@ async fn list(data: web::Data<Mutex<GlobalData>>) -> impl Responder {
 async fn info(
 	web::Path((name, version)): web::Path<(String, String)>,
 ) -> impl Responder {
+	if !util::is_correct_name(&name) {
+		return HttpResponse::NotFound().finish();
+	}
     let version = Version::from_string(&version).unwrap(); // TODO Handle error
 
     // Getting package
@@ -53,6 +58,9 @@ async fn info(
 async fn size(
 	web::Path((name, version)): web::Path<(String, String)>,
 ) -> impl Responder {
+	if !util::is_correct_name(&name) {
+		return HttpResponse::NotFound().finish();
+	}
     let version = Version::from_string(&version).unwrap(); // TODO Handle error
 
     // Getting package
@@ -80,10 +88,20 @@ async fn size(
 
 #[get("/package/{name}/version/{version}/archive")]
 async fn archive(
+	req: HttpRequest,
 	web::Path((name, version)): web::Path<(String, String)>,
 ) -> impl Responder {
-    let version = Version::from_string(&version).unwrap(); // TODO Handle error
+	let version = Version::from_string(&version).unwrap(); // TODO Handle error
 
-    let archive_path = format!("{}/{}-{}", package::SERVER_PACKAGES_DIR, name, version);
-    NamedFile::open(archive_path) // TODO Make the error message cleaner
+	if util::is_correct_name(&name) {
+		let archive_path = format!("{}/{}-{}", package::SERVER_PACKAGES_DIR, name, version);
+
+		// TODO Handle error
+		NamedFile::open(archive_path)
+			.unwrap()
+			.into_response(&req)
+			.unwrap()
+	} else {
+		HttpResponse::NotFound().finish()
+	}
 }

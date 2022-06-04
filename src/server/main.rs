@@ -3,6 +3,7 @@ mod dashboard;
 mod global_data;
 mod job;
 mod package;
+mod util;
 
 use actix_web::{
     get,
