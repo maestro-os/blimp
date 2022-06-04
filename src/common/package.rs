@@ -182,7 +182,7 @@ impl Package {
     }
 
     /// Returns the name of the package.
-    pub fn get_name(&self) -> &String {
+    pub fn get_name(&self) -> &str {
         &self.name
     }
 
@@ -208,6 +208,11 @@ impl Package {
     pub fn is_up_to_date(&self) -> bool {
         self.version >= self.get_latest_version()
     }
+
+	/// Returns the description of the package.
+	pub fn get_description(&self) -> &str {
+		&self.description
+	}
 
     /// Returns the list of build dependencies.
     pub fn get_build_deps(&self) -> &Vec<Dependency> {
@@ -254,7 +259,7 @@ impl Package {
             // Resolving the package, then resolving its dependencies
             if let Some(p) = f(d.get_name().clone(), d.get_version().clone()) {
                 p.resolve_dependencies(sysroot, packages, f)?; // FIXME Possible stack overflow
-                packages.insert(p.get_name().clone(), p);
+                packages.insert(p.get_name().to_owned(), p);
             } else {
                 eprintln!("Unresolved dependency `{}` version `{}`!",
                     d.get_name(), d.get_version());

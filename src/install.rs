@@ -46,7 +46,8 @@ pub fn install(names: &[String], sysroot: &str, local_repos: &[String])
 		// Looking in remote repositories
         match Remote::get_latest(sysroot, &p.clone())? {
             Some((remote, package)) => {
-                let name = package.get_name().clone();
+                let name = package.get_name().to_owned();
+
                 packages.insert(name.clone(), package);
                 remotes.insert(name, remote);
             },

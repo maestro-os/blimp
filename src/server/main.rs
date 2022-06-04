@@ -58,6 +58,7 @@ async fn main() -> std::io::Result<()> {
             .service(root)
             .service(motd)
             .service(dashboard::home)
+            .service(dashboard::package_desc)
             .service(dashboard::style_css)
 			.service(job::job_list)
 			.service(job::job_get)

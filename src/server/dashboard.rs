@@ -6,7 +6,9 @@ use actix_web::get;
 use actix_web::web;
 use common::build_desc::BuildDescriptor;
 use common::package::Package;
+use common::version::Version;
 use crate::global_data::GlobalData;
+use crate::util;
 use std::sync::Mutex;
 
 // TODO login
@@ -86,6 +88,29 @@ async fn home(_data: web::Data<Mutex<GlobalData>>) -> impl Responder {
         Err(e) => return HttpResponse::InternalServerError()
 			.body(format!("Error: {}", e.to_string())),
     }
+
+	HttpResponse::Ok().body(body)
+}
+
+#[get("/dashboard/package_desc/{name}/version/{version}")]
+async fn package_desc(
+	_data: web::Data<Mutex<GlobalData>>,
+	web::Path((name, version)): web::Path<(String, Version)>,
+) -> impl Responder {
+	if !util::is_correct_name(&name) {
+		return HttpResponse::NotFound().finish();
+	}
+
+    // Getting package
+    let package = Package::get(&name.to_owned(), &version).unwrap().unwrap(); // TODO Handle error
+
+	let mut body = include_str!("../../assets/pages/package_desc.html").to_owned();
+
+	body = body.replace("{name}", package.get_name());
+	body = body.replace("{version}", &package.get_version().to_string());
+	body = body.replace("{description}", package.get_description());
+	// TODO Build deps
+	// TODO Run deps
 
 	HttpResponse::Ok().body(body)
 }

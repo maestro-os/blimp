@@ -2,7 +2,6 @@
 
 use common::package::Package;
 use crate::config::Config;
-use std::io;
 
 /// Structure storing data used all across the server.
 pub struct GlobalData {
