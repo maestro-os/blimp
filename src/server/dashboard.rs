@@ -101,18 +101,23 @@ async fn package_desc(
 		return HttpResponse::NotFound().finish();
 	}
 
+	// TODO Handle error
     // Getting package
-    let package = Package::get(&name.to_owned(), &version).unwrap().unwrap(); // TODO Handle error
+    match Package::get(&name.to_owned(), &version).unwrap() {
+		Some(package) => {
+			let mut body = include_str!("../../assets/pages/package_desc.html").to_owned();
 
-	let mut body = include_str!("../../assets/pages/package_desc.html").to_owned();
+			body = body.replace("{name}", package.get_name());
+			body = body.replace("{version}", &package.get_version().to_string());
+			body = body.replace("{description}", package.get_description());
+			// TODO Build deps
+			// TODO Run deps
 
-	body = body.replace("{name}", package.get_name());
-	body = body.replace("{version}", &package.get_version().to_string());
-	body = body.replace("{description}", package.get_description());
-	// TODO Build deps
-	// TODO Run deps
+			HttpResponse::Ok().body(body)
+		},
 
-	HttpResponse::Ok().body(body)
+		None => HttpResponse::NotFound().finish(),
+	}
 }
 
 // TODO Check for a better solution
