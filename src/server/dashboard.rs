@@ -8,13 +8,15 @@ use common::build_desc::BuildDescriptor;
 use common::package::Package;
 use common::version::Version;
 use crate::global_data::GlobalData;
+use crate::job::Job;
 use crate::util;
 use std::sync::Mutex;
 
 // TODO login
 
 #[get("/dashboard")]
-async fn home(_data: web::Data<Mutex<GlobalData>>) -> impl Responder {
+async fn home(data: web::Data<Mutex<GlobalData>>) -> impl Responder {
+	let data = data.lock().unwrap();
 	let mut body = include_str!("../../assets/pages/home.html").to_owned();
 
 	// Filling available packages
@@ -24,7 +26,7 @@ async fn home(_data: web::Data<Mutex<GlobalData>>) -> impl Responder {
 				n0.get_name().cmp(n1.get_name())
 			});
 
-			let html = if packages.len() == 0 {
+			let html = if packages.is_empty() {
 				"<p><b>No available packages</b></p>".to_owned()
 			} else {
 				let mut html = String::new();
@@ -59,7 +61,7 @@ async fn home(_data: web::Data<Mutex<GlobalData>>) -> impl Responder {
 				n0.1.get_package().get_name().cmp(n1.1.get_package().get_name())
 			});
 
-			let html = if descs.len() == 0 {
+			let html = if descs.is_empty() {
 				"<p><b>No available packages</b></p>".to_owned()
 			} else {
 				let mut html = String::new();
@@ -88,6 +90,20 @@ async fn home(_data: web::Data<Mutex<GlobalData>>) -> impl Responder {
         Err(e) => return HttpResponse::InternalServerError()
 			.body(format!("Error: {}", e.to_string())),
     }
+
+	// Filling jobs list
+	let jobs = data.get_jobs();
+	if jobs.is_empty() {
+		body = body.replace("{jobs}", "No jobs");
+	} else {
+		let mut html = String::new();
+
+		for j in jobs {
+			html = format!("{}{}", html, j.get_list_html());
+		}
+
+		body = body.replace("{jobs}", &html);
+	}
 
 	HttpResponse::Ok().body(body)
 }

@@ -63,14 +63,6 @@ impl Job {
 	}
 }
 
-#[get("/dashboard/job")]
-async fn job_list(
-	data: web::Data<Mutex<GlobalData>>,
-) -> impl Responder {
-	// TODO
-	HttpResponse::Ok().body("TODO")
-}
-
 #[get("/dashboard/job/{id}")]
 async fn job_get(
 	data: web::Data<Mutex<GlobalData>>,
