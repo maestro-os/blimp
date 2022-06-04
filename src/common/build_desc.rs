@@ -3,6 +3,7 @@
 use crate::download;
 use crate::package::Package;
 use crate::util;
+use crate::version::Version;
 use serde::Deserialize;
 use serde::Serialize;
 use std::error::Error;
@@ -148,6 +149,16 @@ impl BuildDescriptor {
         }
 
         Ok(descs)
+	}
+
+	/// TODO doc
+	pub fn server_get(name: &str, version: &Version) -> io::Result<Option<(String, Self)>> {
+		// TODO Optimize
+		Ok(Self::server_list()?
+			.into_iter()
+			.filter(| (path, desc) | {
+				desc.package.get_name() == name && desc.package.get_version() == version
+			}).next())
 	}
 
 	/// Returns a reference to the list of sources.

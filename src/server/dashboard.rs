@@ -102,11 +102,12 @@ async fn package_desc(
 	}
 
 	// TODO Handle error
-    // Getting package
-    match Package::get(&name.to_owned(), &version).unwrap() {
-		Some(package) => {
+    // Getting descriptor
+    match BuildDescriptor::server_get(&name.to_owned(), &version).unwrap() {
+		Some((_, desc)) => {
 			let mut body = include_str!("../../assets/pages/package_desc.html").to_owned();
 
+			let package = desc.get_package();
 			body = body.replace("{name}", package.get_name());
 			body = body.replace("{version}", &package.get_version().to_string());
 			body = body.replace("{description}", package.get_description());
