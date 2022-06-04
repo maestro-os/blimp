@@ -84,7 +84,8 @@ pub struct Package {
 }
 
 impl Package {
-    /// Lists available packages on the server. If not on a server, the function is undefined.
+    /// Lists available packages on the server. If not on a server, the function's behaviour is
+	/// undefined.
     pub fn server_list() -> io::Result<Vec<Self>> {
         let mut packages = Vec::new();
 

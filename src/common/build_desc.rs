@@ -1,12 +1,19 @@
 //! This module implements the build descriptor structure.
 
-use common::download;
-use common::package::Package;
-use common::util;
+use crate::download;
+use crate::package::Package;
+use crate::util;
 use serde::Deserialize;
 use serde::Serialize;
 use std::error::Error;
+use std::fs::File;
+use std::fs;
+use std::io::BufReader;
+use std::io;
 use std::process::Command;
+
+/// The directory storing packages' sources to build them on serverside.
+pub const SERVER_PACKAGES_SRC_DIR: &str = "build_src";
 
 /// Structure representing the location of sources and where to unpack them.
 #[derive(Deserialize, Serialize)]
@@ -118,6 +125,24 @@ pub struct BuildDescriptor {
 }
 
 impl BuildDescriptor {
+	/// Lists build descriptors on serverside.
+	/// The function returns a vector of package paths and their associated respective descriptors.
+	pub fn server_list() -> io::Result<Vec<(String, Self)>> {
+        let mut descs = Vec::new();
+
+        let files = fs::read_dir(SERVER_PACKAGES_SRC_DIR)?;
+        for p in files {
+            let path = p?.path().into_os_string().into_string().unwrap();
+			let desc_path = format!("{}/package.json", path);
+
+            let file = File::open(desc_path)?;
+            let reader = BufReader::new(file);
+            descs.push((path, serde_json::from_reader(reader)?));
+        }
+
+        Ok(descs)
+	}
+
 	/// Returns a reference to the list of sources.
 	pub fn get_sources(&self) -> &Vec<Source> {
 		&self.sources

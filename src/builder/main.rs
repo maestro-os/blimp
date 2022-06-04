@@ -1,8 +1,6 @@
 //! The Blimp builder is a tool allowing to build a package.
 
-mod build_desc;
-
-use build_desc::BuildDescriptor;
+use common::build_desc::BuildDescriptor;
 use common::util;
 use flate2::Compression;
 use flate2::write::GzEncoder;

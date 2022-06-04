@@ -1,5 +1,6 @@
 //! This library contains common code between the client and the server.
 
+pub mod build_desc;
 pub mod download;
 pub mod package;
 pub mod request;
