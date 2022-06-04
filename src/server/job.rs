@@ -10,6 +10,9 @@ use crate::global_data::GlobalData;
 use crate::util;
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::io;
+use std::process::Child;
+use std::process::Command;
 use std::sync::Mutex;
 
 /// Enumeration of possible job status.
@@ -27,9 +30,9 @@ pub enum JobStatus {
 	Aborted,
 }
 
-/// Structure representing a job.
-#[derive(Clone, Deserialize, Serialize)]
-pub struct Job {
+/// Structure representing a job description.
+#[derive(Deserialize, Serialize)]
+pub struct JobDesc {
 	/// The job's ID.
 	id: String,
 
@@ -42,13 +45,22 @@ pub struct Job {
 	status: JobStatus,
 }
 
+/// Structure representing a job.
+pub struct Job {
+	/// The job description.
+	desc: JobDesc,
+
+	/// The job's process.
+	process: Option<Child>,
+}
+
 impl Job {
 	/// Returns the job's HTML representation in the jobs list.
 	pub fn get_list_html(&self) -> String {
-		let id = &self.id;
-		let package = &self.package;
-		let version = &self.version;
-		let status_html = match self.status {
+		let id = &self.desc.id;
+		let package = &self.desc.package;
+		let version = &self.desc.version;
+		let status_html = match self.desc.status {
 			JobStatus::Pending => "<td class=\"status-progress\">Pending</td>",
 			JobStatus::InProgress => "<td class=\"status-progress\">In progress</td>",
 			JobStatus::Success => "<td class=\"status-success\">Success</td>",
@@ -64,22 +76,44 @@ impl Job {
 		</tr>")
 	}
 
+	/// Tells whether the job is in capacity to run.
+	/// The function checks that build dependencies are available.
+	pub fn can_run(&self) -> bool {
+		// TODO
+		true
+	}
+
 	/// Runs the job.
-	pub fn run(&mut self) {
-		if !matches!(self.status, JobStatus::Pending) {
-			return;
+	/// If the job cannot run, the function does nothing.
+	pub fn run(&mut self) -> io::Result<()> {
+		if !matches!(self.desc.status, JobStatus::Pending) {
+			return Ok(());
+		}
+		if !self.can_run() {
+			return Ok(());
 		}
 
-		// TODO
+		// TODO Redirect stdout and stderr to logs file
+		self.process = Some(Command::new("blimp-builder")
+			.args(["TODO", "TODO"]) // TODO
+			.spawn()?);
+		self.desc.status = JobStatus::InProgress;
+
+		Ok(())
 	}
 
 	/// Aborts the job.
 	pub fn abort(&mut self) {
-		if matches!(self.status, JobStatus::Success | JobStatus::Failed) {
+		if matches!(self.desc.status, JobStatus::Success | JobStatus::Failed) {
 			return;
 		}
 
-		// TODO
+		// Killing job's processes
+		if let Some(child) = &mut self.process {
+			let _ = child.kill();
+		}
+
+		self.desc.status = JobStatus::Aborted;
 	}
 }
 
@@ -93,7 +127,7 @@ async fn job_get(
 	let job = data.get_jobs()
 		.iter()
 		.filter(| j | {
-			j.id == id
+			j.desc.id == id
 		}).next();
 	let job = match job {
 		Some(job) => job,
@@ -137,19 +171,23 @@ async fn job_start(
 	let mut data = data.lock().unwrap();
 	let id = data.new_job_id();
 
-	let job = Job {
-		id,
+	let mut job = Job {
+		desc: JobDesc {
+			id,
 
-		package: query.name,
-		version: query.version,
+			package: query.name,
+			version: query.version,
 
-		status: JobStatus::Pending,
+			status: JobStatus::Pending,
+		},
+
+		process: None,
 	};
 
-	// TODO If there is not constraint, run the job
+	job.run().unwrap(); // TODO Handle error
 
-	data.get_jobs_mut().push(job.clone());
-	HttpResponse::Ok().json(job)
+	data.get_jobs_mut().push(job);
+	HttpResponse::Ok().json(&data.get_jobs_mut().last().unwrap().desc)
 }
 
 #[post("/dashboard/job/{id}/abort")]
@@ -162,7 +200,7 @@ async fn job_abort(
 	let job = data.get_jobs_mut()
 		.iter_mut()
 		.filter(| j | {
-			j.id == id
+			j.desc.id == id
 		}).next();
 	let job = match job {
 		Some(job) => job,
