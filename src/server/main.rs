@@ -60,6 +60,7 @@ async fn main() -> std::io::Result<()> {
             .service(dashboard::home)
             .service(dashboard::package_desc)
             .service(dashboard::style_css)
+            .service(dashboard::job_js)
 			.service(job::job_get)
 			.service(job::job_logs)
 			.service(job::job_start)

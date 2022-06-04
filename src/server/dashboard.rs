@@ -142,3 +142,9 @@ async fn package_desc(
 async fn style_css() -> impl Responder {
 	include_str!("../../assets/css/style.css")
 }
+
+// TODO Check for a better solution
+#[get("/assets/js/job.js")]
+async fn job_js() -> impl Responder {
+	include_str!("../../assets/js/job.js")
+}
