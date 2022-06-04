@@ -94,7 +94,7 @@ async fn home(data: web::Data<Mutex<GlobalData>>) -> impl Responder {
 	// Filling jobs list
 	let jobs = data.get_jobs();
 	if jobs.is_empty() {
-		body = body.replace("{jobs}", "No jobs");
+		body = body.replace("{jobs}", "<p><b>No jobs</b></p>");
 	} else {
 		let mut html = String::new();
 

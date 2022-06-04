@@ -8,11 +8,12 @@ use actix_web::web;
 use common::version::Version;
 use crate::global_data::GlobalData;
 use crate::util;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::sync::Mutex;
 
 /// Enumeration of possible job status.
+#[derive(Clone, Deserialize, Serialize)]
 pub enum JobStatus {
 	/// The job is pending for one or several other jobs to finish.
 	Pending,
@@ -27,6 +28,7 @@ pub enum JobStatus {
 }
 
 /// Structure representing a job.
+#[derive(Clone, Deserialize, Serialize)]
 pub struct Job {
 	/// The job's ID.
 	id: String,
@@ -68,6 +70,14 @@ async fn job_get(
 	data: web::Data<Mutex<GlobalData>>,
 	web::Path(id): web::Path<String>,
 ) -> impl Responder {
+	let data = data.lock().unwrap();
+
+	let _job = data.get_jobs()
+		.iter()
+		.filter(| j | {
+			j.id == id
+		}).next();
+
 	// TODO
 	HttpResponse::Ok().body("TODO")
 }
@@ -94,7 +104,7 @@ struct JobStartQuery {
 	/// The name of the package to build.
 	name: String,
 	/// The version of the package to build.
-	version: String,
+	version: Version,
 }
 
 #[post("/dashboard/job/start")]
@@ -102,8 +112,20 @@ async fn job_start(
 	data: web::Data<Mutex<GlobalData>>,
 	web::Query(query): web::Query<JobStartQuery>,
 ) -> impl Responder {
-	// TODO
-	HttpResponse::Ok().body("TODO")
+	let mut data = data.lock().unwrap();
+	let id = "TODO".to_owned(); // TODO Generate a random ID
+
+	let job = Job {
+		id,
+
+		package: query.name,
+		version: query.version,
+
+		status: JobStatus::Pending,
+	};
+
+	data.get_jobs_mut().push(job.clone());
+	HttpResponse::Ok().json(job)
 }
 
 #[post("/dashboard/job/{id}/stop")]
