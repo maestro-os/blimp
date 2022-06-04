@@ -5,19 +5,23 @@ use actix_web::Responder;
 use actix_web::get;
 use actix_web::web;
 use common::build_desc::BuildDescriptor;
+use common::package::Package;
 use crate::global_data::GlobalData;
 use std::sync::Mutex;
 
 // TODO login
 
 #[get("/dashboard")]
-async fn home(data: web::Data<Mutex<GlobalData>>) -> impl Responder {
+async fn home(_data: web::Data<Mutex<GlobalData>>) -> impl Responder {
 	let mut body = include_str!("../../assets/pages/home.html").to_owned();
-    let mut data = data.lock().unwrap();
 
 	// Filling available packages
-    match data.get_packages() {
-        Ok(packages) => {
+    match Package::server_list() {
+        Ok(mut packages) => {
+			packages.sort_by(| n0, n1 | {
+				n0.get_name().cmp(n1.get_name())
+			});
+
 			let html = if packages.len() == 0 {
 				"<p><b>No available packages</b></p>".to_owned()
 			} else {
@@ -48,7 +52,11 @@ async fn home(data: web::Data<Mutex<GlobalData>>) -> impl Responder {
 
 	// Filling available build descriptors
     match BuildDescriptor::server_list() {
-        Ok(descs) => {
+        Ok(mut descs) => {
+			descs.sort_by(| n0, n1 | {
+				n0.1.get_package().get_name().cmp(n1.1.get_package().get_name())
+			});
+
 			let html = if descs.len() == 0 {
 				"<p><b>No available packages</b></p>".to_owned()
 			} else {

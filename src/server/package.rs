@@ -19,9 +19,8 @@ use std::sync::Mutex;
 #[get("/package")]
 async fn list(data: web::Data<Mutex<GlobalData>>) -> impl Responder {
     let mut data = data.lock().unwrap();
-    let packages = data.get_packages();
 
-    match packages {
+    match Package::server_list() {
         Ok(packages) => HttpResponse::Ok().json(PackageListResponse {
 			packages: packages.to_vec(),
 		}),

@@ -27,15 +27,4 @@ impl GlobalData {
     pub fn get_config(&mut self) -> &mut Config {
         &mut self.config
     }
-
-    /// Returns a reference to the list of packages.
-    /// If the list is empty, the function loads it.
-    pub fn get_packages(&mut self) -> io::Result<&Vec<Package>> {
-        // If the list is empty, load it
-        if self.packages.is_empty() {
-            self.packages = Package::server_list()?;
-        }
-
-        Ok(&self.packages)
-    }
 }
