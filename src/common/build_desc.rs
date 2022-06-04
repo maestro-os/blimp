@@ -135,7 +135,7 @@ impl BuildDescriptor {
             let path = p?.path().into_os_string().into_string().unwrap();
 			let desc_path = format!("{}/package.json", path);
 
-            match File::open(desc_path) {
+            match File::open(desc_path.clone()) {
 				Ok(file) => {
 					let reader = BufReader::new(file);
 					descs.push((path, serde_json::from_reader(reader)?));
