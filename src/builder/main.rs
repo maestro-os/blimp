@@ -131,10 +131,13 @@ fn get_host_triplet() -> String {
 /// Builds the package.
 /// `from` and `to` correspond to the command line arguments.
 fn build(from: &str, to: &str) {
+	fs::create_dir_all(to).unwrap_or_else(| e | {
+		eprintln!("Cannot create directories `{}`: {}", to, e);
+		exit(1);
+	});
+
 	let build_desc_path = format!("{}/package.json", from);
 	let build_hook_path = format!("{}/build-hook", from);
-
-	// TODO Check that `build_hook_path` is a directory
 
 	let desc_path = format!("{}/package.json", to);
 	let archive_path = format!("{}/package.tar.gz", to);
