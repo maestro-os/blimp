@@ -1,7 +1,5 @@
 //! Blimp is a simple package manager for Unix systems.
 
-#![feature(result_flattening)]
-
 mod confirm;
 mod install;
 mod lockfile;
@@ -157,7 +155,7 @@ fn main_(sysroot: &str) -> Result<bool, Box<dyn Error>> {
             install(names, &sysroot, &[])?; // TODO local repos
 			println!("Done! :)");
 			Ok(true)
-        }, sysroot).flatten(),
+        }, sysroot)?,
 
         "update" => lockfile::lock_wrap(|| {
 			update(sysroot)

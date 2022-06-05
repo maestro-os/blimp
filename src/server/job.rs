@@ -45,15 +45,15 @@ pub enum JobStatus {
 #[derive(Deserialize, Serialize)]
 pub struct JobDesc {
 	/// The job's ID.
-	id: String,
+	pub id: String,
 
 	/// The package's name.
-	package: String,
+	pub package: String,
 	/// The package's version.
-	version: Version,
+	pub version: Version,
 
 	/// The job's current status.
-	status: JobStatus,
+	pub status: JobStatus,
 }
 
 /// Structure representing a job.
@@ -66,6 +66,11 @@ pub struct Job {
 }
 
 impl Job {
+	/// TODO doc
+	pub fn get_desc(&self) -> &JobDesc {
+		&self.desc
+	}
+
 	/// Returns the job's HTML representation in the jobs list.
 	pub fn get_list_html(&self) -> String {
 		let id = &self.desc.id;
@@ -162,12 +167,7 @@ async fn job_get(
 ) -> impl Responder {
 	let data = data.lock().unwrap();
 
-	let job = data.get_jobs()
-		.iter()
-		.filter(| j | {
-			j.desc.id == id
-		}).next();
-	let _job = match job {
+	let _job = match data.get_job(&id) {
 		Some(job) => job,
 		None => return HttpResponse::NotFound().finish(),
 	};
@@ -183,12 +183,7 @@ async fn job_logs(
 ) -> impl Responder {
 	let data = data.lock().unwrap();
 
-	let job = data.get_jobs()
-		.iter()
-		.filter(| j | {
-			j.desc.id == id
-		}).next();
-	let job = match job {
+	let job = match data.get_job(&id) {
 		Some(job) => job,
 		None => return HttpResponse::NotFound().finish(),
 	};
@@ -240,12 +235,7 @@ async fn job_abort(
 ) -> impl Responder {
 	let mut data = data.lock().unwrap();
 
-	let job = data.get_jobs_mut()
-		.iter_mut()
-		.filter(| j | {
-			j.desc.id == id
-		}).next();
-	let job = match job {
+	let job = match data.get_job_mut(&id) {
 		Some(job) => job,
 		None => return HttpResponse::NotFound().finish(),
 	};

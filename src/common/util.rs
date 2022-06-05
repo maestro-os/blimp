@@ -67,8 +67,9 @@ fn uncompress_<R: Read, D: AsRef<Path>>(mut archive: Archive<R>, dest: D, unwrap
 				.skip(1)
 				.filter(| c | matches!(c, Normal(_)))
 				.collect();
+			let path = dest.as_ref().join(path);
 
-			entry.unpack(dest.as_ref().join(path))?;
+			entry.unpack(path)?;
 		}
 	} else {
 		archive.unpack(dest)?;

@@ -39,6 +39,20 @@ impl GlobalData {
 		&mut self.jobs
 	}
 
+	/// Returns an immutable reference to the job with id `id`.
+	pub fn get_job(&self, id: &str) -> Option<&Job> {
+		self.jobs.iter()
+			.filter(| j | j.get_desc().id == id)
+			.next()
+	}
+
+	/// Returns a mutable reference to the job with id `id`.
+	pub fn get_job_mut(&mut self, id: &str) -> Option<&mut Job> {
+		self.jobs.iter_mut()
+			.filter(| j | j.get_desc().id == id)
+			.next()
+	}
+
 	/// Returns an unused ID for a new job.
 	pub fn new_job_id(&self) -> String {
 		// TODO
