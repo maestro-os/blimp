@@ -11,6 +11,7 @@ pub async fn download_file(url: &str, path: &str) -> Result<(), Box<dyn Error>> 
 	let mut stream = response.bytes_stream();
 
 	let mut file = OpenOptions::new()
+		.create(true)
 		.write(true)
 		.truncate(true)
 		.open(path)?;

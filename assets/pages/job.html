@@ -20,13 +20,17 @@
 			<div class="box">
 				<h2>Build logs</h2>
 
-				<textarea id="logs" rows=500 columns=300></textarea>
+				<textarea id="logs" rows=100 cols=300 disabled></textarea>
 			</div>
 		</div>
 	</body>
 
 	<script src="/assets/js/job.js"></script>
 	<script>
+		setInterval(function() {
+			update_logs('{id}');
+		}, 5000);
+
 		update_logs('{id}');
 	</script>
 </html>

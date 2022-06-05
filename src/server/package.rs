@@ -8,7 +8,6 @@ use actix_web::{
     web,
 };
 use common::package::Package;
-use common::package;
 use common::request::PackageListResponse;
 use common::request::PackageSizeResponse;
 use common::version::Version;
@@ -63,8 +62,8 @@ async fn size(
     let package = Package::get(&name.to_owned(), &version).unwrap(); // TODO Handle error
 
     match package {
-        Some(_) => {
-            let archive_path = format!("{}/{}-{}", package::SERVER_PACKAGES_DIR, name, version);
+        Some(package) => {
+			let archive_path = package.get_archive_path();
             let file = File::open(archive_path).unwrap(); // TODO Handle error
             let size = file.metadata().unwrap().len(); // TODO Handle error
 
@@ -89,15 +88,24 @@ async fn archive(
 ) -> impl Responder {
 	let version = Version::from_string(&version).unwrap(); // TODO Handle error
 
-	if util::is_correct_name(&name) {
-		let archive_path = format!("{}/{}-{}", package::SERVER_PACKAGES_DIR, name, version);
+    // Getting package
+    let package = Package::get(&name.to_owned(), &version).unwrap(); // TODO Handle error
 
-		// TODO Handle error
-		NamedFile::open(archive_path)
-			.unwrap()
-			.into_response(&req)
-			.unwrap()
-	} else {
-		HttpResponse::NotFound().finish()
-	}
+    match package {
+        Some(package) => {
+			let archive_path = package.get_archive_path();
+			// TODO Handle error
+			NamedFile::open(archive_path)
+				.unwrap()
+				.into_response(&req)
+				.unwrap()
+        },
+
+        None => {
+            let json = json!({
+                "error": format!("Package `{}` with version `{}` not found", name, version),
+            });
+            HttpResponse::NotFound().set(ContentType::json()).body(json)
+        },
+    }
 }

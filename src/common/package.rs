@@ -10,6 +10,7 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
+use std::fs::OpenOptions;
 use std::fs;
 use std::io::BufReader;
 use std::io::Write;
@@ -105,7 +106,7 @@ impl Package {
     /// Returns the package with name `name` and version `version` on serverside.
     /// If the package doesn't exist, the function returns None.
     pub fn get(name: &str, version: &Version) -> io::Result<Option<Self>> {
-        let desc_path = format!("{}/{}-{}", SERVER_PACKAGES_DESC_DIR, name, &version);
+        let desc_path = format!("{}/{}_{}", SERVER_PACKAGES_DESC_DIR, name, &version);
 
         if let Ok(file) = File::open(desc_path) {
             let reader = BufReader::new(file);
@@ -116,6 +117,11 @@ impl Package {
             Ok(None)
         }
     }
+
+	/// TODO doc
+	pub fn get_archive_path(&self) -> String {
+		format!("{}/{}_{}", SERVER_PACKAGES_DIR, self.name, self.version)
+	}
 
     /// Returns the installed package with name `name`.
     /// `sysroot` is the path to the system's root.
@@ -141,17 +147,20 @@ impl Package {
         let path = format!("{}/{}", sysroot, INSTALLED_FILE);
 
 		// Reading the file
-		let mut json: PackageListResponse = {
-        	let file = File::open(path.clone())?;
-        	let reader = BufReader::new(file);
-        	serde_json::from_reader(reader)?
+		let mut json: PackageListResponse = if let Ok(file) = File::open(&path) {
+			let reader = BufReader::new(file);
+			serde_json::from_reader(reader)?
+		} else {
+			PackageListResponse {
+				packages: vec![],
+			}
 		};
 
 		// Removing the entry
         json.packages.push(self.clone());
 
 		// Writing the file
-        let mut file = File::create(path)?;
+        let mut file = File::create(&path)?;
         file.write_all(serde_json::to_string_pretty(&json)?.as_bytes())?;
         Ok(())
     }
