@@ -11,7 +11,7 @@ function start_job(name, version) {
 
 function update_logs(job_id) {
 	var xmlHttp = new XMLHttpRequest();
-	xmlHttp.open("POST", "/dashboard/job/" + job_id + "/logs", false);
+	xmlHttp.open("GET", "/dashboard/job/" + job_id + "/logs", false);
 	xmlHttp.send(null);
 
 	var textarea = document.getElementById("logs");
