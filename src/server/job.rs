@@ -173,7 +173,7 @@ async fn job_get(
 	};
 
 	let mut body = include_str!("../../assets/pages/job.html").to_owned();
-	body = body.replace("{}", &job.get_desc().id);
+	body = body.replace("{id}", &job.get_desc().id);
 
 	HttpResponse::Ok().body(body)
 }
