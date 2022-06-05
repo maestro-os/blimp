@@ -1,6 +1,5 @@
 //! This module implements the global data structure. 
 
-use common::package::Package;
 use crate::config::Config;
 use crate::job::Job;
 

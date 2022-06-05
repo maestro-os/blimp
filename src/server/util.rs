@@ -6,10 +6,3 @@ pub fn is_correct_name(name: &str) -> bool {
 		c.is_ascii_alphanumeric() || c == '-' || c == '_'
 	})
 }
-
-/// Tells whether the given string is a correct job ID.
-pub fn is_correct_job_id(id: &str) -> bool {
-	id.chars().all(| c | {
-		c.is_ascii_alphanumeric()
-	})
-}

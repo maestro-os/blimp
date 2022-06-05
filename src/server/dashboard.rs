@@ -8,7 +8,6 @@ use common::build_desc::BuildDescriptor;
 use common::package::Package;
 use common::version::Version;
 use crate::global_data::GlobalData;
-use crate::job::Job;
 use crate::util;
 use std::sync::Mutex;
 

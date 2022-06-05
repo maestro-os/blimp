@@ -5,15 +5,26 @@ use actix_web::Responder;
 use actix_web::get;
 use actix_web::post;
 use actix_web::web;
+use common::build_desc::BuildDescriptor;
 use common::version::Version;
 use crate::global_data::GlobalData;
-use crate::util;
 use serde::{Deserialize, Serialize};
+use std::fs::File;
 use std::fs;
 use std::io;
+use std::os::unix::io::AsRawFd;
+use std::os::unix::io::FromRawFd;
 use std::process::Child;
 use std::process::Command;
+use std::process::Stdio;
 use std::sync::Mutex;
+
+/// The path to the directory storing job logs.
+const LOGS_DIR_PATH: &str = "job_logs";
+/// The path to the directory storing the resulting package in private.
+const OUT_DIR_PATH: &str = "build_out";
+
+// TODO Watch for terminated job and set status accordingly
 
 /// Enumeration of possible job status.
 #[derive(Clone, Deserialize, Serialize)]
@@ -76,6 +87,16 @@ impl Job {
 		</tr>")
 	}
 
+	/// Returns the path to job's logs file.
+	pub fn get_logs_file_path(&self) -> String {
+		format!("{}/{}.log", LOGS_DIR_PATH, self.desc.id)
+	}
+
+	/// Returns the path to the build output directory.
+	pub fn get_out_dir_path(&self) -> String {
+		format!("{}/{}", OUT_DIR_PATH, self.desc.id)
+	}
+
 	/// Tells whether the job is in capacity to run.
 	/// The function checks that build dependencies are available.
 	pub fn can_run(&self) -> bool {
@@ -93,12 +114,29 @@ impl Job {
 			return Ok(());
 		}
 
-		// TODO Redirect stdout and stderr to logs file
-		self.process = Some(Command::new("blimp-builder")
-			.args(["TODO", "TODO"]) // TODO
-			.spawn()?);
-		self.desc.status = JobStatus::InProgress;
+		// TODO Handle None
+		// Getting descriptor
+		let (desc_path, _) = BuildDescriptor::server_get(&self.desc.package, &self.desc.version)?
+			.unwrap();
 
+		// Creating logs file
+		let file = File::create(self.get_logs_file_path())?;
+		let fd = file.as_raw_fd();
+		let stdout = unsafe {
+			Stdio::from_raw_fd(fd)
+		};
+		let stderr = unsafe {
+			Stdio::from_raw_fd(fd)
+		};
+
+		// Running job
+		self.process = Some(Command::new("blimp-builder")
+			.args([&desc_path, &self.get_out_dir_path()])
+			.stdout(stdout)
+			.stderr(stderr)
+			.spawn()?);
+
+		self.desc.status = JobStatus::InProgress;
 		Ok(())
 	}
 
@@ -129,7 +167,7 @@ async fn job_get(
 		.filter(| j | {
 			j.desc.id == id
 		}).next();
-	let job = match job {
+	let _job = match job {
 		Some(job) => job,
 		None => return HttpResponse::NotFound().finish(),
 	};
@@ -143,15 +181,20 @@ async fn job_logs(
 	data: web::Data<Mutex<GlobalData>>,
 	web::Path(id): web::Path<String>,
 ) -> impl Responder {
-	if util::is_correct_job_id(&id) {
-		// TODO Put build logs directory name in constant
-		let path = format!("job_logs/{}.log", id);
-		let logs = fs::read_to_string(&path).unwrap(); // TODO Handle error
+	let data = data.lock().unwrap();
 
-		HttpResponse::Ok().body(logs)
-	} else {
-		HttpResponse::NotFound().finish()
-	}
+	let job = data.get_jobs()
+		.iter()
+		.filter(| j | {
+			j.desc.id == id
+		}).next();
+	let job = match job {
+		Some(job) => job,
+		None => return HttpResponse::NotFound().finish(),
+	};
+
+	let logs = fs::read_to_string(&job.get_logs_file_path()).unwrap(); // TODO Handle error
+	HttpResponse::Ok().body(logs)
 }
 
 /// Structure representing the query for a request which starts a build job.

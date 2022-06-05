@@ -12,16 +12,12 @@ use common::package;
 use common::request::PackageListResponse;
 use common::request::PackageSizeResponse;
 use common::version::Version;
-use crate::GlobalData;
 use crate::util;
 use serde_json::json;
 use std::fs::File;
-use std::sync::Mutex;
 
 #[get("/package")]
-async fn list(data: web::Data<Mutex<GlobalData>>) -> impl Responder {
-    let mut data = data.lock().unwrap();
-
+async fn list() -> impl Responder {
     match Package::server_list() {
         Ok(packages) => HttpResponse::Ok().json(PackageListResponse {
 			packages: packages.to_vec(),
