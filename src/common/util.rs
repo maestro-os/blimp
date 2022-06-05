@@ -3,13 +3,17 @@
 use flate2::read::GzDecoder;
 use serde::Deserialize;
 use serde::Serialize;
+use std::error::Error;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::fs;
 use std::io::BufReader;
 use std::io::BufWriter;
+use std::io::Read;
 use std::io;
+use std::path::Component::Normal;
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 use tar::Archive;
 use xz2::read::XzDecoder;
@@ -36,7 +40,13 @@ pub fn create_tmp_file() -> io::Result<(String, File)> {
 
     loop {
         let path = format!("/tmp/blimp-{}", i);
-        if let Ok(file) = OpenOptions::new().write(true).create_new(true).open(path.clone()) {
+		let result = OpenOptions::new()
+			.read(true)
+			.write(true)
+			.create_new(true)
+			.open(path.clone());
+
+        if let Ok(file) = result {
             return Ok((path, file));
         }
 
@@ -44,34 +54,60 @@ pub fn create_tmp_file() -> io::Result<(String, File)> {
     }
 }
 
+/// TODO doc
+/// `unwrap` tells whether the tarball shall be unwrapped.
+fn uncompress_<R: Read, D: AsRef<Path>>(mut archive: Archive<R>, dest: D, unwrap: bool)
+	-> Result<(), Box<dyn Error>> {
+	if unwrap {
+		for entry in archive.entries()? {
+			let mut entry = entry?;
+
+			let path: PathBuf = entry.path()?
+				.components()
+				.skip(1)
+				.filter(| c | matches!(c, Normal(_)))
+				.collect();
+
+			entry.unpack(dest.as_ref().join(path))?;
+		}
+	} else {
+		archive.unpack(dest)?;
+	}
+
+	Ok(())
+}
+
 /// Uncompresses the given archive file `src` to the given location `dest`.
-/// `unwrap` tells whether the tarball shall be unwrapped. TODO: explain what unwrapping is
-pub fn uncompress(src: &str, dest: &str, _unwrap: bool) -> io::Result<()> {
+/// `unwrap` tells whether the tarball shall be unwrapped.
+/// If the tarball contains directories at the root, the unwrap operation unwraps their content
+/// instead of the directories themselves.
+pub fn uncompress<S: AsRef<Path>, D: AsRef<Path>>(src: S, dest: D, unwrap: bool)
+	-> Result<(), Box<dyn Error>> {
 	// Trying to uncompress .tar.gz
-    {
-    	let file = File::open(src)?;
-    	let tar = GzDecoder::new(file);
-    	let mut archive = Archive::new(tar);
+	{
+		let file = File::open(&src)?;
+		let tar = GzDecoder::new(file);
+		let archive = Archive::new(tar);
 
-    	if let Ok(a) = archive.unpack(dest) {
-    		return Ok(a);
-    	}
-    }
+		if uncompress_(archive, &dest, unwrap).is_ok() {
+			return Ok(());
+		}
+	}
 
-    {
-		// Trying to uncompress .tar.xz
-    	let file = File::open(src)?;
-    	let tar = XzDecoder::new(file);
-    	let mut archive = Archive::new(tar);
+	// Trying to uncompress .tar.xz
+	{
+		let file = File::open(&src)?;
+		let tar = XzDecoder::new(file);
+		let archive = Archive::new(tar);
 
-    	archive.unpack(dest)
-    }
+		uncompress_(archive, &dest, unwrap)
+	}
 }
 
 /// Uncompresses the given .tar.gz file `archive` into a temporary directory, executes the given
 /// function `f` with the path to the temporary directory as argument, then removes the directory
 /// and returns the result of the call to `f`.
-pub fn uncompress_wrap<T, F: FnOnce(&str) -> T>(archive: &str, f: F) -> io::Result<T> {
+pub fn uncompress_wrap<T, F: FnOnce(&str) -> T>(archive: &str, f: F) -> Result<T, Box<dyn Error>> {
     // Uncompressing
     let tmp_dir = create_tmp_dir()?;
     uncompress(archive, &tmp_dir, false)?;

@@ -8,6 +8,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::error::Error;
 use std::fs::File;
 use std::fs;
 use std::io::BufReader;
@@ -285,7 +286,7 @@ impl Package {
     /// Installs the package. If the package is already installed, the function does nothing.
     /// `sysroot` is the path to the system's root.
     /// The function assumes the running dependencies of the package are already installed.
-    pub fn install(&self, sysroot: &str) -> io::Result<()> {
+    pub fn install(&self, sysroot: &str) -> Result<(), Box<dyn Error>> {
         if self.is_installed(sysroot) {
             return Ok(());
         }
@@ -315,7 +316,7 @@ impl Package {
 
     /// Upgrades the package.
     /// `sysroot` is the path to the system's root.
-    pub fn upgrade(&self, sysroot: &str) -> io::Result<()> {
+    pub fn upgrade(&self, sysroot: &str) -> Result<(), Box<dyn Error>> {
         // Uncompressing the package
         util::uncompress_wrap(&self.get_cache_path(sysroot), | tmp_dir | {
             // Running the pre-upgrade hook
@@ -341,7 +342,7 @@ impl Package {
 
     /// Removes the package.
     /// `sysroot` is the path to the system's root.
-    pub fn remove(&self, sysroot: &str) -> io::Result<()> {
+    pub fn remove(&self, sysroot: &str) -> Result<(), Box<dyn Error>> {
         // Uncompressing the package
         util::uncompress_wrap(&self.get_cache_path(sysroot), | tmp_dir | {
             // Running the pre-remove hook

@@ -6,5 +6,7 @@ config.json
 public_desc/
 public_packages/
 build_src/
+job_lgos/
+build_out/
 
 test/

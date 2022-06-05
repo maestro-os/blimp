@@ -28,8 +28,7 @@ pub enum Source {
 		/// The URL of the sources.
 		url: String,
 
-		/// If true, the builder unwraps the package, meaning that if the tarball contains a single
-		/// directory, its content is taken instead of the directory itself.
+		/// If true, unwrapping the tarball.
 		unwrap: bool,
 	},
 
@@ -50,8 +49,7 @@ pub enum Source {
 		/// The path to the local tarball or directory.
 		path: String,
 
-		/// If true, the builder unwraps the package, meaning that if the tarball contains a single
-		/// directory, its content is taken instead of the directory itself.
+		/// If true, unwrapping the tarball.
 		unwrap: bool,
 	},
 }
@@ -156,7 +154,7 @@ impl BuildDescriptor {
 		// TODO Optimize
 		Ok(Self::server_list()?
 			.into_iter()
-			.filter(| (path, desc) | {
+			.filter(| (_, desc) | {
 				desc.package.get_name() == name && desc.package.get_version() == version
 			}).next())
 	}
