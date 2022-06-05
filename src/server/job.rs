@@ -167,13 +167,15 @@ async fn job_get(
 ) -> impl Responder {
 	let data = data.lock().unwrap();
 
-	let _job = match data.get_job(&id) {
+	let job = match data.get_job(&id) {
 		Some(job) => job,
 		None => return HttpResponse::NotFound().finish(),
 	};
 
-	// TODO
-	HttpResponse::Ok().body("TODO")
+	let mut body = include_str!("../../assets/pages/job.html").to_owned();
+	body = body.replace("{}", &job.get_desc().id);
+
+	HttpResponse::Ok().body(body)
 }
 
 #[get("/dashboard/job/{id}/logs")]
