@@ -10,7 +10,6 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
-use std::fs::OpenOptions;
 use std::fs;
 use std::io::BufReader;
 use std::io::Write;

@@ -11,6 +11,7 @@ use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Read;
 use std::io;
+use std::os::unix;
 use std::path::Component::Normal;
 use std::path::Path;
 use std::path::PathBuf;
@@ -146,12 +147,18 @@ pub fn run_hook(hook_path: &str, sysroot: &str) -> io::Result<bool> {
 pub fn recursive_copy(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result<()> {
 	for entry in fs::read_dir(src)? {
         let entry = entry?;
-
+		let file_type = entry.file_type()?;
         let to = dst.as_ref().join(entry.file_name());
 
-        if entry.file_type()?.is_dir() {
+        if file_type.is_dir() {
         	fs::create_dir_all(&to)?;
             recursive_copy(entry.path(), &to)?;
+        } else if file_type.is_symlink() {
+			let _metadata = fs::symlink_metadata(entry.path())?;
+			let target = fs::read_link(entry.path())?;
+
+			// TODO Set timestamps and owner
+			unix::fs::symlink(&to, target)?;
         } else {
             fs::copy(entry.path(), &to)?;
         }
