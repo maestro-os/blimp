@@ -158,7 +158,7 @@ pub fn recursive_copy(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Resul
 			let target = fs::read_link(entry.path())?;
 
 			// TODO Set timestamps and owner
-			unix::fs::symlink(&to, target)?;
+			unix::fs::symlink(target, &to)?;
         } else {
             fs::copy(entry.path(), &to)?;
         }
