@@ -42,22 +42,26 @@ BLIMP_DEBUG, allowing to keep the files after building to investigate problems")
 }
 
 /// Runs the build hook.
-/// `hook_path` is the path to the hook file.
+/// `from` is the path to the package's directory.
 /// `build_dir` is the path to the build directory.
 /// `sysroot` is the fake sysroot on which the package is installed before being compressed.
 /// `jobs` is the recommended number of jobs to build this package.
 /// `host` is the host triplet.
 /// `target` is the target triplet.
-fn run_build_hook(hook_path: &str, build_dir: &str, sysroot: &str, jobs: u32, host: &str,
+fn run_build_hook(from: &str, build_dir: &str, sysroot: &str, jobs: u32, host: &str,
 	target: &str) {
-	// TODO Pipe stdout and stderr into log files
+	let absolute_from = fs::canonicalize(&PathBuf::from(from))
+		.unwrap()
+		.into_os_string()
+		.into_string()
+		.unwrap();
 
-	// TODO Clean
-	let absolute_hook_path = fs::canonicalize(&PathBuf::from(hook_path)).unwrap().into_os_string()
-		.into_string().unwrap();
+	// The path to the build hook
+	let hook_path = format!("{}/build-hook", absolute_from);
 
 	// Executing the build hook
-	let status = Command::new(absolute_hook_path)
+	let status = Command::new(hook_path)
+		.env("DESC_PATH", absolute_from)
 		.env("HOST", host)
 		.env("TARGET", target)
 		.env("SYSROOT", sysroot)
@@ -137,7 +141,6 @@ fn build(from: &str, to: &str) {
 	});
 
 	let build_desc_path = format!("{}/package.json", from);
-	let build_hook_path = format!("{}/build-hook", from);
 
 	let desc_path = format!("{}/package.json", to);
 	let archive_path = format!("{}/package.tar.gz", to);
@@ -200,7 +203,7 @@ fn build(from: &str, to: &str) {
 	println!("Jobs: {}; Host: {}; Target: {}", jobs, host, target);
 	println!();
 
-	run_build_hook(&build_hook_path, &build_dir, &sysroot, jobs, &host, &target);
+	run_build_hook(from, &build_dir, &sysroot, jobs, &host, &target);
 
 	println!("Writing built package...");
 
