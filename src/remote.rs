@@ -22,7 +22,7 @@ const REMOTES_FILE: &str = "/usr/lib/blimp/remotes_list";
 const DATABASE_PATH: &str = "/usr/lib/blimp/database";
 
 /// Structure representing a remote host.
-#[derive(Clone)]
+#[derive(Clone, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Remote {
     /// The host's address and port (optional).
     host: String,
@@ -36,35 +36,33 @@ impl Remote {
         }
     }
 
-    /// Returns the list of remote hosts.
+    /// Loads and returns the list of remote hosts.
     /// `sysroot` is the path to the system's root.
-    pub fn list(sysroot: &str) -> io::Result<Vec<Self>> {
-        let mut v = Vec::new();
-
+    pub fn load_list(sysroot: &str) -> io::Result<Vec<Self>> {
         let path = format!("{}/{}", sysroot, REMOTES_FILE);
         let file = File::open(path)?;
         let reader = BufReader::new(file);
 
-        for l in reader.lines() {
-            v.push(Self::new(l?));
-        }
-
-        Ok(v)
+		reader.lines()
+			.map(|s| Ok(Self::new(s?)))
+			.collect::<io::Result<Vec<Self>>>()
     }
 
-	/// Adds a new remote.
-    /// `sysroot` is the path to the system's root.
-	/// `remote` is the remote to add.
-	pub fn add(sysroot: &str, remote: &str) -> io::Result<()> {
+	/// Saves the list of remote hosts.
+	pub fn save_list(sysroot: &str, remotes: &[Self]) -> io::Result<()> {
         let path = format!("{}/{}", sysroot, REMOTES_FILE);
         let file = OpenOptions::new()
 			.read(true)
 			.write(true)
 			.create(true)
+			.truncate(true)
 			.open(path)?;
         let mut writer = BufWriter::new(file);
+		for r in remotes {
+			writer.write(r.get_host().as_bytes())?;
+			writer.write(b"\n")?;
+		}
 
-		writer.write(remote.as_bytes())?;
 		Ok(())
 	}
 
@@ -128,7 +126,7 @@ impl Remote {
     pub fn get_package(sysroot: &str, name: &str, version: &Version)
         -> io::Result<Option<(Self, Package)>> {
         // Iterating over remotes
-        for r in Remote::list(sysroot)? {
+        for r in Remote::load_list(sysroot)? {
             let file = File::open(r.get_database_path(sysroot))?;
             let reader = BufReader::new(file);
 
@@ -150,7 +148,7 @@ impl Remote {
     /// `sysroot` is the path to the system's root.
     pub fn get_latest(sysroot: &str, name: &String) -> io::Result<Option<(Self, Package)>> {
         // Iterating over remotes
-        for r in Remote::list(sysroot)? {
+        for r in Remote::load_list(sysroot)? {
             let file = File::open(r.get_database_path(sysroot))?;
             let reader = BufReader::new(file);
 

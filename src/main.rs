@@ -40,14 +40,14 @@ specify a version");
     eprintln!();
     eprintln!("ENVIRONMENT VARIABLES:");
     eprintln!("\tSYSROOT: Specifies the path to the system's root");
-    eprintln!("\tLOCAL_REPOSITORY: Specifies pathes separated by `:` at which packages are stored \
-locally");
+    eprintln!("\tLOCAL_REPOSITORIES: Specifies paths separated by `:` at which packages are \
+stored locally (the SYSROOT variable doesn't apply to these paths)");
 }
 
 /// Updates the packages list.
 /// `sysroot` is the path to the root of the system.
 fn update(sysroot: &str) -> bool {
-    match Remote::list(sysroot) {
+    match Remote::load_list(sysroot) {
         Ok(remotes) => {
             println!("Updating from remotes...");
 
@@ -76,7 +76,7 @@ fn update(sysroot: &str) -> bool {
 /// Lists remotes.
 /// `sysroot` is the path to the root of the system.
 fn remote_list(sysroot: &str) -> bool {
-    match Remote::list(sysroot) {
+    match Remote::load_list(sysroot) {
         Ok(remotes) => {
             println!("Remotes list:");
 
@@ -99,25 +99,68 @@ fn remote_list(sysroot: &str) -> bool {
     }
 }
 
-/// Adds a remote.
+/// Adds one or several remotes.
 /// `sysroot` is the path to the root of the system.
-/// `remote` is the remote to add.
-fn remote_add(sysroot: &str, remote: &str) -> bool {
-    match Remote::add(sysroot, remote) {
-        Ok(()) => {
-			println!("Added remote `{}`", remote);
-            true
-        },
+/// `remotes` is the list of remotes to add.
+fn remote_add(sysroot: &str, remotes: &[String]) -> bool {
+	let mut list = match Remote::load_list(sysroot) {
+		Ok(l) => l,
+		Err(e) => {
+			eprintln!("Cannot read remotes list: {}", e);
+			return false;
+		}
+	};
+	list.sort();
 
-        Err(e) => {
-            eprintln!("Error: {}", e);
-            false
-        },
-    }
+	for r in remotes {
+		match list.binary_search_by(|r1| r1.get_host().cmp(r)) {
+			Ok(_) => eprintln!("Remote `{}` already exists", r),
+			Err(_) => list.push(Remote::new(r.clone())),
+		}
+	}
+
+	match Remote::save_list(sysroot, &list) {
+		Ok(_) => true,
+		Err(e) => {
+			eprintln!("Cannot write remotes list: {}", e);
+			false
+		}
+	}
+}
+
+/// Removes one or several remotes.
+/// `sysroot` is the path to the root of the system.
+/// `remotes` is the list of remotes to remove.
+fn remote_remove(sysroot: &str, remotes: &[String]) -> bool {
+	let mut list = match Remote::load_list(sysroot) {
+		Ok(l) => l,
+		Err(e) => {
+			eprintln!("Cannot read remotes list: {}", e);
+			return false;
+		}
+	};
+	list.sort();
+
+	for r in remotes {
+		match list.binary_search_by(|r1| r1.get_host().cmp(r)) {
+			Ok(i) => {
+				let _ = list.remove(i);
+			},
+			Err(_) => eprintln!("Remote `{}` not found", r),
+		}
+	}
+
+	match Remote::save_list(sysroot, &list) {
+		Ok(_) => true,
+		Err(e) => {
+			eprintln!("Cannot write remotes list: {}", e);
+			false
+		}
+	}
 }
 
 // TODO Parse options
-fn main_(sysroot: &str) -> Result<bool, Box<dyn Error>> {
+fn main_(sysroot: &str, local_repos: &[String]) -> Result<bool, Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
     // The name of the binary file
     let bin = if args.len() == 0 {
@@ -152,7 +195,7 @@ fn main_(sysroot: &str) -> Result<bool, Box<dyn Error>> {
                 return Ok(false);
             }
 
-            install(names, &sysroot, &[])?; // TODO local repos
+            install(names, &sysroot, local_repos)?;
 			println!("Done! :)");
 			Ok(true)
         }, sysroot)?,
@@ -190,16 +233,20 @@ fn main_(sysroot: &str) -> Result<bool, Box<dyn Error>> {
 
         "remote-add" => lockfile::lock_wrap(|| {
             if args.len() <= 2 {
-                eprintln!("Please specify a remote to add");
+                eprintln!("Please specify a remote(s) to add");
                 return false;
             }
 
-			remote_add(sysroot, &args[2])
+			remote_add(sysroot, &args[2..])
 		}, sysroot),
 
         "remote-remove" => lockfile::lock_wrap(|| {
-            // TODO
-            todo!();
+            if args.len() <= 2 {
+                eprintln!("Please specify a remote(s) to remove");
+                return false;
+            }
+
+			remote_remove(sysroot, &args[2..])
 		}, sysroot),
 
         _ => {
@@ -215,8 +262,15 @@ fn main_(sysroot: &str) -> Result<bool, Box<dyn Error>> {
 fn main() {
     // Getting the sysroot
     let sysroot = env::var("SYSROOT").unwrap_or("/".to_string());
+    let local_repos = env::var("LOCAL_REPOSITORIES")
+		.map(|s| {
+			s.split(":")
+				.map(|s| s.to_owned())
+				.collect()
+		})
+		.unwrap_or(vec![]);
 
-	match main_(&sysroot) {
+	match main_(&sysroot, &local_repos) {
 		Ok(success) => if !success {
 			exit(1);
 		},
