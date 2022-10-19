@@ -1,0 +1,10 @@
+name: Testing
+on: push
+jobs:
+    test:
+        runs-on: [linux]
+        steps:
+            - uses: actions/checkout@v2
+            - run: cargo check
+            - run: cargo clippy
+            - run: cargo test
