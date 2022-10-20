@@ -2,11 +2,10 @@
 
 mod confirm;
 mod install;
-mod lockfile;
-mod remote;
 
+use common::lockfile;
+use common::remote::Remote;
 use install::install;
-use remote::Remote;
 use std::env;
 use std::error::Error;
 use std::process::exit;

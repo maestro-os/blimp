@@ -1,10 +1,10 @@
 //! A remote is a remote host from which packages can be downloaded.
 
-use common::download;
-use common::package::Package;
-use common::request::PackageListResponse;
-use common::request::PackageSizeResponse;
-use common::version::Version;
+use crate::download;
+use crate::package::Package;
+use crate::request::PackageListResponse;
+use crate::request::PackageSizeResponse;
+use crate::version::Version;
 use std::error::Error;
 use std::fs::File;
 use std::fs::OpenOptions;

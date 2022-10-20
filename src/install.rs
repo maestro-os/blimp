@@ -1,10 +1,10 @@
 //! This module handles package installation.
 
 use common::package::Package;
+use common::remote::Remote;
 use common::util;
 use common::version::Version;
 use crate::confirm;
-use crate::remote::Remote;
 use std::collections::HashMap;
 use std::error::Error;
 use tokio::runtime::Runtime;
