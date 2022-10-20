@@ -4,7 +4,7 @@ mod confirm;
 mod install;
 
 use common::lockfile;
-use common::remote::Remote;
+use common::repository::remote::Remote;
 use install::install;
 use std::env;
 use std::error::Error;

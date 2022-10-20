@@ -143,29 +143,6 @@ impl Remote {
         Ok(None)
     }
 
-    /// Returns the latest version of the package with name `name`.
-    /// If the package doesn't exist, the function returns None.
-    /// `sysroot` is the path to the system's root.
-    pub fn get_latest(sysroot: &str, name: &String) -> io::Result<Option<(Self, Package)>> {
-        // Iterating over remotes
-        for r in Remote::load_list(sysroot)? {
-            let file = File::open(r.get_database_path(sysroot))?;
-            let reader = BufReader::new(file);
-
-            let json: PackageListResponse = serde_json::from_reader(reader)?;
-
-            // TODO Take highest version
-            // Iterating over packages on the remote
-            for p in json.packages {
-                if p.get_name() == name {
-                    return Ok(Some((r, p)));
-                }
-            }
-        }
-
-        Ok(None)
-    }
-
     /// Returns the download size of the package `package` in bytes.
     pub async fn get_size(&self, package: &Package) -> Result<u64, String> {
         let url = format!("http://{}/package/{}/version/{}/size",

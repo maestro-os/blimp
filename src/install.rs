@@ -1,7 +1,9 @@
 //! This module handles package installation.
 
 use common::package::Package;
-use common::remote::Remote;
+use common::repository::Repository;
+use common::repository::remote::Remote;
+use common::repository;
 use common::util;
 use common::version::Version;
 use crate::confirm;
@@ -35,22 +37,14 @@ pub fn install(names: &[String], sysroot: &str, local_repos: &[String])
 	-> Result<(), Box<dyn Error>> {
     let mut failed = false;
 
-    // The list of packages to install
-    let mut packages = HashMap::<String, Package>::new();
-    // The list of remotes for each packages
-    let mut remotes = HashMap::<String, Remote>::new();
+	// The list of repositories
+	let repos = Repository::load_all(sysroot: &str, local_repos: &[String])?;
+    // The list of packages to install with their respective repository
+    let mut packages = HashMap::<String, (Package, &Repository)>::new();
 
     for p in names {
-		// TODO Look in local repos
-
-		// Looking in remote repositories
-        match Remote::get_latest(sysroot, &p.clone())? {
-            Some((remote, package)) => {
-                let name = package.get_name().to_owned();
-
-                packages.insert(name.clone(), package);
-                remotes.insert(name, remote);
-            },
+        match repository::get_latest_package(&repos, sysroot, &p)? {
+            Some((repo, package)) => packages.insert(p.to_owned(), (package, repo)),
 
             None => {
                 eprintln!("Package `{}` not found!", p);
@@ -58,7 +52,6 @@ pub fn install(names: &[String], sysroot: &str, local_repos: &[String])
             },
         }
     }
-
 	if failed {
 		return Ok(());
 	}
@@ -69,26 +62,25 @@ pub fn install(names: &[String], sysroot: &str, local_repos: &[String])
     let mut total_packages = packages.clone();
 
     // Resolving dependencies
-    for (_, package) in &packages {
-        // Closure to get a package
-        let mut get_package = | name: String, version: Version | {
-            let r = Remote::get_package(sysroot, &name, &version).or_else(| e | {
-                eprintln!("IO error: {}", e);
-                Err(())
-            }).ok()?;
-            let (remote, package) = r?;
-            remotes.insert(remote.get_host().to_string(), remote);
+    for (_, package) in packages {
+        let valid = package.resolve_dependencies(
+			sysroot,
+			&mut total_packages,
+			| name: String, version: Version | {
+				let r = Remote::get_package(sysroot, &name, &version).or_else(| e | {
+					eprintln!("IO error: {}", e);
+					Err(())
+				}).ok()?;
 
-            Some(package)
-        };
-
-        let valid = package.resolve_dependencies(sysroot, &mut total_packages, &mut get_package)?;
+				let (remote, package) = r?;
+				Some((package, remote))
+			}
+		)?;
 
         if !valid {
             failed = true;
         }
     }
-
 	if failed {
 		return Ok(());
 	}
