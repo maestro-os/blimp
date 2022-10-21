@@ -389,6 +389,7 @@ version = "0.1.0"
 dependencies = [
  "actix-files",
  "actix-web",
+ "bytes 1.2.1",
  "env_logger",
  "flate2",
  "futures",

@@ -302,15 +302,15 @@ impl Package {
         // Uncompressing the package
         util::uncompress_wrap(&self.get_cache_path(sysroot), | tmp_dir | {
             // Running the pre-install hook
-            if !util::run_hook(&format!("{}/pre-install-hook", tmp_dir), &sysroot)? {
+            if !util::run_hook(&format!("{}/pre-install-hook", tmp_dir.display()), &sysroot)? {
                 return Err(io::Error::new(io::ErrorKind::Other, "Pre-install hook failed!"));
             }
 
             // Installing the package's files
-            let data_path = format!("{}/data", tmp_dir);
+            let data_path = format!("{}/data", tmp_dir.display());
             util::recursive_copy(&data_path, &sysroot)?;
 
-            if !util::run_hook(&format!("{}/post-install-hook", tmp_dir), &sysroot)? {
+            if !util::run_hook(&format!("{}/post-install-hook", tmp_dir.display()), &sysroot)? {
                 return Err(io::Error::new(io::ErrorKind::Other, "Post-install hook failed!"));
             }
 
@@ -328,14 +328,14 @@ impl Package {
         // Uncompressing the package
         util::uncompress_wrap(&self.get_cache_path(sysroot), | tmp_dir | {
             // Running the pre-upgrade hook
-            if !util::run_hook(&format!("{}/pre-upgrade-hook", tmp_dir), &sysroot)? {
+            if !util::run_hook(&format!("{}/pre-upgrade-hook", tmp_dir.display()), &sysroot)? {
                 return Err(io::Error::new(io::ErrorKind::Other, "Pre-upgrade hook failed!"));
             }
 
             // TODO Patch files corresponding to the ones in inner data archive
 
             // Running the post-upgrade hook
-            if !util::run_hook(&format!("{}/post-upgrade-hook", tmp_dir), &sysroot)? {
+            if !util::run_hook(&format!("{}/post-upgrade-hook", tmp_dir.display()), &sysroot)? {
                 return Err(io::Error::new(io::ErrorKind::Other, "Post-upgrade hook failed!"));
             }
 
@@ -354,14 +354,14 @@ impl Package {
         // Uncompressing the package
         util::uncompress_wrap(&self.get_cache_path(sysroot), | tmp_dir | {
             // Running the pre-remove hook
-            if !util::run_hook(&format!("{}/pre-remove-hook", tmp_dir), &sysroot)? {
+            if !util::run_hook(&format!("{}/pre-remove-hook", tmp_dir.display()), &sysroot)? {
                 return Err(io::Error::new(io::ErrorKind::Other, "Pre-remove hook failed!"));
             }
 
             // TODO Remove files corresponding to the ones in inner data archive
 
             // Running the post-remove hook
-            if !util::run_hook(&format!("{}/post-remove-hook", tmp_dir), &sysroot)? {
+            if !util::run_hook(&format!("{}/post-remove-hook", tmp_dir.display()), &sysroot)? {
                 return Err(io::Error::new(io::ErrorKind::Other, "Post-remove hook failed!"));
             }
 

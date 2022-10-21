@@ -21,11 +21,12 @@ use xz2::read::XzDecoder;
 
 // TODO Add a maximum try count
 /// Creates a temporary directory. The function returns the path to the directory.
-pub fn create_tmp_dir() -> io::Result<String> {
+pub fn create_tmp_dir() -> io::Result<PathBuf> {
     let mut i = 0;
 
     loop {
-        let path = format!("/tmp/blimp-{}", i);
+        let path = PathBuf::from(format!("/tmp/blimp-{}", i));
+
         if fs::create_dir(&path).is_ok() {
             return Ok(path);
         }
@@ -36,11 +37,12 @@ pub fn create_tmp_dir() -> io::Result<String> {
 
 // TODO Add a maximum try count
 /// Creates a temporary file. The function returns the path to the file and the file itself.
-pub fn create_tmp_file() -> io::Result<(String, File)> {
+pub fn create_tmp_file() -> io::Result<(PathBuf, File)> {
     let mut i = 0;
 
     loop {
-        let path = format!("/tmp/blimp-{}", i);
+        let path = PathBuf::from(format!("/tmp/blimp-{}", i));
+
 		let result = OpenOptions::new()
 			.read(true)
 			.write(true)
@@ -109,7 +111,8 @@ pub fn uncompress<S: AsRef<Path>, D: AsRef<Path>>(src: S, dest: D, unwrap: bool)
 /// Uncompresses the given .tar.gz file `archive` into a temporary directory, executes the given
 /// function `f` with the path to the temporary directory as argument, then removes the directory
 /// and returns the result of the call to `f`.
-pub fn uncompress_wrap<T, F: FnOnce(&str) -> T>(archive: &str, f: F) -> Result<T, Box<dyn Error>> {
+pub fn uncompress_wrap<T, F: FnOnce(&Path) -> T>(archive: &str, f: F)
+	-> Result<T, Box<dyn Error>> {
     // Uncompressing
     let tmp_dir = create_tmp_dir()?;
     uncompress(archive, &tmp_dir, false)?;

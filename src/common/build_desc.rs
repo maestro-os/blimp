@@ -1,6 +1,6 @@
 //! This module implements the build descriptor structure.
 
-use crate::download;
+use crate::download::DownloadTask;
 use crate::package::Package;
 use crate::util;
 use crate::version::Version;
@@ -69,7 +69,10 @@ impl Source {
 				println!("Fetching `{}`...", url);
 
 				let (path, _) = util::create_tmp_file()?;
-				download::download_file(url, &path).await?;
+
+				// Downloading
+				let mut download_task = DownloadTask::new(url, &path).await?;
+				while download_task.next().await? {}
 
 				let dest_path = format!("{}/{}", build_dir, location);
 				// Uncompressing the archive
