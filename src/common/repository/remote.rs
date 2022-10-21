@@ -125,7 +125,7 @@ impl Remote {
 	///
 	/// Arguments:
     /// `sysroot` is the path to the system's root.
-    pub async fn download_archive(
+    pub async fn fetch_archive(
 		&self,
 		repo: &Repository,
 		package: &Package,

@@ -11,6 +11,7 @@ use std::fs::File;
 use std::fs;
 use std::io::BufReader;
 use std::io;
+use std::path::Path;
 use std::process::Command;
 
 /// The directory storing packages' sources to build them on serverside.
@@ -57,7 +58,7 @@ pub enum Source {
 impl Source {
 	/// Fetches files from the source and uncompresses them if necessary.
 	/// Files are placed into the build directory `build_dir` according to the location.
-	pub async fn fetch(&self, build_dir: &str) -> Result<(), Box<dyn Error>> {
+	pub async fn fetch(&self, build_dir: &Path) -> Result<(), Box<dyn Error>> {
 		match self {
 			Self::Url {
 				location,
@@ -74,7 +75,7 @@ impl Source {
 				let mut download_task = DownloadTask::new(url, &path).await?;
 				while download_task.next().await? {}
 
-				let dest_path = format!("{}/{}", build_dir, location);
+				let dest_path = format!("{}/{}", build_dir.display(), location);
 				// Uncompressing the archive
 				util::uncompress(&path, &dest_path, *unwrap)?;
 			},
@@ -86,7 +87,7 @@ impl Source {
 			} => {
 				println!("Cloning `{}`...", git_url);
 
-				let dest_path = format!("{}/{}", build_dir, location);
+				let dest_path = format!("{}/{}", build_dir.display(), location);
 				let status = Command::new("git")
 					.args(["clone", git_url, &dest_path])
 					.status()?;

@@ -11,22 +11,6 @@ use std::collections::HashMap;
 use std::error::Error;
 use tokio::runtime::Runtime;
 
-/// Downloads the package `package` from remote `remote`.
-/// `sysroot` is the path to the system's root.
-async fn download_package(sysroot: &str, remote: &Remote, package: &Package) -> bool {
-    match remote.download(sysroot, package).await {
-        Ok(_) => {
-            println!("Downloaded `{}`", package.get_name());
-            true
-        },
-
-        Err(e) => {
-            eprintln!("Failed to download `{}`: {}", package.get_name(), e);
-            false
-        },
-    }
-}
-
 // TODO Clean
 /// Installs the given list of packages.
 /// `names` is the list of packages to install.
@@ -38,13 +22,15 @@ pub fn install(names: &[String], sysroot: &str, local_repos: &[String])
     let mut failed = false;
 
 	// The list of repositories
-	let repos = Repository::load_all(sysroot: &str, local_repos: &[String])?;
+	let repos = Repository::load_all(sysroot, local_repos)?;
     // The list of packages to install with their respective repository
     let mut packages = HashMap::<String, (Package, &Repository)>::new();
 
     for p in names {
         match repository::get_latest_package(&repos, sysroot, &p)? {
-            Some((repo, package)) => packages.insert(p.to_owned(), (package, repo)),
+            Some((repo, package)) => {
+				packages.insert(p.to_owned(), (package, repo));
+			},
 
             None => {
                 eprintln!("Package `{}` not found!", p);
@@ -62,15 +48,17 @@ pub fn install(names: &[String], sysroot: &str, local_repos: &[String])
     let mut total_packages = packages.clone();
 
     // Resolving dependencies
-    for (_, package) in packages {
+    for (_, (package, _)) in packages {
         let valid = package.resolve_dependencies(
 			sysroot,
 			&mut total_packages,
 			| name: String, version: Version | {
-				let r = Remote::get_package(sysroot, &name, &version).or_else(| e | {
-					eprintln!("IO error: {}", e);
-					Err(())
-				}).ok()?;
+				let r = repository::get_package(&repos, sysroot, &name, &version)
+					.or_else(| e | {
+						eprintln!("error: {}", e);
+						Err(())
+					})
+					.ok()?;
 
 				let (remote, package) = r?;
 				Some((package, remote))
@@ -90,16 +78,18 @@ pub fn install(names: &[String], sysroot: &str, local_repos: &[String])
     let mut futures = Vec::new();
 
     println!("Packages to be installed:");
-    for (name, package) in &total_packages {
+
+    for (name, (package, repo)) in &total_packages {
         if package.is_in_cache(sysroot) {
             println!("\t- {} ({}) - cached", name, package.get_version());
         } else {
             println!("\t- {} ({})", name, package.get_version());
         }
 
-        if !package.is_in_cache(sysroot) {
-            let remote = &remotes[package.get_name()];
-            futures.push(remote.get_size(package));
+        if !repo.has_package(package) {
+			if let Some(remote) = repo.get_remote() {
+				futures.push(remote.get_size(package));
+			}
         }
     }
 
@@ -121,13 +111,15 @@ pub fn install(names: &[String], sysroot: &str, local_repos: &[String])
     println!("Downloading packages...");
     let mut futures = Vec::new();
 
-    for (name, package) in &total_packages {
-        if !package.is_in_cache(sysroot) {
-            let remote = &remotes[package.get_name()];
-            futures.push(download_package(sysroot, remote, package));
-        } else {
+    for (name, (package, repo)) in &total_packages {
+        if package.is_in_cache(sysroot) {
             println!("`{}` is in cache.", name);
+			continue;
         }
+
+		if let Some(remote) = repo.get_remote() {
+			futures.push(Remote::fetch_archive(remote, package, repo));
+		}
     }
 
     // TODO Add progress bar
@@ -145,7 +137,7 @@ pub fn install(names: &[String], sysroot: &str, local_repos: &[String])
     println!("Installing packages...");
 
     // Installing all packages
-    for (name, package) in total_packages {
+    for (name, (package, _)) in total_packages {
         println!("Installing `{}`...", name);
 
         if let Err(e) = package.install(sysroot) {

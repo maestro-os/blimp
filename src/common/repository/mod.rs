@@ -5,6 +5,7 @@
 pub mod remote;
 
 use crate::package::Package;
+use crate::version::Version;
 use remote::Remote;
 use std::io;
 use std::path::PathBuf;
@@ -73,6 +74,23 @@ impl Repository {
 		// TODO
 		todo!();
 	}
+}
+
+/// Returns the package with name `name` and version `version` along with its associated
+/// repository.
+/// If the package doesn't exist, the function returns None.
+///
+/// Arguments:
+/// - `repos` is the list of repositories to check on.
+/// - `sysroot` is the path to the system's root.
+pub fn get_package<'a>(
+	_repos: &'a [Repository],
+	_sysroot: &str,
+	_name: &str,
+	_version: &Version,
+) -> io::Result<Option<(&'a Repository, Package)>> {
+	// TODO
+	todo!();
 }
 
 /// Returns the latest version of the package with name `name` along with its associated

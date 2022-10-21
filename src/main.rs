@@ -54,13 +54,15 @@ fn update(sysroot: &str) -> bool {
             for r in remotes {
                 let host = r.get_host();
 
-                println!("Updating from {}...", host);
-
-                match r.fetch_all(true, &sysroot) {
-                    Ok(packages) => println!("Found {} package(s).", packages.len()),
-                    Err(e) => eprintln!("{}", e),
+                match r.fetch_list(&sysroot) {
+                    Ok(packages) => {
+						println!("Remote {}: Found {} package(s).", host, packages.len());
+					},
+                    Err(e) => eprintln!("Remote {}: error: {}", host, e),
                 }
             }
+
+			// TODO Save all packages
 
             true
         },

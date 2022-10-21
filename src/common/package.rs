@@ -242,23 +242,32 @@ impl Package {
     /// The function makes use of packages that are already in the HashMap and those which are
     /// already installed to determine if there is a dependency error.
     /// If an error occurs, the function returns `false`.
-    pub fn resolve_dependencies<F>(&self, sysroot: &str, packages: &mut HashMap<String, Self>,
-        f: &mut F) -> io::Result<bool> where F: FnMut(String, Version) -> Option<Self> {
+    pub fn resolve_dependencies<F>(
+		&self,
+		sysroot: &str,
+		packages: &mut HashMap<String, Self>,
+        f: &mut F,
+	) -> io::Result<bool> where F: FnMut(&str, &Version) -> Option<Self> {
         // Tells whether dependencies are valid
         let mut valid = true;
 
         for d in &self.run_deps {
             // Getting the package. Either in the installation list or already installed
-            let pkg = Self::get_installed(sysroot, d.get_name())?.or_else(|| {
-                Some(packages.get(d.get_name())?.clone())
-            });
+            let pkg = Self::get_installed(sysroot, d.get_name())?
+				.or_else(|| {
+					Some(packages.get(d.get_name())?.clone())
+				});
 
             // Checking for version conflict
             if let Some(p) = pkg {
                 // If versions don't correspond, error
                 if d.get_version() != p.get_version() {
-                    eprintln!("Conflicting version `{}` and `{}` on `{}`!",
-                        d.get_version(), p.get_version(), d.get_name());
+                    eprintln!(
+						"Conflicting version `{}` and `{}` on `{}`!",
+                        d.get_version(),
+						p.get_version(),
+						d.get_name()
+					);
                     valid = false;
                 }
 
@@ -266,12 +275,15 @@ impl Package {
             }
 
             // Resolving the package, then resolving its dependencies
-            if let Some(p) = f(d.get_name().clone(), d.get_version().clone()) {
+            if let Some(p) = f(d.get_name(), d.get_version()) {
                 p.resolve_dependencies(sysroot, packages, f)?; // FIXME Possible stack overflow
                 packages.insert(p.get_name().to_owned(), p);
             } else {
-                eprintln!("Unresolved dependency `{}` version `{}`!",
-                    d.get_name(), d.get_version());
+                eprintln!(
+					"Unresolved dependency `{}` version `{}`!",
+                    d.get_name(),
+					d.get_version()
+				);
                 valid = false;
             }
         }
