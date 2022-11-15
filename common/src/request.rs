@@ -7,13 +7,13 @@ use serde::Serialize;
 /// Structure representing the response to the request of all packages present on the server.
 #[derive(Deserialize, Serialize)]
 pub struct PackageListResponse {
-    /// The list of packages on the remote.
-    pub packages: Vec<Package>,
+	/// The list of packages on the remote.
+	pub packages: Vec<Package>,
 }
 
 /// Structure representing the response to the request of the size of a package.
 #[derive(Deserialize, Serialize)]
 pub struct PackageSizeResponse {
-    /// The size of the package in bytes.
-    pub size: u64,
+	/// The size of the package in bytes.
+	pub size: u64,
 }

@@ -1,16 +1,16 @@
 //! TODO doc
 
-use actix_web::HttpResponse;
-use actix_web::Responder;
+use crate::global_data::GlobalData;
 use actix_web::get;
 use actix_web::post;
 use actix_web::web;
+use actix_web::HttpResponse;
+use actix_web::Responder;
 use common::build_desc::BuildDescriptor;
 use common::version::Version;
-use crate::global_data::GlobalData;
 use serde::{Deserialize, Serialize};
-use std::fs::File;
 use std::fs;
+use std::fs::File;
 use std::io;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::io::FromRawFd;
@@ -84,12 +84,14 @@ impl Job {
 			JobStatus::Aborted => "<td class=\"status-failed\">Aborted</td>",
 		};
 
-		format!("<tr>
+		format!(
+			"<tr>
 			<td><a href=\"/dashboard/job/{id}\">#{id}</a></td>
 			<td>{package}</td>
 			<td>{version}</td>
 			{status_html}
-		</tr>")
+		</tr>"
+		)
 	}
 
 	/// Returns the path to job's logs file.
@@ -121,25 +123,23 @@ impl Job {
 
 		// TODO Handle None
 		// Getting descriptor
-		let (desc_path, _) = BuildDescriptor::server_get(&self.desc.package, &self.desc.version)?
-			.unwrap();
+		let (desc_path, _) =
+			BuildDescriptor::server_get(&self.desc.package, &self.desc.version)?.unwrap();
 
 		// Creating logs file
 		let file = File::create(self.get_logs_file_path())?;
 		let fd = file.as_raw_fd();
-		let stdout = unsafe {
-			Stdio::from_raw_fd(fd)
-		};
-		let stderr = unsafe {
-			Stdio::from_raw_fd(fd)
-		};
+		let stdout = unsafe { Stdio::from_raw_fd(fd) };
+		let stderr = unsafe { Stdio::from_raw_fd(fd) };
 
 		// Running job
-		self.process = Some(Command::new("blimp-builder")
-			.args([&desc_path, &self.get_out_dir_path()])
-			.stdout(stdout)
-			.stderr(stderr)
-			.spawn()?);
+		self.process = Some(
+			Command::new("blimp-builder")
+				.args([&desc_path, &self.get_out_dir_path()])
+				.stdout(stdout)
+				.stderr(stderr)
+				.spawn()?,
+		);
 
 		self.desc.status = JobStatus::InProgress;
 		Ok(())

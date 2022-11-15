@@ -23,16 +23,12 @@ impl Repository {
 	/// Loads and returns the list of all repositories.
 	///
 	/// Arguments:
-    /// - `sysroot` is the path to the system's root.
+	/// - `sysroot` is the path to the system's root.
 	/// - `local_repos` is the list of paths of local repositories.
-	pub fn load_all(
-		sysroot: &str,
-		local_repos: &[String],
-	) -> io::Result<Vec<Self>> {
+	pub fn load_all(sysroot: &str, local_repos: &[String]) -> io::Result<Vec<Self>> {
 		let mut repos = vec![];
 
-		let iter = local_repos.iter()
-			.map(|path| Self::new(path.to_string()));
+		let iter = local_repos.iter().map(|path| Self::new(path.to_string()));
 		repos.extend(iter);
 
 		// TODO Load repos from remotes
@@ -56,12 +52,24 @@ impl Repository {
 
 	/// Returns the path to the descriptor associated with the given package `pack`.
 	pub fn get_cache_desc_path(&self, pack: &Package) -> PathBuf {
-		format!("{}/{}/{}/desc", self.path, pack.get_name(), pack.get_version()).into()
+		format!(
+			"{}/{}/{}/desc",
+			self.path,
+			pack.get_name(),
+			pack.get_version()
+		)
+		.into()
 	}
 
 	/// Returns the path to the archive associated with the given package `pack`.
 	pub fn get_cache_archive_path(&self, pack: &Package) -> PathBuf {
-		format!("{}/{}/{}/archive", self.path, pack.get_name(), pack.get_version()).into()
+		format!(
+			"{}/{}/{}/archive",
+			self.path,
+			pack.get_name(),
+			pack.get_version()
+		)
+		.into()
 	}
 
 	/// Returns the latest version of the package with name `name` along with its associated
@@ -70,11 +78,7 @@ impl Repository {
 	///
 	/// Arguments:
 	/// - `sysroot` is the path to the system's root.
-	pub fn get_latest_package(
-		&self,
-		sysroot: &str,
-		name: &str
-	) -> io::Result<Option<Package>> {
+	pub fn get_latest_package(&self, sysroot: &str, name: &str) -> io::Result<Option<Package>> {
 		// TODO
 		todo!();
 	}
@@ -107,12 +111,12 @@ pub fn get_package<'a>(
 pub fn get_latest_package<'a>(
 	repos: &'a [Repository],
 	sysroot: &str,
-	name: &str
+	name: &str,
 ) -> io::Result<Option<(&'a Repository, Package)>> {
 	for repo in repos {
 		match repo.get_latest_package(sysroot, name)? {
 			Some(pack) => return Ok(Some((repo, pack))),
-			None => {},
+			None => {}
 		}
 	}
 

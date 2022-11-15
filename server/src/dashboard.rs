@@ -1,14 +1,14 @@
 //! TODO doc
 
-use actix_web::HttpResponse;
-use actix_web::Responder;
+use crate::global_data::GlobalData;
+use crate::util;
 use actix_web::get;
 use actix_web::web;
+use actix_web::HttpResponse;
+use actix_web::Responder;
 use common::build_desc::BuildDescriptor;
 use common::package::Package;
 use common::version::Version;
-use crate::global_data::GlobalData;
-use crate::util;
 use std::sync::Mutex;
 
 // TODO login
@@ -19,11 +19,9 @@ async fn home(data: web::Data<Mutex<GlobalData>>) -> impl Responder {
 	let mut body = include_str!("../../assets/pages/home.html").to_owned();
 
 	// Filling available packages
-    match Package::server_list() {
-        Ok(mut packages) => {
-			packages.sort_by(| n0, n1 | {
-				n0.get_name().cmp(n1.get_name())
-			});
+	match Package::server_list() {
+		Ok(mut packages) => {
+			packages.sort_by(|n0, n1| n0.get_name().cmp(n1.get_name()));
 
 			let html = if packages.is_empty() {
 				"<p><b>No available packages</b></p>".to_owned()
@@ -38,7 +36,12 @@ async fn home(data: web::Data<Mutex<GlobalData>>) -> impl Responder {
 					/*for v in p.get_versions() {
 						html += &format!("<li><a href=\"/dashboard/package/{}/version/{}\">{}</a></li>\n", p.get_name(), v, v);
 					}*/
-					html += &format!("<li><a href=\"/dashboard/package/{}/version/{}\">{}</a></li>\n", p.get_name(), p.get_version(), p.get_version());
+					html += &format!(
+						"<li><a href=\"/dashboard/package/{}/version/{}\">{}</a></li>\n",
+						p.get_name(),
+						p.get_version(),
+						p.get_version()
+					);
 
 					html += "</ul>\n";
 				}
@@ -47,17 +50,20 @@ async fn home(data: web::Data<Mutex<GlobalData>>) -> impl Responder {
 			};
 
 			body = body.replace("{available_packages}", &html);
-		},
+		}
 
-        Err(e) => return HttpResponse::InternalServerError()
-			.body(format!("Error: {}", e.to_string())),
-    }
+		Err(e) => {
+			return HttpResponse::InternalServerError().body(format!("Error: {}", e.to_string()))
+		}
+	}
 
 	// Filling available build descriptors
-    match BuildDescriptor::server_list() {
-        Ok(mut descs) => {
-			descs.sort_by(| n0, n1 | {
-				n0.1.get_package().get_name().cmp(n1.1.get_package().get_name())
+	match BuildDescriptor::server_list() {
+		Ok(mut descs) => {
+			descs.sort_by(|n0, n1| {
+				n0.1.get_package()
+					.get_name()
+					.cmp(n1.1.get_package().get_name())
 			});
 
 			let html = if descs.is_empty() {
@@ -75,7 +81,12 @@ async fn home(data: web::Data<Mutex<GlobalData>>) -> impl Responder {
 					/*for v in p.get_versions() {
 						html += &format!("<li><a href=\"/dashboard/package_desc/{}/version/{}\">{}</a></li>\n", p.get_name(), v, v);
 					}*/
-					html += &format!("<li><a href=\"/dashboard/package_desc/{}/version/{}\">{}</a></li>\n", p.get_name(), p.get_version(), p.get_version());
+					html += &format!(
+						"<li><a href=\"/dashboard/package_desc/{}/version/{}\">{}</a></li>\n",
+						p.get_name(),
+						p.get_version(),
+						p.get_version()
+					);
 
 					html += "</ul>\n";
 				}
@@ -84,11 +95,12 @@ async fn home(data: web::Data<Mutex<GlobalData>>) -> impl Responder {
 			};
 
 			body = body.replace("{packages}", &html);
-		},
+		}
 
-        Err(e) => return HttpResponse::InternalServerError()
-			.body(format!("Error: {}", e.to_string())),
-    }
+		Err(e) => {
+			return HttpResponse::InternalServerError().body(format!("Error: {}", e.to_string()))
+		}
+	}
 
 	// Filling jobs list
 	let jobs = data.get_jobs();
@@ -117,8 +129,8 @@ async fn package_desc(
 	}
 
 	// TODO Handle error
-    // Getting descriptor
-    match BuildDescriptor::server_get(&name.to_owned(), &version).unwrap() {
+	// Getting descriptor
+	match BuildDescriptor::server_get(&name.to_owned(), &version).unwrap() {
 		Some((_, desc)) => {
 			let mut body = include_str!("../../assets/pages/package_desc.html").to_owned();
 
@@ -130,7 +142,7 @@ async fn package_desc(
 			// TODO Run deps
 
 			HttpResponse::Ok().body(body)
-		},
+		}
 
 		None => HttpResponse::NotFound().finish(),
 	}

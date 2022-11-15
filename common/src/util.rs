@@ -4,13 +4,13 @@ use flate2::read::GzDecoder;
 use serde::Deserialize;
 use serde::Serialize;
 use std::error::Error;
+use std::fs;
 use std::fs::File;
 use std::fs::OpenOptions;
-use std::fs;
+use std::io;
 use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Read;
-use std::io;
 use std::os::unix;
 use std::path::Component::Normal;
 use std::path::Path;
@@ -22,26 +22,26 @@ use xz2::read::XzDecoder;
 // TODO Add a maximum try count
 /// Creates a temporary directory. The function returns the path to the directory.
 pub fn create_tmp_dir() -> io::Result<PathBuf> {
-    let mut i = 0;
+	let mut i = 0;
 
-    loop {
-        let path = PathBuf::from(format!("/tmp/blimp-{}", i));
+	loop {
+		let path = PathBuf::from(format!("/tmp/blimp-{}", i));
 
-        if fs::create_dir(&path).is_ok() {
-            return Ok(path);
-        }
+		if fs::create_dir(&path).is_ok() {
+			return Ok(path);
+		}
 
-        i += 1;
-    }
+		i += 1;
+	}
 }
 
 // TODO Add a maximum try count
 /// Creates a temporary file. The function returns the path to the file and the file itself.
 pub fn create_tmp_file() -> io::Result<(PathBuf, File)> {
-    let mut i = 0;
+	let mut i = 0;
 
-    loop {
-        let path = PathBuf::from(format!("/tmp/blimp-{}", i));
+	loop {
+		let path = PathBuf::from(format!("/tmp/blimp-{}", i));
 
 		let result = OpenOptions::new()
 			.read(true)
@@ -49,26 +49,30 @@ pub fn create_tmp_file() -> io::Result<(PathBuf, File)> {
 			.create_new(true)
 			.open(path.clone());
 
-        if let Ok(file) = result {
-            return Ok((path, file));
-        }
+		if let Ok(file) = result {
+			return Ok((path, file));
+		}
 
-        i += 1;
-    }
+		i += 1;
+	}
 }
 
 /// TODO doc
 /// `unwrap` tells whether the tarball shall be unwrapped.
-fn uncompress_<R: Read, D: AsRef<Path>>(mut archive: Archive<R>, dest: D, unwrap: bool)
-	-> Result<(), Box<dyn Error>> {
+fn uncompress_<R: Read, D: AsRef<Path>>(
+	mut archive: Archive<R>,
+	dest: D,
+	unwrap: bool,
+) -> Result<(), Box<dyn Error>> {
 	if unwrap {
 		for entry in archive.entries()? {
 			let mut entry = entry?;
 
-			let path: PathBuf = entry.path()?
+			let path: PathBuf = entry
+				.path()?
 				.components()
 				.skip(1)
-				.filter(| c | matches!(c, Normal(_)))
+				.filter(|c| matches!(c, Normal(_)))
 				.collect();
 			let path = dest.as_ref().join(path);
 
@@ -85,8 +89,11 @@ fn uncompress_<R: Read, D: AsRef<Path>>(mut archive: Archive<R>, dest: D, unwrap
 /// `unwrap` tells whether the tarball shall be unwrapped.
 /// If the tarball contains directories at the root, the unwrap operation unwraps their content
 /// instead of the directories themselves.
-pub fn uncompress<S: AsRef<Path>, D: AsRef<Path>>(src: S, dest: D, unwrap: bool)
-	-> Result<(), Box<dyn Error>> {
+pub fn uncompress<S: AsRef<Path>, D: AsRef<Path>>(
+	src: S,
+	dest: D,
+	unwrap: bool,
+) -> Result<(), Box<dyn Error>> {
 	// Trying to uncompress .tar.gz
 	{
 		let file = File::open(&src)?;
@@ -111,18 +118,17 @@ pub fn uncompress<S: AsRef<Path>, D: AsRef<Path>>(src: S, dest: D, unwrap: bool)
 /// Uncompresses the given .tar.gz file `archive` into a temporary directory, executes the given
 /// function `f` with the path to the temporary directory as argument, then removes the directory
 /// and returns the result of the call to `f`.
-pub fn uncompress_wrap<T, F: FnOnce(&Path) -> T>(archive: &str, f: F)
-	-> Result<T, Box<dyn Error>> {
-    // Uncompressing
-    let tmp_dir = create_tmp_dir()?;
-    uncompress(archive, &tmp_dir, false)?;
+pub fn uncompress_wrap<T, F: FnOnce(&Path) -> T>(archive: &str, f: F) -> Result<T, Box<dyn Error>> {
+	// Uncompressing
+	let tmp_dir = create_tmp_dir()?;
+	uncompress(archive, &tmp_dir, false)?;
 
-    let v = f(&tmp_dir);
+	let v = f(&tmp_dir);
 
-    // Removing temporary directory
-    fs::remove_dir_all(&tmp_dir)?;
+	// Removing temporary directory
+	fs::remove_dir_all(&tmp_dir)?;
 
-    Ok(v)
+	Ok(v)
 }
 
 /// Run the hook at the given path.
@@ -130,87 +136,85 @@ pub fn uncompress_wrap<T, F: FnOnce(&Path) -> T>(archive: &str, f: F)
 /// If the hook succeeded, the function returns `true`. If it didn't, it returns `false`.
 /// If the hook doesn't exist, the function does nothing and returns successfully.
 pub fn run_hook(hook_path: &str, sysroot: &str) -> io::Result<bool> {
-    if !Path::new(hook_path).exists() {
-        return Ok(true);
-    }
+	if !Path::new(hook_path).exists() {
+		return Ok(true);
+	}
 
-    // Runs the hook
-    let status = Command::new(hook_path)
-        .env("SYSROOT", sysroot)
-        .status()?;
+	// Runs the hook
+	let status = Command::new(hook_path).env("SYSROOT", sysroot).status()?;
 
-    if let Some(code) = status.code() {
-        Ok(code == 0)
-    } else {
-        Ok(false)
-    }
+	if let Some(code) = status.code() {
+		Ok(code == 0)
+	} else {
+		Ok(false)
+	}
 }
 
 /// Copies the content of the directory `src` to the directory `dst` recursively.
 pub fn recursive_copy(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result<()> {
 	for entry in fs::read_dir(src)? {
-        let entry = entry?;
+		let entry = entry?;
 		let file_type = entry.file_type()?;
-        let to = dst.as_ref().join(entry.file_name());
+		let to = dst.as_ref().join(entry.file_name());
 
-        if file_type.is_dir() {
-        	fs::create_dir_all(&to)?;
-            recursive_copy(entry.path(), &to)?;
-        } else if file_type.is_symlink() {
+		if file_type.is_dir() {
+			fs::create_dir_all(&to)?;
+			recursive_copy(entry.path(), &to)?;
+		} else if file_type.is_symlink() {
 			let _metadata = fs::symlink_metadata(entry.path())?;
 			let target = fs::read_link(entry.path())?;
 
 			// TODO Set timestamps and owner
 			unix::fs::symlink(target, &to)?;
-        } else {
-            fs::copy(entry.path(), &to)?;
-        }
-    }
+		} else {
+			fs::copy(entry.path(), &to)?;
+		}
+	}
 
 	Ok(())
 }
 
 /// Prints the given size in bytes into a human-readable form.
 pub fn print_size(mut size: u64) {
-    let mut level = 0;
-    while level < 6 && size > 1024 {
-        size /= 1024;
-        level += 1;
-    }
+	let mut level = 0;
+	while level < 6 && size > 1024 {
+		size /= 1024;
+		level += 1;
+	}
 
-    let suffix = match level {
-        0 => " bytes",
-        1 => " KiB",
-        2 => " MiB",
-        3 => " GiB",
-        4 => " TiB",
-        5 => " PiB",
-        6 => " EiB",
+	let suffix = match level {
+		0 => " bytes",
+		1 => " KiB",
+		2 => " MiB",
+		3 => " GiB",
+		4 => " TiB",
+		5 => " PiB",
+		6 => " EiB",
 
-        _ => return,
-    };
+		_ => return,
+	};
 
-    print!("{}{}", size, suffix);
+	print!("{}{}", size, suffix);
 }
 
 /// Reads a JSON file.
 pub fn read_json<T: for<'a> Deserialize<'a>>(file: &str) -> io::Result<T> {
-    let file = File::open(file)?;
-    let reader = BufReader::new(file);
+	let file = File::open(file)?;
+	let reader = BufReader::new(file);
 
-    serde_json::from_reader(reader).or_else(|e| {
-    	let msg = format!("JSON deserializing failed: {}", e);
+	serde_json::from_reader(reader).or_else(|e| {
+		let msg = format!("JSON deserializing failed: {}", e);
 		Err(io::Error::new(io::ErrorKind::Other, msg))
-    })
+	})
 }
 
 /// Writes a JSON file.
 pub fn write_json<T: Serialize>(file: &str, data: &T) -> io::Result<()> {
-    let file = File::create(file)?;
-    let writer = BufWriter::new(file);
+	let file = File::create(file)?;
+	let writer = BufWriter::new(file);
 
-    serde_json::to_writer_pretty(writer, &data).or_else(|e| {
-    	let msg = format!("JSON serializing failed: {}", e);
+	serde_json::to_writer_pretty(writer, &data).or_else(|e| {
+		let msg = format!("JSON serializing failed: {}", e);
 		Err(io::Error::new(io::ErrorKind::Other, msg))
-    })
+	})
 }

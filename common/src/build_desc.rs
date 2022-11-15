@@ -6,10 +6,10 @@ use crate::version::Version;
 use serde::Deserialize;
 use serde::Serialize;
 use std::error::Error;
-use std::fs::File;
 use std::fs;
-use std::io::BufReader;
+use std::fs::File;
 use std::io;
+use std::io::BufReader;
 use std::path::Path;
 use std::process::Command;
 
@@ -84,10 +84,12 @@ impl Source {
 
 				#[cfg(not(feature = "network"))]
 				{
-					panic!("Feature `network` is not enabled! Please recompile blimp common with \
-this feature enabled");
+					panic!(
+						"Feature `network` is not enabled! Please recompile blimp common with \
+this feature enabled"
+					);
 				}
-			},
+			}
 
 			Self::Git {
 				location,
@@ -108,10 +110,12 @@ this feature enabled");
 
 				#[cfg(not(feature = "network"))]
 				{
-					panic!("Feature `network` is not enabled! Please recompile blimp common with \
-this feature enabled");
+					panic!(
+						"Feature `network` is not enabled! Please recompile blimp common with \
+this feature enabled"
+					);
 				}
-			},
+			}
 
 			Self::Local {
 				location,
@@ -122,7 +126,7 @@ this feature enabled");
 			} => {
 				// TODO
 				todo!();
-			},
+			}
 		}
 
 		// TODO Remove the archive?
@@ -145,26 +149,26 @@ impl BuildDescriptor {
 	/// Lists build descriptors on serverside.
 	/// The function returns a vector of package paths and their associated respective descriptors.
 	pub fn server_list() -> io::Result<Vec<(String, Self)>> {
-        let mut descs = Vec::new();
+		let mut descs = Vec::new();
 
-        let files = fs::read_dir(SERVER_PACKAGES_SRC_DIR)?;
-        for p in files {
-            let path = p?.path().into_os_string().into_string().unwrap();
+		let files = fs::read_dir(SERVER_PACKAGES_SRC_DIR)?;
+		for p in files {
+			let path = p?.path().into_os_string().into_string().unwrap();
 			let desc_path = format!("{}/package.json", path);
 
-            match File::open(desc_path.clone()) {
+			match File::open(desc_path.clone()) {
 				Ok(file) => {
 					let reader = BufReader::new(file);
 					descs.push((path, serde_json::from_reader(reader)?));
-				},
+				}
 
 				Err(err) => {
 					eprintln!("Warning: cannot open `{}`: {}", desc_path, err);
-				},
+				}
 			}
-        }
+		}
 
-        Ok(descs)
+		Ok(descs)
 	}
 
 	/// TODO doc
@@ -172,9 +176,10 @@ impl BuildDescriptor {
 		// TODO Optimize
 		Ok(Self::server_list()?
 			.into_iter()
-			.filter(| (_, desc) | {
+			.filter(|(_, desc)| {
 				desc.package.get_name() == name && desc.package.get_version() == version
-			}).next())
+			})
+			.next())
 	}
 
 	/// Returns a reference to the list of sources.
