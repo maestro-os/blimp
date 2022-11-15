@@ -387,20 +387,31 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 name = "blimp"
 version = "0.1.0"
 dependencies = [
- "actix-files",
- "actix-web",
- "bytes 1.2.1",
- "env_logger",
+ "common",
+ "tokio 1.21.2",
+]
+
+[[package]]
+name = "blimp-builder"
+version = "0.1.0"
+dependencies = [
+ "common",
  "flate2",
- "futures",
- "futures-util",
- "rand 0.8.5",
- "reqwest",
- "serde",
- "serde_json",
  "tar",
  "tokio 1.21.2",
- "xz2",
+]
+
+[[package]]
+name = "blimp-server"
+version = "0.1.0"
+dependencies = [
+ "actix-files",
+ "actix-web",
+ "common",
+ "env_logger",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -492,6 +503,22 @@ name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
+
+[[package]]
+name = "common"
+version = "0.1.0"
+dependencies = [
+ "bytes 1.2.1",
+ "flate2",
+ "futures",
+ "futures-util",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tar",
+ "tokio 1.21.2",
+ "xz2",
+]
 
 [[package]]
 name = "const_fn"

@@ -1,0 +1,8 @@
+[package]
+name = "blimp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+common = { path = "../common" }
+tokio = "1.21.2"

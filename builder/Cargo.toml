@@ -1,0 +1,10 @@
+[package]
+name = "blimp-builder"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+common = { path = "../common" }
+flate2 = "1.0.22"
+tar = "0.4.38"
+tokio = "1.21.2"
