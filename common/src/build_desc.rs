@@ -125,9 +125,9 @@ this feature enabled");
 			},
 		}
 
-    	// TODO Remove the archive?
+		// TODO Remove the archive?
 
-    	//Ok(())
+		Ok(())
 	}
 }
 
