@@ -1,6 +1,5 @@
 //! This module implements the build descriptor structure.
 
-use crate::download::DownloadTask;
 use crate::package::Package;
 use crate::util;
 use crate::version::Version;
@@ -13,6 +12,9 @@ use std::io::BufReader;
 use std::io;
 use std::path::Path;
 use std::process::Command;
+
+#[cfg(feature = "network")]
+use crate::download::DownloadTask;
 
 /// The directory storing packages' sources to build them on serverside.
 pub const SERVER_PACKAGES_SRC_DIR: &str = "build_src";
@@ -67,17 +69,24 @@ impl Source {
 
 				unwrap,
 			} => {
-				println!("Fetching `{}`...", url);
+				#[cfg(feature = "network")]
+				{
+					let (path, _) = util::create_tmp_file()?;
 
-				let (path, _) = util::create_tmp_file()?;
+					// Downloading
+					let mut download_task = DownloadTask::new(url, &path).await?;
+					while download_task.next().await? {}
 
-				// Downloading
-				let mut download_task = DownloadTask::new(url, &path).await?;
-				while download_task.next().await? {}
+					let dest_path = format!("{}/{}", build_dir.display(), location);
+					// Uncompressing the archive
+					util::uncompress(&path, &dest_path, *unwrap)?;
+				}
 
-				let dest_path = format!("{}/{}", build_dir.display(), location);
-				// Uncompressing the archive
-				util::uncompress(&path, &dest_path, *unwrap)?;
+				#[cfg(not(feature = "network"))]
+				{
+					panic!("Feature `network` is not enabled! Please recompile blimp common with \
+this feature enabled");
+				}
 			},
 
 			Self::Git {
@@ -85,15 +94,22 @@ impl Source {
 
 				git_url,
 			} => {
-				println!("Cloning `{}`...", git_url);
+				#[cfg(feature = "network")]
+				{
+					let dest_path = format!("{}/{}", build_dir.display(), location);
+					let status = Command::new("git")
+						.args(["clone", git_url, &dest_path])
+						.status()?;
 
-				let dest_path = format!("{}/{}", build_dir.display(), location);
-				let status = Command::new("git")
-					.args(["clone", git_url, &dest_path])
-					.status()?;
+					if !status.success() {
+						return Err(format!("Cloning `{}` failed", git_url).into());
+					}
+				}
 
-				if !status.success() {
-					return Err(format!("Cloning `{}` failed", git_url).into());
+				#[cfg(not(feature = "network"))]
+				{
+					panic!("Feature `network` is not enabled! Please recompile blimp common with \
+this feature enabled");
 				}
 			},
 
@@ -104,8 +120,6 @@ impl Source {
 
 				unwrap,
 			} => {
-				println!("Copying `{}`...", path);
-
 				// TODO
 				todo!();
 			},
@@ -113,7 +127,7 @@ impl Source {
 
     	// TODO Remove the archive?
 
-    	Ok(())
+    	//Ok(())
 	}
 }
 

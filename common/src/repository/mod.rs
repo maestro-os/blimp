@@ -2,13 +2,16 @@
 //!
 //! Repositories can either be local, or linked to remotes, from which packages can be fetched.
 
+#[cfg(feature = "network")]
 pub mod remote;
 
 use crate::package::Package;
 use crate::version::Version;
-use remote::Remote;
 use std::io;
 use std::path::PathBuf;
+
+#[cfg(feature = "network")]
+use remote::Remote;
 
 /// Structure representing a repository.
 pub struct Repository {
@@ -45,6 +48,7 @@ impl Repository {
 	}
 
 	/// Returns the remote associated with the repository.
+	#[cfg(feature = "network")]
 	pub fn get_remote(&self) -> Option<Remote> {
 		// TODO
 		todo!();
