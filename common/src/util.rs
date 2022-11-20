@@ -58,10 +58,11 @@ pub fn create_tmp_file() -> io::Result<(PathBuf, File)> {
 }
 
 /// TODO doc
+///
 /// `unwrap` tells whether the tarball shall be unwrapped.
-fn uncompress_<R: Read, D: AsRef<Path>>(
+fn uncompress_<R: Read>(
 	mut archive: Archive<R>,
-	dest: D,
+	dest: &Path,
 	unwrap: bool,
 ) -> Result<(), Box<dyn Error>> {
 	if unwrap {
@@ -74,7 +75,7 @@ fn uncompress_<R: Read, D: AsRef<Path>>(
 				.skip(1)
 				.filter(|c| matches!(c, Normal(_)))
 				.collect();
-			let path = dest.as_ref().join(path);
+			let path = dest.join(path);
 
 			entry.unpack(path)?;
 		}
@@ -89,9 +90,9 @@ fn uncompress_<R: Read, D: AsRef<Path>>(
 /// `unwrap` tells whether the tarball shall be unwrapped.
 /// If the tarball contains directories at the root, the unwrap operation unwraps their content
 /// instead of the directories themselves.
-pub fn uncompress<S: AsRef<Path>, D: AsRef<Path>>(
-	src: S,
-	dest: D,
+pub fn uncompress(
+	src: &Path,
+	dest: &Path,
 	unwrap: bool,
 ) -> Result<(), Box<dyn Error>> {
 	// Trying to uncompress .tar.gz
@@ -118,7 +119,10 @@ pub fn uncompress<S: AsRef<Path>, D: AsRef<Path>>(
 /// Uncompresses the given .tar.gz file `archive` into a temporary directory, executes the given
 /// function `f` with the path to the temporary directory as argument, then removes the directory
 /// and returns the result of the call to `f`.
-pub fn uncompress_wrap<T, F: FnOnce(&Path) -> T>(archive: &str, f: F) -> Result<T, Box<dyn Error>> {
+pub fn uncompress_wrap<T, F: FnOnce(&Path) -> T>(
+	archive: &Path,
+	f: F,
+) -> Result<T, Box<dyn Error>> {
 	// Uncompressing
 	let tmp_dir = create_tmp_dir()?;
 	uncompress(archive, &tmp_dir, false)?;
@@ -132,34 +136,35 @@ pub fn uncompress_wrap<T, F: FnOnce(&Path) -> T>(archive: &str, f: F) -> Result<
 }
 
 /// Run the hook at the given path.
-/// `sysroot` is the sysroot.
+///
+/// Arguments:
+/// - `hook_path` is the path to the hook to be executed.
+/// - `sysroot` is the sysroot.
+///
 /// If the hook succeeded, the function returns `true`. If it didn't, it returns `false`.
 /// If the hook doesn't exist, the function does nothing and returns successfully.
-pub fn run_hook(hook_path: &str, sysroot: &str) -> io::Result<bool> {
+pub fn run_hook(hook_path: &Path, sysroot: &Path) -> io::Result<bool> {
 	if !Path::new(hook_path).exists() {
 		return Ok(true);
 	}
 
-	// Runs the hook
-	let status = Command::new(hook_path).env("SYSROOT", sysroot).status()?;
+	let status = Command::new(hook_path)
+		.env("SYSROOT", sysroot.as_os_str())
+		.status()?;
 
-	if let Some(code) = status.code() {
-		Ok(code == 0)
-	} else {
-		Ok(false)
-	}
+	Ok(status.success())
 }
 
 /// Copies the content of the directory `src` to the directory `dst` recursively.
-pub fn recursive_copy(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result<()> {
+pub fn recursive_copy(src: &Path, dst: &Path) -> io::Result<()> {
 	for entry in fs::read_dir(src)? {
 		let entry = entry?;
 		let file_type = entry.file_type()?;
-		let to = dst.as_ref().join(entry.file_name());
+		let to = dst.join(entry.file_name());
 
 		if file_type.is_dir() {
 			fs::create_dir_all(&to)?;
-			recursive_copy(entry.path(), &to)?;
+			recursive_copy(&entry.path(), &to)?;
 		} else if file_type.is_symlink() {
 			let _metadata = fs::symlink_metadata(entry.path())?;
 			let target = fs::read_link(entry.path())?;
@@ -198,7 +203,7 @@ pub fn print_size(mut size: u64) {
 }
 
 /// Reads a JSON file.
-pub fn read_json<T: for<'a> Deserialize<'a>>(file: &str) -> io::Result<T> {
+pub fn read_json<T: for<'a> Deserialize<'a>>(file: &Path) -> io::Result<T> {
 	let file = File::open(file)?;
 	let reader = BufReader::new(file);
 
@@ -209,7 +214,7 @@ pub fn read_json<T: for<'a> Deserialize<'a>>(file: &str) -> io::Result<T> {
 }
 
 /// Writes a JSON file.
-pub fn write_json<T: Serialize>(file: &str, data: &T) -> io::Result<()> {
+pub fn write_json<T: Serialize>(file: &Path, data: &T) -> io::Result<()> {
 	let file = File::create(file)?;
 	let writer = BufWriter::new(file);
 

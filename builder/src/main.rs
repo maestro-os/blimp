@@ -2,16 +2,16 @@
 
 use common::build_desc::BuildDescriptor;
 use common::util;
-use flate2::write::GzEncoder;
 use flate2::Compression;
+use flate2::write::GzEncoder;
 use std::env;
-use std::fs;
 use std::fs::File;
+use std::fs;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::exit;
 use std::process::Command;
+use std::process::exit;
 use std::str;
 use tokio::runtime::Runtime;
 
@@ -52,15 +52,18 @@ BLIMP_DEBUG, allowing to keep the files after building to investigate problems"
 /// `jobs` is the recommended number of jobs to build this package.
 /// `host` is the host triplet.
 /// `target` is the target triplet.
-fn run_build_hook(from: &str, build_dir: &str, sysroot: &str, jobs: u32, host: &str, target: &str) {
-	let absolute_from = fs::canonicalize(&PathBuf::from(from))
-		.unwrap()
-		.into_os_string()
-		.into_string()
-		.unwrap();
+fn run_build_hook(
+	from: &Path,
+	build_dir: &Path,
+	sysroot: &Path,
+	jobs: u32,
+	host: &str,
+	target: &str,
+) {
+	let absolute_from = fs::canonicalize(from).unwrap();
 
 	// The path to the build hook
-	let hook_path = format!("{}/build-hook", absolute_from);
+	let hook_path = absolute_from.join("build-hook");
 
 	// Executing the build hook
 	let status = Command::new(hook_path)
@@ -77,13 +80,7 @@ fn run_build_hook(from: &str, build_dir: &str, sysroot: &str, jobs: u32, host: &
 		});
 
 	// Tells whether the process succeeded
-	let success = {
-		if let Some(code) = status.code() {
-			code == 0
-		} else {
-			false
-		}
-	};
+	let success = status.success();
 
 	// On fail, exit
 	if !success {
@@ -104,8 +101,17 @@ fn get_jobs_count() -> u32 {
 	}
 }
 
-/// Creates the archive.
-fn create_archive(archive_path: &str, desc_path: &str, sysroot_path: &str) -> io::Result<()> {
+/// Creates a package's archive.
+///
+/// Arguments:
+/// - `archive_path` is the path of the archive to create.
+/// - `desc_path` is the path to the package's descriptor.
+/// - `sysroot_path` is the sysroot containing the package's files.
+fn create_archive(
+	archive_path: &Path,
+	desc_path: &Path,
+	sysroot_path: &Path,
+) -> io::Result<()> {
 	let tar_gz = File::create(archive_path)?;
 	let enc = GzEncoder::new(tar_gz, Compression::default());
 	let mut tar = tar::Builder::new(enc);
@@ -139,32 +145,33 @@ fn get_host_triplet() -> String {
 // TODO Clean up on error
 /// Builds the package.
 /// `from` and `to` correspond to the command line arguments.
-fn build(from: &str, to: &str) {
+fn build(from: &Path, to: &Path) {
 	fs::create_dir_all(to).unwrap_or_else(|e| {
-		eprintln!("Cannot create directories `{}`: {}", to, e);
+		eprintln!("Cannot create directories `{}`: {}", to.display(), e);
 		exit(1);
 	});
 
-	let build_desc_path = format!("{}/package.json", from);
+	let build_desc_path = from.join("package.json");
 
-	let desc_path = format!("{}/package.json", to);
-	let archive_path = format!("{}/package.tar.gz", to);
+	let desc_path = to.join("package.json");
+	let archive_path = to.join("package.tar.gz");
 
 	// If destination files already exist, fail
 	if Path::new(&desc_path).exists() {
-		eprintln!("{}: File exists", desc_path);
+		eprintln!("{}: File exists", desc_path.display());
 		exit(1);
 	}
 	if Path::new(&archive_path).exists() {
-		eprintln!("{}: File exists", archive_path);
+		eprintln!("{}: File exists", archive_path.display());
 		exit(1);
 	}
 
 	// Reading the build descriptor
-	let build_desc = util::read_json::<BuildDescriptor>(&build_desc_path).unwrap_or_else(|e| {
-		eprintln!("Failed to read the build descriptor: {}", e);
-		exit(1);
-	});
+	let build_desc = util::read_json::<BuildDescriptor>(&build_desc_path)
+		.unwrap_or_else(|e| {
+			eprintln!("Failed to read the build descriptor: {}", e);
+			exit(1);
+		});
 
 	// The package
 	let package = build_desc.get_package();
@@ -228,10 +235,10 @@ fn build(from: &str, to: &str) {
 	});
 
 	if env::var("BLIMP_DEBUG").unwrap_or("0".to_owned()) == "1" {
-		println!("[DEBUG] The build directory is located at: {}", build_dir);
+		println!("[DEBUG] The build directory is located at: {}", build_dir.display());
 		println!(
 			"[DEBUG] The fake sysroot directory is located at: {}",
-			sysroot
+			sysroot.display()
 		);
 	} else {
 		println!("Cleaning up...");
@@ -247,13 +254,7 @@ fn build(from: &str, to: &str) {
 fn main() {
 	let args: Vec<String> = env::args().collect();
 	// The name of the binary file
-	let bin = {
-		if args.len() == 0 {
-			String::from("blimp-builder")
-		} else {
-			args[0].clone()
-		}
-	};
+	let bin = args.first().map(|s| s.as_str()).unwrap_or("blimp-builder");
 
 	// If the argument count is incorrect, print usage
 	if args.len() <= 1 || args.len() > 3 {
@@ -261,12 +262,12 @@ fn main() {
 		exit(1);
 	}
 
-	let from = args[1].clone();
+	let from = PathBuf::from(&args[1]);
 	let to = {
 		if args.len() < 3 {
-			".".to_owned()
+			PathBuf::from(".")
 		} else {
-			args[2].clone()
+			PathBuf::from(&args[2])
 		}
 	};
 

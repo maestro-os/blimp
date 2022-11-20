@@ -6,11 +6,13 @@ use crate::version::Version;
 use serde::Deserialize;
 use serde::Serialize;
 use std::error::Error;
-use std::fs;
+use std::ffi::OsString;
 use std::fs::File;
-use std::io;
+use std::fs;
 use std::io::BufReader;
+use std::io;
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 
 #[cfg(feature = "network")]
@@ -77,7 +79,9 @@ impl Source {
 					let mut download_task = DownloadTask::new(url, &path).await?;
 					while download_task.next().await? {}
 
-					let dest_path = format!("{}/{}", build_dir.display(), location);
+					let mut dest_path: PathBuf = build_dir.to_path_buf();
+					dest_path.push(location);
+
 					// Uncompressing the archive
 					util::uncompress(&path, &dest_path, *unwrap)?;
 				}
@@ -98,9 +102,15 @@ this feature enabled"
 			} => {
 				#[cfg(feature = "network")]
 				{
-					let dest_path = format!("{}/{}", build_dir.display(), location);
+					let mut dest_path: PathBuf = build_dir.to_path_buf();
+					dest_path.push(location);
+
 					let status = Command::new("git")
-						.args(["clone", git_url, &dest_path])
+						.args([
+							OsString::from("clone"),
+							OsString::from(git_url),
+							dest_path.into()
+						])
 						.status()?;
 
 					if !status.success() {

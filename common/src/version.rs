@@ -34,36 +34,22 @@ impl<'de> Deserialize<'de> for Version {
 		D: Deserializer<'de>,
 	{
 		let s: String = Deserialize::deserialize(deserializer)?;
-		Self::from_string(&s).map_err(D::Error::custom)
+		s.as_str()
+			.try_into()
+			.map_err(D::Error::custom)
 	}
 }
 
-impl Version {
-	/// Creates an instance from a given string.
-	pub fn from_string(string: &str) -> Result<Self, ParseIntError> {
-		let mut s = Self {
-			numbers: Vec::new(),
-		};
+impl TryFrom<&str> for Version {
+	type Error = ParseIntError;
 
-		for n in string.split(".") {
-			s.numbers.push(n.parse::<u32>()?);
-		}
-
-		Ok(s)
-	}
-
-	/// Returns the version as string.
-	pub fn to_string(&self) -> String {
-		let mut s = String::new();
-		for (i, n) in self.numbers.iter().enumerate() {
-			s += &n.to_string();
-
-			if i + 1 < self.numbers.len() {
-				s += ".";
-			}
-		}
-
-		s
+	fn try_from(value: &str) -> Result<Self, Self::Error> {
+		value.split(".")
+			.map(|n| n.parse::<u32>())
+			.collect::<Result<Vec<_>, _>>()
+			.map(|numbers| Self {
+				numbers,
+			})
 	}
 }
 

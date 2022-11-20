@@ -1,22 +1,28 @@
 //! A repository contains packages that can be installed.
 //!
-//! Repositories can either be local, or linked to remotes, from which packages can be fetched.
+//! A repository can be linked to a remote, from which packages can be fetched.
 
 #[cfg(feature = "network")]
 pub mod remote;
 
 use crate::package::Package;
 use crate::version::Version;
+use std::fs;
 use std::io;
+use std::path::Path;
 use std::path::PathBuf;
 
 #[cfg(feature = "network")]
 use remote::Remote;
 
-/// Structure representing a repository.
+/// Structure representing a local repository.
 pub struct Repository {
 	/// The path to the repository.
-	path: String,
+	path: PathBuf,
+
+	/// The remote associated with the repository.
+	#[cfg(feature = "network")]
+	remote: Option<Remote>,
 }
 
 impl Repository {
@@ -25,100 +31,127 @@ impl Repository {
 	/// Arguments:
 	/// - `sysroot` is the path to the system's root.
 	/// - `local_repos` is the list of paths of local repositories.
-	pub fn load_all(sysroot: &str, local_repos: &[String]) -> io::Result<Vec<Self>> {
+	pub fn load_all(_sysroot: &Path, local_repos: &[PathBuf]) -> io::Result<Vec<Self>> {
 		let mut repos = vec![];
 
-		let iter = local_repos.iter().map(|path| Self::new(path.to_string()));
-		repos.extend(iter);
+		// TODO List from blimp directory using sysroot
 
-		// TODO Load repos from remotes
+		let mut local_repos = local_repos.iter()
+			.map(|path| Self::load(path.clone()))
+			.collect::<Result<Vec<_>, _>>()?;
+		repos.append(&mut local_repos);
 
 		Ok(repos)
 	}
 
-	/// Creates a new instance from the given path.
-	pub fn new(path: String) -> Self {
-		Self {
+	/// Loads the repository at the given path.
+	///
+	/// If the repository is invalid, the function returns an error.
+	pub fn load(path: PathBuf) -> io::Result<Self> {
+		Ok(Self {
 			path,
-		}
+
+			// TODO read from file
+			remote: None,
+		})
 	}
 
 	/// Returns the remote associated with the repository.
 	#[cfg(feature = "network")]
-	pub fn get_remote(&self) -> Option<Remote> {
-		// TODO
-		todo!();
+	pub fn get_remote(&self) -> Option<&Remote> {
+		self.remote.as_ref()
 	}
 
-	/// Returns the path to the descriptor associated with the given package `pack`.
-	pub fn get_cache_desc_path(&self, pack: &Package) -> PathBuf {
-		format!(
-			"{}/{}/{}/desc",
-			self.path,
-			pack.get_name(),
-			pack.get_version()
-		)
-		.into()
+	/// Returns the path to the archive of the package with the given name `name` and version
+	/// `version`.
+	pub fn get_archive_path(&self, name: &str, version: &Version) -> PathBuf {
+		let mut path = self.path.clone();
+		path.push(&self.path);
+		path.push(name);
+		path.push(version.to_string());
+		path.push("archive");
+
+		path
 	}
 
-	/// Returns the path to the archive associated with the given package `pack`.
-	pub fn get_cache_archive_path(&self, pack: &Package) -> PathBuf {
-		format!(
-			"{}/{}/{}/archive",
-			self.path,
-			pack.get_name(),
-			pack.get_version()
-		)
-		.into()
-	}
-
-	/// Returns the latest version of the package with name `name` along with its associated
-	/// repository.
-	/// If the package doesn't exist, the function returns None.
+	/// Returns the package with name `name` and version `version`.
 	///
-	/// Arguments:
-	/// - `sysroot` is the path to the system's root.
-	pub fn get_latest_package(&self, sysroot: &str, name: &str) -> io::Result<Option<Package>> {
-		// TODO
-		todo!();
+	/// If the package doesn't exist, the function returns None.
+	pub fn get_package(&self, name: &str, version: &Version) -> io::Result<Option<Package>> {
+		let mut path = self.path.clone();
+		path.push(name);
+		path.push(version.to_string());
+
+		Package::load(path)
 	}
-}
 
-/// Returns the package with name `name` and version `version` along with its associated
-/// repository.
-/// If the package doesn't exist, the function returns None.
-///
-/// Arguments:
-/// - `repos` is the list of repositories to check on.
-/// - `sysroot` is the path to the system's root.
-pub fn get_package<'a>(
-	_repos: &'a [Repository],
-	_sysroot: &str,
-	_name: &str,
-	_version: &Version,
-) -> io::Result<Option<(&'a Repository, Package)>> {
-	// TODO
-	todo!();
-}
+	/// Returns the latest version of the package with name `name`.
+	///
+	/// If the package doesn't exist, the function returns None.
+	pub fn get_latest_package(&self, name: &str) -> io::Result<Option<Package>> {
+		let mut path = self.path.clone();
+		path.push(name);
 
-/// Returns the latest version of the package with name `name` along with its associated
-/// repository.
-/// If the package doesn't exist, the function returns None.
-///
-/// Arguments:
-/// - `repos` is the list of repositories to check on.
-/// - `sysroot` is the path to the system's root.
-pub fn get_latest_package<'a>(
-	repos: &'a [Repository],
-	sysroot: &str,
-	name: &str,
-) -> io::Result<Option<(&'a Repository, Package)>> {
-	for repo in repos {
-		match repo.get_latest_package(sysroot, name)? {
-			Some(pack) => return Ok(Some((repo, pack))),
-			None => {}
+		let latest_version = fs::read_dir(path)?
+			.into_iter()
+			.filter_map(|ent| {
+				let ent = ent.ok()?;
+
+				if ent.file_type().ok()?.is_dir() {
+					let name = ent.file_name();
+					Version::try_from(name.to_str()?).ok()
+				} else {
+					None
+				}
+			})
+			.max();
+
+		match latest_version {
+			Some(latest_version) => self.get_package(name, &latest_version),
+			None => Ok(None),
 		}
 	}
+}
 
-	Ok(None)
+// TODO Handle error reporting
+/// Returns the package with name `name` and version `version` along with its associated
+/// repository.
+///
+/// `repos` is the list of repositories to check on.
+///
+/// If the package doesn't exist, the function returns None.
+pub fn get_package<'a>(
+	repos: &'a [Repository],
+	name: &str,
+	version: &Version,
+) -> io::Result<Option<(&'a Repository, Package)>> {
+	Ok(repos.iter()
+		.filter_map(|repo| {
+			match repo.get_package(name, version) {
+				Ok(Some(pack)) => Some((repo, pack)),
+				_ => None,
+			}
+		})
+		.next())
+}
+
+// TODO Handle error reporting
+/// Returns the latest version of the package with name `name` along with its associated
+/// repository.
+///
+/// `repos` is the list of repositories to check on.
+///
+/// If the package doesn't exist, the function returns None.
+pub fn get_latest_package<'a>(
+	repos: &'a [Repository],
+	name: &str,
+) -> io::Result<Option<(&'a Repository, Package)>> {
+	Ok(repos.iter()
+		.filter_map(|repo| {
+			match repo.get_latest_package(name) {
+				Ok(Some(pack)) => Some((repo, pack)),
+				_ => None,
+			}
+		})
+		.max_by(|(_, p0), (_, p1)| p0.get_version().cmp(p1.get_version())))
 }

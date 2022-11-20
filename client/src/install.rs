@@ -1,14 +1,16 @@
 //! This module handles package installation.
 
-use crate::confirm;
 use common::package::Package;
-use common::repository;
-use common::repository::remote::Remote;
 use common::repository::Repository;
+use common::repository::remote::Remote;
+use common::repository;
 use common::util;
 use common::version::Version;
+use crate::confirm;
 use std::collections::HashMap;
 use std::error::Error;
+use std::path::Path;
+use std::path::PathBuf;
 use tokio::runtime::Runtime;
 
 // TODO Clean
@@ -19,8 +21,8 @@ use tokio::runtime::Runtime;
 /// On success, the function returns `true`. On failure, it returns `false`.
 pub fn install(
 	names: &[String],
-	sysroot: &str,
-	local_repos: &[String],
+	sysroot: &Path,
+	local_repos: &[PathBuf],
 ) -> Result<(), Box<dyn Error>> {
 	let mut failed = false;
 
@@ -30,7 +32,7 @@ pub fn install(
 	let mut packages = HashMap::<String, (Package, &Repository)>::new();
 
 	for p in names {
-		match repository::get_latest_package(&repos, sysroot, &p)? {
+		match repository::get_latest_package(&repos, &p)? {
 			Some((repo, package)) => {
 				packages.insert(p.to_owned(), (package, repo));
 			}
@@ -56,7 +58,7 @@ pub fn install(
 			sysroot,
 			&mut total_packages,
 			|name: String, version: Version| {
-				let r = repository::get_package(&repos, sysroot, &name, &version)
+				let r = repository::get_package(&repos, &name, &version)
 					.or_else(|e| {
 						eprintln!("error: {}", e);
 						Err(())
@@ -121,7 +123,7 @@ pub fn install(
 		}
 
 		if let Some(remote) = repo.get_remote() {
-			futures.push(Remote::fetch_archive(remote, package, repo));
+			futures.push(Remote::fetch_archive(remote, repo, package));
 		}
 	}
 
@@ -143,7 +145,7 @@ pub fn install(
 	for (name, (package, _)) in total_packages {
 		println!("Installing `{}`...", name);
 
-		if let Err(e) = package.install(sysroot) {
+		if let Err(e) = install(sysroot, package) {
 			eprintln!("Failed to install `{}`: {}", name, e);
 		}
 	}

@@ -2,7 +2,6 @@ use crate::util;
 use actix_files::NamedFile;
 use actix_web::{get, http::header::ContentType, web, HttpRequest, HttpResponse, Responder};
 use common::package::Package;
-use common::request::PackageListResponse;
 use common::request::PackageSizeResponse;
 use common::version::Version;
 use serde_json::json;
@@ -11,9 +10,7 @@ use std::fs::File;
 #[get("/package")]
 async fn list() -> impl Responder {
 	match Package::server_list() {
-		Ok(packages) => HttpResponse::Ok().json(PackageListResponse {
-			packages: packages.to_vec(),
-		}),
+		Ok(packages) => HttpResponse::Ok().json(packages.to_vec()),
 
 		Err(e) => HttpResponse::InternalServerError().json(json!({
 			"error": e.to_string(),
@@ -45,7 +42,7 @@ async fn size(web::Path((name, version)): web::Path<(String, String)>) -> impl R
 	if !util::is_correct_name(&name) {
 		return HttpResponse::NotFound().finish();
 	}
-	let version = Version::from_string(&version).unwrap(); // TODO Handle error
+	let version = Version::try_from(&version).unwrap(); // TODO Handle error
 
 	// Getting package
 	let package = Package::get(&name.to_owned(), &version).unwrap(); // TODO Handle error
@@ -75,7 +72,7 @@ async fn archive(
 	req: HttpRequest,
 	web::Path((name, version)): web::Path<(String, String)>,
 ) -> impl Responder {
-	let version = Version::from_string(&version).unwrap(); // TODO Handle error
+	let version = Version::try_from(&version).unwrap(); // TODO Handle error
 
 	// Getting package
 	let package = Package::get(&name.to_owned(), &version).unwrap(); // TODO Handle error

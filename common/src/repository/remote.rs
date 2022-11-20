@@ -3,7 +3,6 @@
 use crate::download::DownloadTask;
 use crate::package::Package;
 use crate::repository::Repository;
-use crate::request::PackageListResponse;
 use crate::request::PackageSizeResponse;
 use std::error::Error;
 use std::fs::File;
@@ -85,18 +84,14 @@ impl Remote {
 	}
 
 	/// Fetches the list of all the packages from the remote.
-	/// `sysroot` is the path to the system's root.
-	pub async fn fetch_list(&self, sysroot: &str) -> Result<Vec<Package>, Box<dyn Error>> {
+	pub async fn fetch_list(&self) -> Result<Vec<Package>, Box<dyn Error>> {
 		let url = format!("http://{}/package", &self.host);
 		let response = reqwest::get(url).await?;
 		let status = response.status();
 		let content = response.text().await?;
 
 		match status {
-			reqwest::StatusCode::OK => {
-				let json: PackageListResponse = serde_json::from_str(&content)?;
-				Ok(json.packages)
-			}
+			reqwest::StatusCode::OK => Ok(serde_json::from_str(&content)?),
 
 			_ => Err(format!("Failed to retrieve packages list from remote: {}", status).into()),
 		}
@@ -124,9 +119,6 @@ impl Remote {
 	}
 
 	/// Downloads the archive of package `package` to the given repository `repo`.
-	///
-	/// Arguments:
-	/// `sysroot` is the path to the system's root.
 	pub async fn fetch_archive(
 		&self,
 		repo: &Repository,
@@ -139,7 +131,7 @@ impl Remote {
 			package.get_version()
 		);
 
-		let path = repo.get_cache_archive_path(package);
+		let path = repo.get_archive_path(package.get_name(), package.get_version());
 		DownloadTask::new(&url, &path).await
 	}
 }

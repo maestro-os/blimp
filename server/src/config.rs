@@ -27,11 +27,11 @@ impl Config {
 
 	/// Reads the configuration from file.
 	pub fn read() -> io::Result<Self> {
-		util::read_json(CONFIG_FILE)
+		util::read_json(&Path::new(CONFIG_FILE))
 	}
 
 	pub fn write(&self) -> io::Result<()> {
-		util::write_json(CONFIG_FILE, self)
+		util::write_json(&Path::new(CONFIG_FILE), self)
 	}
 }
 

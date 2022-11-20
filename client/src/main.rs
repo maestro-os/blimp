@@ -2,19 +2,23 @@
 
 mod confirm;
 mod install;
+mod update;
 
 use common::lockfile;
 use common::repository::remote::Remote;
 use install::install;
 use std::env;
 use std::error::Error;
+use std::path::Path;
+use std::path::PathBuf;
 use std::process::exit;
+use update::update;
 
 /// The software's current version.
 const VERSION: &str = "0.1";
 
 /// Prints command line usage.
-fn print_usage(bin: &String) {
+fn print_usage(bin: &str) {
 	eprintln!("blimp package manager version {}", VERSION);
 	eprintln!();
 	eprintln!("USAGE:");
@@ -47,37 +51,6 @@ specify a version"
 		"\tLOCAL_REPOSITORIES: Specifies paths separated by `:` at which packages are \
 stored locally (the SYSROOT variable doesn't apply to these paths)"
 	);
-}
-
-/// Updates the packages list.
-/// `sysroot` is the path to the root of the system.
-fn update(sysroot: &str) -> bool {
-	match Remote::load_list(sysroot) {
-		Ok(remotes) => {
-			println!("Updating from remotes...");
-
-			// TODO async?
-			for r in remotes {
-				let host = r.get_host();
-
-				match r.fetch_list(&sysroot) {
-					Ok(packages) => {
-						println!("Remote {}: Found {} package(s).", host, packages.len());
-					}
-					Err(e) => eprintln!("Remote {}: error: {}", host, e),
-				}
-			}
-
-			// TODO Save all packages
-
-			true
-		}
-
-		Err(e) => {
-			eprintln!("IO error: {}", e);
-			false
-		}
-	}
 }
 
 /// Lists remotes.
@@ -166,15 +139,10 @@ fn remote_remove(sysroot: &str, remotes: &[String]) -> bool {
 	}
 }
 
-// TODO Parse options
-fn main_(sysroot: &str, local_repos: &[String]) -> Result<bool, Box<dyn Error>> {
+fn main_(sysroot: &Path, local_repos: &[PathBuf]) -> Result<bool, Box<dyn Error>> {
 	let args: Vec<String> = env::args().collect();
-	// The name of the binary file
-	let bin = if args.len() == 0 {
-		"blimp".to_owned()
-	} else {
-		args[0].clone()
-	};
+	// Name of the current binary file
+	let bin = args.first().map(|s| s.as_str()).unwrap_or("blimp");
 
 	// If no argument is specified, print usage
 	if args.len() <= 1 {
@@ -186,7 +154,7 @@ fn main_(sysroot: &str, local_repos: &[String]) -> Result<bool, Box<dyn Error>> 
 	match args[1].as_str() {
 		"info" => {
 			let packages = &args[2..];
-			if packages.len() == 0 {
+			if packages.is_empty() {
 				eprintln!("Please specify one or several packages");
 				return Ok(false);
 			}
@@ -195,8 +163,9 @@ fn main_(sysroot: &str, local_repos: &[String]) -> Result<bool, Box<dyn Error>> 
 			todo!();
 		}
 
-		"install" => lockfile::lock_wrap(
-			|| {
+		"update" => lockfile::lock_wrap(|| update(sysroot), sysroot),
+
+		"install" => lockfile::lock_wrap(|| {
 				let names = &args[2..];
 				if names.len() == 0 {
 					eprintln!("Please specify one or several packages");
@@ -210,10 +179,7 @@ fn main_(sysroot: &str, local_repos: &[String]) -> Result<bool, Box<dyn Error>> 
 			sysroot,
 		)?,
 
-		"update" => lockfile::lock_wrap(|| update(sysroot), sysroot),
-
-		"upgrade" => lockfile::lock_wrap(
-			|| {
+		"upgrade" => lockfile::lock_wrap(|| {
 				let _packages = &args[2..];
 
 				// TODO
@@ -222,8 +188,7 @@ fn main_(sysroot: &str, local_repos: &[String]) -> Result<bool, Box<dyn Error>> 
 			sysroot,
 		),
 
-		"remove" => lockfile::lock_wrap(
-			|| {
+		"remove" => lockfile::lock_wrap(|| {
 				let packages = &args[2..];
 				if packages.len() == 0 {
 					eprintln!("Please specify one or several packages");
@@ -236,8 +201,7 @@ fn main_(sysroot: &str, local_repos: &[String]) -> Result<bool, Box<dyn Error>> 
 			sysroot,
 		),
 
-		"clean" => lockfile::lock_wrap(
-			|| {
+		"clean" => lockfile::lock_wrap(|| {
 				// TODO
 				todo!();
 			},
@@ -246,8 +210,7 @@ fn main_(sysroot: &str, local_repos: &[String]) -> Result<bool, Box<dyn Error>> 
 
 		"remote-list" => lockfile::lock_wrap(|| remote_list(sysroot), sysroot),
 
-		"remote-add" => lockfile::lock_wrap(
-			|| {
+		"remote-add" => lockfile::lock_wrap(|| {
 				if args.len() <= 2 {
 					eprintln!("Please specify a remote(s) to add");
 					return false;
@@ -258,8 +221,7 @@ fn main_(sysroot: &str, local_repos: &[String]) -> Result<bool, Box<dyn Error>> 
 			sysroot,
 		),
 
-		"remote-remove" => lockfile::lock_wrap(
-			|| {
+		"remote-remove" => lockfile::lock_wrap(|| {
 				if args.len() <= 2 {
 					eprintln!("Please specify a remote(s) to remove");
 					return false;
@@ -284,18 +246,14 @@ fn main() {
 	// Getting the sysroot
 	let sysroot = env::var("SYSROOT").unwrap_or("/".to_string());
 	let local_repos = env::var("LOCAL_REPOSITORIES")
-		.map(|s| s.split(":").map(|s| s.to_owned()).collect())
+		.map(|s| s.split(":").map(|s| PathBuf::from(s)).collect())
 		.unwrap_or(vec![]);
 
 	match main_(&sysroot, &local_repos) {
-		Ok(success) => {
-			if !success {
-				exit(1);
-			}
-		}
+		Ok(false) => exit(1),
 
 		Err(e) => {
-			eprintln!("Error: {}", e);
+			eprintln!("{}", e);
 			exit(1);
 		}
 	}
