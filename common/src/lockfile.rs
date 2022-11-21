@@ -2,8 +2,9 @@
 //! same time.
 
 use std::error::Error;
-use std::fs;
 use std::fs::OpenOptions;
+use std::fs;
+use std::path::Path;
 
 /// Blimp's path.
 const BLIMP_PATH: &str = "/usr/lib/blimp";
@@ -14,12 +15,12 @@ const LOCKFILE_PATH: &str = "/usr/lib/blimp/.lock";
 /// Creates the lock file if not present. If the file was successfuly created, the function returns
 /// `true`. Else, it returns `false`.
 /// `sysroot` is the system's root.
-pub fn lock(sysroot: &str) -> bool {
+pub fn lock(sysroot: &Path) -> bool {
 	// Creating directories
-	let blimp_dir = format!("{}/{}", sysroot, BLIMP_PATH);
+	let blimp_dir = sysroot.join(BLIMP_PATH);
 	let _ = fs::create_dir_all(blimp_dir);
 
-	let path = format!("{}/{}", sysroot, LOCKFILE_PATH);
+	let path = sysroot.join(LOCKFILE_PATH);
 	// Trying to create the file and failing if it already exist, allowing to avoid TOCTOU race
 	// conditions
 	OpenOptions::new()
@@ -31,15 +32,15 @@ pub fn lock(sysroot: &str) -> bool {
 
 /// Removes the lock file.
 /// `sysroot` is the system's root.
-pub fn unlock(sysroot: &str) {
-	let path = format!("{}/{}", sysroot, LOCKFILE_PATH);
+pub fn unlock(sysroot: &Path) {
+	let path = sysroot.join(LOCKFILE_PATH);
 	let _ = fs::remove_file(path);
 }
 
 /// Executes the given closure `f` while locking.
 /// If the lock cannot be aquired, the function returns an error.
 /// `sysroot` is the system's root.
-pub fn lock_wrap<T, F: FnOnce() -> T>(f: F, sysroot: &str) -> Result<T, Box<dyn Error>> {
+pub fn lock_wrap<T, F: FnOnce() -> T>(f: F, sysroot: &Path) -> Result<T, Box<dyn Error>> {
 	if !lock(sysroot) {
 		return Err("failed to acquire lockfile".into());
 	}

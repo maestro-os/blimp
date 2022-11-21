@@ -25,7 +25,7 @@ pub fn update(sysroot: &Path) -> bool {
 
 	for r in remotes {
 		let host = r.get_host();
-		futures.push((host, r.fetch_list(sysroot)));
+		futures.push((host, r.fetch_list()));
 	}
 	for (host, f) in futures {
 		match rt.block_on(f) {

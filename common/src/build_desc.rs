@@ -12,7 +12,6 @@ use std::fs;
 use std::io::BufReader;
 use std::io;
 use std::path::Path;
-use std::path::PathBuf;
 use std::process::Command;
 
 #[cfg(feature = "network")]
@@ -63,70 +62,8 @@ impl Source {
 	/// Fetches files from the source and uncompresses them if necessary.
 	/// Files are placed into the build directory `build_dir` according to the location.
 	pub async fn fetch(&self, build_dir: &Path) -> Result<(), Box<dyn Error>> {
+		#[cfg(not(feature = "network"))]
 		match self {
-			Self::Url {
-				location,
-
-				url,
-
-				unwrap,
-			} => {
-				#[cfg(feature = "network")]
-				{
-					let (path, _) = util::create_tmp_file()?;
-
-					// Downloading
-					let mut download_task = DownloadTask::new(url, &path).await?;
-					while download_task.next().await? {}
-
-					let mut dest_path: PathBuf = build_dir.to_path_buf();
-					dest_path.push(location);
-
-					// Uncompressing the archive
-					util::uncompress(&path, &dest_path, *unwrap)?;
-				}
-
-				#[cfg(not(feature = "network"))]
-				{
-					panic!(
-						"Feature `network` is not enabled! Please recompile blimp common with \
-this feature enabled"
-					);
-				}
-			}
-
-			Self::Git {
-				location,
-
-				git_url,
-			} => {
-				#[cfg(feature = "network")]
-				{
-					let mut dest_path: PathBuf = build_dir.to_path_buf();
-					dest_path.push(location);
-
-					let status = Command::new("git")
-						.args([
-							OsString::from("clone"),
-							OsString::from(git_url),
-							dest_path.into()
-						])
-						.status()?;
-
-					if !status.success() {
-						return Err(format!("Cloning `{}` failed", git_url).into());
-					}
-				}
-
-				#[cfg(not(feature = "network"))]
-				{
-					panic!(
-						"Feature `network` is not enabled! Please recompile blimp common with \
-this feature enabled"
-					);
-				}
-			}
-
 			Self::Local {
 				location,
 
@@ -135,8 +72,56 @@ this feature enabled"
 				unwrap,
 			} => {
 				// TODO
-				todo!();
 			}
+
+			_ => {
+				panic!("Feature `network` is not enabled! Please recompile blimp common with \
+this feature enabled");
+			},
+		}
+
+		#[cfg(feature = "network")]
+		match self {
+			Self::Url {
+				location,
+
+				url,
+
+				unwrap,
+			} => {
+				let (path, _) = util::create_tmp_file()?;
+
+				// Downloading
+				let mut download_task = DownloadTask::new(url, &path).await?;
+				while download_task.next().await? {}
+
+				let dest_path = build_dir.join(location);
+
+				// Uncompressing the archive
+				util::uncompress(&path, &dest_path, *unwrap)?;
+			}
+
+			Self::Git {
+				location,
+
+				git_url,
+			} => {
+				let dest_path = build_dir.join(location);
+
+				let status = Command::new("git")
+					.args([
+						OsString::from("clone"),
+						OsString::from(git_url),
+						dest_path.into()
+					])
+					.status()?;
+
+				if !status.success() {
+					return Err(format!("Cloning `{}` failed", git_url).into());
+				}
+			}
+
+			_ => {},
 		}
 
 		// TODO Remove the archive?

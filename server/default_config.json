@@ -1,0 +1,7 @@
+{
+	"port": 80,
+
+	"motd": "This is a dummy blimp server",
+
+	"repo_path": "path/to/public/repository"
+}

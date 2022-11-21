@@ -1,12 +1,3 @@
 /target
 
 *.swp
-
-config.json
-
-public_desc
-public_packages
-build_src
-job_logs
-build_src
-build_out

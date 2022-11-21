@@ -55,7 +55,7 @@ stored locally (the SYSROOT variable doesn't apply to these paths)"
 
 /// Lists remotes.
 /// `sysroot` is the path to the root of the system.
-fn remote_list(sysroot: &str) -> bool {
+fn remote_list(sysroot: &Path) -> bool {
 	match Remote::load_list(sysroot) {
 		Ok(remotes) => {
 			println!("Remotes list:");
@@ -82,7 +82,7 @@ fn remote_list(sysroot: &str) -> bool {
 /// Adds one or several remotes.
 /// `sysroot` is the path to the root of the system.
 /// `remotes` is the list of remotes to add.
-fn remote_add(sysroot: &str, remotes: &[String]) -> bool {
+fn remote_add(sysroot: &Path, remotes: &[String]) -> bool {
 	let mut list = match Remote::load_list(sysroot) {
 		Ok(l) => l,
 		Err(e) => {
@@ -111,7 +111,7 @@ fn remote_add(sysroot: &str, remotes: &[String]) -> bool {
 /// Removes one or several remotes.
 /// `sysroot` is the path to the root of the system.
 /// `remotes` is the list of remotes to remove.
-fn remote_remove(sysroot: &str, remotes: &[String]) -> bool {
+fn remote_remove(sysroot: &Path, remotes: &[String]) -> bool {
 	let mut list = match Remote::load_list(sysroot) {
 		Ok(l) => l,
 		Err(e) => {

@@ -7,11 +7,12 @@ use crate::request::PackageSizeResponse;
 use std::error::Error;
 use std::fs::File;
 use std::fs::OpenOptions;
-use std::io;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Write;
+use std::io;
+use std::path::Path;
 
 // TODO Use https
 
@@ -35,8 +36,8 @@ impl Remote {
 
 	/// Loads and returns the list of remote hosts.
 	/// `sysroot` is the path to the system's root.
-	pub fn load_list(sysroot: &str) -> io::Result<Vec<Self>> {
-		let path = format!("{}/{}", sysroot, REMOTES_FILE);
+	pub fn load_list(sysroot: &Path) -> io::Result<Vec<Self>> {
+		let path = sysroot.join(REMOTES_FILE);
 		let file = File::open(path)?;
 		let reader = BufReader::new(file);
 
@@ -47,8 +48,8 @@ impl Remote {
 	}
 
 	/// Saves the list of remote hosts.
-	pub fn save_list(sysroot: &str, remotes: &[Self]) -> io::Result<()> {
-		let path = format!("{}/{}", sysroot, REMOTES_FILE);
+	pub fn save_list(sysroot: &Path, remotes: &[Self]) -> io::Result<()> {
+		let path = sysroot.join(REMOTES_FILE);
 		let file = OpenOptions::new()
 			.read(true)
 			.write(true)

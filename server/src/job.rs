@@ -226,8 +226,8 @@ async fn job_start(
 
 	job.run().unwrap(); // TODO Handle error
 
-	data.get_jobs_mut().push(job);
-	HttpResponse::Ok().json(&data.get_jobs_mut().last().unwrap().desc)
+	data.jobs.push(job);
+	HttpResponse::Ok().json(&data.jobs.last().unwrap().desc)
 }
 
 #[post("/dashboard/job/{id}/abort")]

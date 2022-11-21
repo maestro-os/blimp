@@ -21,23 +21,21 @@ async fn root() -> impl Responder {
 
 #[get("/motd")]
 async fn motd(data: web::Data<Mutex<GlobalData>>) -> impl Responder {
-	let mut data = data.lock().unwrap();
-
-	HttpResponse::Ok().body(data.get_config().motd.clone())
+	let data = data.lock().unwrap();
+	HttpResponse::Ok().body(data.config.motd.clone())
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-	// If the config doesn't exist, create it
-	if !Config::exists() {
-		Config::default().write().unwrap(); // TODO Handle error
-	}
-
 	// Reading config and initializing global data
 	let config = Config::read().unwrap(); // TODO Handle error
 	let port = config.port;
 
-	let data = web::Data::new(Mutex::new(GlobalData::new(config)));
+	let data = web::Data::new(Mutex::new(GlobalData {
+		config,
+
+		jobs: vec![], // TODO Load
+	}));
 
 	// Enabling logging
 	std::env::set_var("RUST_LOG", "actix_web=info");

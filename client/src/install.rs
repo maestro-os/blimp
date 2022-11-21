@@ -142,10 +142,11 @@ pub fn install(
 	println!("Installing packages...");
 
 	// Installing all packages
-	for (name, (package, _)) in total_packages {
+	for (name, (pack, repo)) in total_packages {
 		println!("Installing `{}`...", name);
 
-		if let Err(e) = install(sysroot, package) {
+		let archive_path = repo.get_archive_path(pack.get_name(), pack.get_version());
+		if let Err(e) = common::install::install(sysroot, &pack, archive_path) {
 			eprintln!("Failed to install `{}`: {}", name, e);
 		}
 	}

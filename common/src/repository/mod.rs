@@ -51,8 +51,8 @@ impl Repository {
 		Ok(Self {
 			path,
 
-			// TODO read from file
-			remote: None,
+			#[cfg(feature = "network")]
+			remote: None, // TODO read from file
 		})
 	}
 

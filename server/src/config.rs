@@ -20,11 +20,6 @@ pub struct Config {
 }
 
 impl Config {
-	/// Tells whether the configuration file exists.
-	pub fn exists() -> bool {
-		Path::new(CONFIG_FILE).exists()
-	}
-
 	/// Reads the configuration from file.
 	pub fn read() -> io::Result<Self> {
 		util::read_json(&Path::new(CONFIG_FILE))
@@ -32,15 +27,5 @@ impl Config {
 
 	pub fn write(&self) -> io::Result<()> {
 		util::write_json(&Path::new(CONFIG_FILE), self)
-	}
-}
-
-impl Default for Config {
-	fn default() -> Self {
-		Self {
-			port: 80,
-
-			motd: "This is a dummy blimp server".to_owned(),
-		}
 	}
 }

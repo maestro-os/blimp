@@ -19,11 +19,13 @@ async fn list() -> impl Responder {
 }
 
 #[get("/package/{name}/version/{version}")]
-async fn info(web::Path((name, version)): web::Path<(String, String)>) -> impl Responder {
+async fn info(
+	web::Path((name, version)): web::Path<(String, String)>,
+) -> impl Responder {
 	if !util::is_correct_name(&name) {
 		return HttpResponse::NotFound().finish();
 	}
-	let version = Version::from_string(&version).unwrap(); // TODO Handle error
+	let version = Version::try_from(version.as_str()).unwrap(); // TODO Handle error
 
 	// Getting package
 	let package = Package::get(&name.to_owned(), &version).unwrap(); // TODO Handle error
@@ -38,11 +40,13 @@ async fn info(web::Path((name, version)): web::Path<(String, String)>) -> impl R
 }
 
 #[get("/package/{name}/version/{version}/size")]
-async fn size(web::Path((name, version)): web::Path<(String, String)>) -> impl Responder {
+async fn size(
+	web::Path((name, version)): web::Path<(String, String)>,
+) -> impl Responder {
 	if !util::is_correct_name(&name) {
 		return HttpResponse::NotFound().finish();
 	}
-	let version = Version::try_from(&version).unwrap(); // TODO Handle error
+	let version = Version::try_from(version.as_str()).unwrap(); // TODO Handle error
 
 	// Getting package
 	let package = Package::get(&name.to_owned(), &version).unwrap(); // TODO Handle error
@@ -72,7 +76,7 @@ async fn archive(
 	req: HttpRequest,
 	web::Path((name, version)): web::Path<(String, String)>,
 ) -> impl Responder {
-	let version = Version::try_from(&version).unwrap(); // TODO Handle error
+	let version = Version::try_from(version.as_str()).unwrap(); // TODO Handle error
 
 	// Getting package
 	let package = Package::get(&name.to_owned(), &version).unwrap(); // TODO Handle error
