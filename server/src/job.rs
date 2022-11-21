@@ -6,7 +6,6 @@ use actix_web::post;
 use actix_web::web;
 use actix_web::HttpResponse;
 use actix_web::Responder;
-use common::build_desc::BuildDescriptor;
 use common::version::Version;
 use serde::{Deserialize, Serialize};
 use std::fs;

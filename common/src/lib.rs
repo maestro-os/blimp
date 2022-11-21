@@ -1,6 +1,6 @@
 //! This library contains common code between the client and the server.
 
-pub mod build_desc;
+pub mod build;
 pub mod install;
 pub mod lockfile;
 pub mod package;
