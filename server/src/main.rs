@@ -1,11 +1,18 @@
 mod config;
-mod dashboard;
 mod global_data;
-mod job;
 mod package;
 mod util;
 
-use actix_web::{get, middleware, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{
+	App,
+	HttpResponse,
+	HttpServer,
+	Responder,
+	get,
+	middleware,
+	web,
+};
+use common::repository::Repository;
 use config::Config;
 use global_data::GlobalData;
 use std::sync::Mutex;
@@ -22,7 +29,7 @@ async fn root() -> impl Responder {
 #[get("/motd")]
 async fn motd(data: web::Data<Mutex<GlobalData>>) -> impl Responder {
 	let data = data.lock().unwrap();
-	HttpResponse::Ok().body(data.config.motd.clone())
+	HttpResponse::Ok().body(&data.motd)
 }
 
 #[actix_web::main]
@@ -32,9 +39,9 @@ async fn main() -> std::io::Result<()> {
 	let port = config.port;
 
 	let data = web::Data::new(Mutex::new(GlobalData {
-		config,
+		motd: config.motd,
 
-		jobs: vec![], // TODO Load
+		repo: Repository::load(config.repo_path.clone()).unwrap(), // TODO Handle error
 	}));
 
 	// Enabling logging
@@ -49,14 +56,6 @@ async fn main() -> std::io::Result<()> {
 			.app_data(data.clone())
 			.service(root)
 			.service(motd)
-			.service(dashboard::home)
-			.service(dashboard::package_desc)
-			.service(dashboard::style_css)
-			.service(dashboard::job_js)
-			.service(job::job_get)
-			.service(job::job_logs)
-			.service(job::job_start)
-			.service(job::job_abort)
 			.service(package::list)
 			.service(package::info)
 			.service(package::size)

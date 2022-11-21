@@ -1,14 +1,18 @@
-use crate::util;
 use actix_files::NamedFile;
 use actix_web::{get, http::header::ContentType, web, HttpRequest, HttpResponse, Responder};
 use common::package::Package;
 use common::request::PackageSizeResponse;
 use common::version::Version;
+use crate::global_data::GlobalData;
+use crate::util;
 use serde_json::json;
 use std::fs::File;
+use std::sync::Mutex;
 
 #[get("/package")]
-async fn list() -> impl Responder {
+async fn list(
+	data: web::Data<Mutex<GlobalData>>,
+) -> impl Responder {
 	match Package::server_list() {
 		Ok(packages) => HttpResponse::Ok().json(packages.to_vec()),
 
@@ -21,6 +25,7 @@ async fn list() -> impl Responder {
 #[get("/package/{name}/version/{version}")]
 async fn info(
 	web::Path((name, version)): web::Path<(String, String)>,
+	data: web::Data<Mutex<GlobalData>>,
 ) -> impl Responder {
 	if !util::is_correct_name(&name) {
 		return HttpResponse::NotFound().finish();
@@ -42,6 +47,7 @@ async fn info(
 #[get("/package/{name}/version/{version}/size")]
 async fn size(
 	web::Path((name, version)): web::Path<(String, String)>,
+	data: web::Data<Mutex<GlobalData>>,
 ) -> impl Responder {
 	if !util::is_correct_name(&name) {
 		return HttpResponse::NotFound().finish();
@@ -75,6 +81,7 @@ async fn size(
 async fn archive(
 	req: HttpRequest,
 	web::Path((name, version)): web::Path<(String, String)>,
+	data: web::Data<Mutex<GlobalData>>,
 ) -> impl Responder {
 	let version = Version::try_from(version.as_str()).unwrap(); // TODO Handle error
 

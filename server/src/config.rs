@@ -1,5 +1,6 @@
 //! This module handles the server's configuration file.
 
+use std::path::PathBuf;
 use common::util;
 use serde::Deserialize;
 use serde::Serialize;
@@ -17,6 +18,9 @@ pub struct Config {
 
 	/// The server's motd.
 	pub motd: String,
+
+	/// The path to the repository containing the server's packages.
+	pub repo_path: PathBuf,
 }
 
 impl Config {
