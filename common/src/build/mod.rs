@@ -88,7 +88,7 @@ impl BuildProcess {
 		};
 
 		let runtime = Runtime::new()?;
-		let futures = build_desc.get_sources()
+		let futures = build_desc.sources
 			.iter()
 			.map(|s| s.fetch(&build_dir))
 			.collect::<Vec<_>>();
@@ -113,19 +113,22 @@ impl BuildProcess {
 		jobs: u32,
 		host: &str,
 		target: &str,
-	) -> bool {
-		let Some(ref build_dir) = self.build_dir else {
-			return false;
-		};
-		let Some(ref sysroot) = self.sysroot else {
-			return false;
+	) -> io::Result<bool> {
+		let (
+			Some(build_dir),
+			Some(sysroot),
+		) = (
+			&self.build_dir,
+			&self.sysroot,
+		) else {
+			return Ok(false);
 		};
 
-		let absolute_from = fs::canonicalize(&self.input_path).unwrap();
-		let hook_path = self.input_path.join("build-hook");
+		let absolute_input = fs::canonicalize(&self.input_path)?;
+		let hook_path = absolute_input.join("build-hook");
 
 		Command::new(hook_path)
-			.env("DESC_PATH", absolute_from)
+			.env("DESC_PATH", absolute_input)
 			.env("HOST", host)
 			.env("TARGET", target)
 			.env("SYSROOT", sysroot)
@@ -133,13 +136,13 @@ impl BuildProcess {
 			.current_dir(build_dir)
 			.status()
 			.map(|status| status.success())
-			.unwrap_or(false)
 	}
 
 	/// Creates the archive of the package after being build.
 	///
 	/// `output_path` is the path at which the package's archive will be created.
 	pub fn create_archive(&self, output_path: &Path) -> io::Result<()> {
+		let output_path = output_path.join("package.tar.gz");
 		let build_desc_path = self.input_path.join("package.json");
 
 		let Some(ref sysroot) = self.sysroot else {
@@ -181,12 +184,6 @@ impl Drop for BuildProcess {
 			}
 		}
 	}
-}
-
-/// Returns the recommended amount of CPUs to build the package.
-pub fn get_jobs_count() -> u32 {
-	// TODO
-	todo!();
 }
 
 /// Returns the triplet of the host on which the package is to be built.

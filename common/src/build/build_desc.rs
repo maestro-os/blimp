@@ -2,23 +2,26 @@
 
 use crate::package::Package;
 use crate::util;
-use crate::version::Version;
 use serde::Deserialize;
 use serde::Serialize;
 use std::error::Error;
 use std::ffi::OsString;
-use std::fs::File;
-use std::fs;
-use std::io::BufReader;
-use std::io;
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 
 #[cfg(feature = "network")]
 use crate::download::DownloadTask;
 
-/// The directory storing packages' sources to build them on serverside.
-pub const SERVER_PACKAGES_SRC_DIR: &str = "build_src";
+/// TODO doc
+fn concat_paths(build_dir: &Path, location: &str) -> PathBuf {
+	let loc = match location.chars().next() {
+		Some(c) if c == '/' => &location[1..],
+		_ => location,
+	};
+
+	build_dir.to_path_buf().join(loc)
+}
 
 /// Structure representing the location of sources and where to unpack them.
 #[derive(Deserialize, Serialize)]
@@ -71,6 +74,8 @@ impl Source {
 
 				unwrap,
 			} => {
+				let _dest_path = concat_paths(build_dir, &location);
+
 				// TODO
 			}
 
@@ -89,13 +94,12 @@ this feature enabled");
 
 				unwrap,
 			} => {
-				let (path, _) = util::create_tmp_file()?;
+				let dest_path = concat_paths(build_dir, &location);
 
 				// Downloading
+				let (path, _) = util::create_tmp_file()?;
 				let mut download_task = DownloadTask::new(url, &path).await?;
 				while download_task.next().await? {}
-
-				let dest_path = build_dir.join(location);
 
 				// Uncompressing the archive
 				util::uncompress(&path, &dest_path, *unwrap)?;
@@ -106,7 +110,7 @@ this feature enabled");
 
 				git_url,
 			} => {
-				let dest_path = build_dir.join(location);
+				let dest_path = concat_paths(build_dir, &location);
 
 				let status = Command::new("git")
 					.args([
@@ -134,56 +138,8 @@ this feature enabled");
 #[derive(Deserialize, Serialize)]
 pub struct BuildDescriptor {
 	/// The list of sources for the package.
-	sources: Vec<Source>,
+	pub sources: Vec<Source>,
 
 	/// The package's descriptor.
-	package: Package,
-}
-
-impl BuildDescriptor {
-	/// Lists build descriptors on serverside.
-	/// The function returns a vector of package paths and their associated respective descriptors.
-	pub fn server_list() -> io::Result<Vec<(String, Self)>> {
-		let mut descs = Vec::new();
-
-		let files = fs::read_dir(SERVER_PACKAGES_SRC_DIR)?;
-		for p in files {
-			let path = p?.path().into_os_string().into_string().unwrap();
-			let desc_path = format!("{}/package.json", path);
-
-			match File::open(desc_path.clone()) {
-				Ok(file) => {
-					let reader = BufReader::new(file);
-					descs.push((path, serde_json::from_reader(reader)?));
-				}
-
-				Err(err) => {
-					eprintln!("Warning: cannot open `{}`: {}", desc_path, err);
-				}
-			}
-		}
-
-		Ok(descs)
-	}
-
-	/// TODO doc
-	pub fn server_get(name: &str, version: &Version) -> io::Result<Option<(String, Self)>> {
-		// TODO Optimize
-		Ok(Self::server_list()?
-			.into_iter()
-			.filter(|(_, desc)| {
-				desc.package.get_name() == name && desc.package.get_version() == version
-			})
-			.next())
-	}
-
-	/// Returns a reference to the list of sources.
-	pub fn get_sources(&self) -> &Vec<Source> {
-		&self.sources
-	}
-
-	/// Returns a reference to the package descriptor.
-	pub fn get_package(&self) -> &Package {
-		&self.package
-	}
+	pub package: Package,
 }

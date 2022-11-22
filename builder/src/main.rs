@@ -5,6 +5,7 @@ use std::env;
 use std::path::PathBuf;
 use std::process::exit;
 use std::str;
+use std::thread;
 
 /// The software's current version.
 const VERSION: &str = "0.1";
@@ -44,7 +45,9 @@ fn get_jobs_count() -> u32 {
 			exit(1);
 		}),
 
-		Err(_) => common::build::get_jobs_count(),
+		Err(_) => thread::available_parallelism()
+			.map(|n| n.get() as u32)
+			.unwrap_or(1),
 	}
 }
 
@@ -90,13 +93,17 @@ fn build(from: PathBuf, to: PathBuf) {
 		exit(1);
 	});
 
-	if !build_process.build(jobs, &host, &target) {
-		// TODO return the status of the build process instead?
+	let success = build_process.build(jobs, &host, &target).unwrap_or_else(|e| {
+		eprintln!("Cannot build package: {}", e);
+		exit(1);
+	});
+	if !success {
+		eprintln!("Package build failed!");
 		exit(1);
 	}
 
 	build_process.create_archive(&to).unwrap_or_else(|e| {
-		eprintln!("Cannot fetch sources: {}", e);
+		eprintln!("Cannot create archive: {}", e);
 		exit(1);
 	});
 

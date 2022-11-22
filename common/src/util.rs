@@ -87,7 +87,9 @@ fn uncompress_<R: Read>(
 }
 
 /// Uncompresses the given archive file `src` to the given location `dest`.
+///
 /// `unwrap` tells whether the tarball shall be unwrapped.
+///
 /// If the tarball contains directories at the root, the unwrap operation unwraps their content
 /// instead of the directories themselves.
 pub fn uncompress(
