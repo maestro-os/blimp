@@ -15,10 +15,11 @@ use tokio::runtime::Runtime;
 
 // TODO Clean
 /// Installs the given list of packages.
-/// `names` is the list of packages to install.
-/// `sysroot` is the path to the root of the system on which the packages will be installed.
-/// `local_repos` is the list of paths to local package repositories.
-/// On success, the function returns `true`. On failure, it returns `false`.
+///
+/// Arguments:
+/// - `names` is the list of packages to install.
+/// - `sysroot` is the path to the root of the system on which the packages will be installed.
+/// - `local_repos` is the list of paths to local package repositories.
 pub fn install(
 	names: &[String],
 	sysroot: &Path,
@@ -57,13 +58,15 @@ pub fn install(
 		let valid = package.resolve_dependencies(
 			sysroot,
 			&mut total_packages,
-			|name: String, version: Version| {
-				let r = repository::get_package(&repos, &name, &version)
+			|name, version| {
+				let r = repository::get_package(&repos, name, &version)
 					.or_else(|e| {
 						eprintln!("error: {}", e);
 						Err(())
 					})
 					.ok()?;
+
+				// TODO If not present, check on remote
 
 				let (remote, package) = r?;
 				Some((package, remote))
@@ -85,16 +88,13 @@ pub fn install(
 	println!("Packages to be installed:");
 
 	for (name, (package, repo)) in &total_packages {
-		if package.is_in_cache(sysroot) {
+		// TODO get size from local or remote
+		// TODO print size for each package
+
+		if package.get_package() {
 			println!("\t- {} ({}) - cached", name, package.get_version());
 		} else {
 			println!("\t- {} ({})", name, package.get_version());
-		}
-
-		if !repo.has_package(package) {
-			if let Some(remote) = repo.get_remote() {
-				futures.push(remote.get_size(package));
-			}
 		}
 	}
 
@@ -146,7 +146,7 @@ pub fn install(
 		println!("Installing `{}`...", name);
 
 		let archive_path = repo.get_archive_path(pack.get_name(), pack.get_version());
-		if let Err(e) = common::install::install(sysroot, &pack, archive_path) {
+		if let Err(e) = common::install::install(sysroot, &pack, &archive_path) {
 			eprintln!("Failed to install `{}`: {}", name, e);
 		}
 	}

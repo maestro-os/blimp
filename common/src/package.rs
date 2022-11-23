@@ -119,11 +119,13 @@ impl Package {
 	///
 	/// Arguments:
 	/// - `sysroot` is the path to the system's root.
-	/// - `f` is a function used to get a package from its name and version. If the package doesn't
-	/// exist, the function returns None.
+	/// - `f` is a function used to get a package from its name and version.
+	///
+	/// If the package doesn't exist, the function returns None.
 	///
 	/// The function makes use of packages that are already in the HashMap and those which are
 	/// already installed to determine if there is a dependency error.
+	///
 	/// If an error occurs, the function returns `false`.
 	pub fn resolve_dependencies<F>(
 		&self,
