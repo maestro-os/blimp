@@ -78,7 +78,6 @@ impl Repository {
 	/// `version`.
 	pub fn get_archive_path(&self, name: &str, version: &Version) -> PathBuf {
 		let mut path = self.path.clone();
-		path.push(&self.path);
 		path.push(name);
 		path.push(version.to_string());
 		path.push("archive");

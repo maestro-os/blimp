@@ -55,6 +55,11 @@ impl BuildProcess {
 	}
 
 	/// TODO doc
+	pub fn get_build_desc(&self) -> Option<&BuildDescriptor> {
+		self.build_desc.as_ref()
+	}
+
+	/// TODO doc
 	pub fn get_build_dir(&self) -> Option<&PathBuf> {
 		self.build_dir.as_ref()
 	}
@@ -142,7 +147,6 @@ impl BuildProcess {
 	///
 	/// `output_path` is the path at which the package's archive will be created.
 	pub fn create_archive(&self, output_path: &Path) -> io::Result<()> {
-		let output_path = output_path.join("package.tar.gz");
 		let build_desc_path = self.input_path.join("package.json");
 
 		let Some(ref sysroot) = self.sysroot else {

@@ -1,7 +1,10 @@
 //! The Blimp builder is a tool allowing to build a package.
 
 use common::build::BuildProcess;
+use common::repository::Repository;
+use common::util;
 use std::env;
+use std::fs;
 use std::path::PathBuf;
 use std::process::exit;
 use std::str;
@@ -15,20 +18,19 @@ fn print_usage(bin: &str) {
 	eprintln!("blimp package builder version {}", VERSION);
 	eprintln!();
 	eprintln!("USAGE:");
-	eprintln!("\t{} <FROM> [TO]", bin);
+	eprintln!("\t{} <FROM> <TO>", bin);
 	eprintln!();
 	eprintln!("FROM is the path to the package's build files");
-	eprintln!("TO is the path to the directory where the files will be written");
+	eprintln!("TO is the repository in which the output package will be placed");
 	eprintln!();
 	eprintln!(
-		"The software builds the package according to the package's build files, then \
-writes the package's description `package.json` and archive `package.tar.gz` into the given \
-destination directory."
+		"The software builds the package according to the package's build files, then writes the \
+package into the repository at the given path."
 	);
 	eprintln!();
 	eprintln!(
-		"When creating a package, the building process can be debugged using the \
-BLIMP_DEBUG, allowing to keep the files after building to investigate problems"
+		"When creating a package, the building process can be debugged using the BLIMP_DEBUG \
+environment variable, allowing to keep the files after building to investigate problems"
 	);
 	eprintln!();
 	eprintln!("ENVIRONMENT VARIABLES:");
@@ -79,6 +81,7 @@ fn build(from: PathBuf, to: PathBuf) {
 	let host = get_host_triplet();
 	let target = env::var("TARGET")
 		.unwrap_or_else(|_| host.clone());
+	println!("[INFO] Jobs: {}; Host: {}; Target: {}", jobs, host, target);
 
 	let mut build_process = BuildProcess::new(from);
 	build_process.set_clean_on_drop(!debug);
@@ -107,9 +110,27 @@ fn build(from: PathBuf, to: PathBuf) {
 		exit(1);
 	}
 
+	println!("[INFO] Preparing repository at `{}`...", to.display());
+
+	// TODO Move to separate function
+	let archive_path = {
+		let build_desc = build_process.get_build_desc().unwrap(); // TODO Handle error
+		let name = build_desc.package.get_name();
+		let version = build_desc.package.get_version();
+
+		let package_path = to.join(name).join(version.to_string());
+		fs::create_dir_all(&package_path).unwrap(); // TODO Handle error
+
+		let desc_path = package_path.join("desc");
+		util::write_json(&desc_path, &build_desc.package).unwrap(); // TODO Handle error
+
+		let repo = Repository::load(to).unwrap(); // TODO Handle error
+		repo.get_archive_path(&name, &version)
+	};
+
 	println!("[INFO] Creating archive...");
 
-	build_process.create_archive(&to).unwrap_or_else(|e| {
+	build_process.create_archive(&archive_path).unwrap_or_else(|e| {
 		eprintln!("Cannot create archive: {}", e);
 		exit(1);
 	});
@@ -131,19 +152,13 @@ fn main() {
 		.unwrap_or("blimp-builder");
 
 	// If the argument count is incorrect, print usage
-	if args.len() <= 1 || args.len() > 3 {
+	if args.len() != 3 {
 		print_usage(&bin);
 		exit(1);
 	}
 
 	let from = PathBuf::from(&args[1]);
-	let to = {
-		if args.len() < 3 {
-			PathBuf::from(".")
-		} else {
-			PathBuf::from(&args[2])
-		}
-	};
+	let to = PathBuf::from(&args[2]);
 
 	build(from, to);
 }
