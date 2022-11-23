@@ -1,24 +1,19 @@
 use actix_files::NamedFile;
-use actix_web::{get, http::header::ContentType, web, HttpRequest, HttpResponse, Responder};
-use common::package::Package;
-use common::request::PackageSizeResponse;
+use actix_web::{get, web, HttpRequest, HttpResponse, Responder};
 use common::version::Version;
 use crate::global_data::GlobalData;
 use crate::util;
-use serde_json::json;
-use std::fs::File;
 use std::sync::Mutex;
 
 #[get("/package")]
 async fn list(
 	data: web::Data<Mutex<GlobalData>>,
 ) -> impl Responder {
-	match Package::server_list() {
-		Ok(packages) => HttpResponse::Ok().json(packages.to_vec()),
+	let repo = &data.lock().unwrap().repo;
 
-		Err(e) => HttpResponse::InternalServerError().json(json!({
-			"error": e.to_string(),
-		})),
+	match repo.list_packages() {
+		Ok(packages) => HttpResponse::Ok().json(packages),
+		Err(_) => HttpResponse::InternalServerError().finish(),
 	}
 }
 
@@ -32,48 +27,12 @@ async fn info(
 	}
 	let version = Version::try_from(version.as_str()).unwrap(); // TODO Handle error
 
-	// Getting package
-	let package = Package::get(&name.to_owned(), &version).unwrap(); // TODO Handle error
+	let repo = &data.lock().unwrap().repo;
+	let package = repo.get_package(&name, &version).unwrap(); // TODO Handle error
 
 	match package {
 		Some(p) => HttpResponse::Ok().json(p),
-
-		None => HttpResponse::NotFound().json(json!({
-			"error": format!("Package `{}` with version `{}` not found", name, version),
-		})),
-	}
-}
-
-#[get("/package/{name}/version/{version}/size")]
-async fn size(
-	web::Path((name, version)): web::Path<(String, String)>,
-	data: web::Data<Mutex<GlobalData>>,
-) -> impl Responder {
-	if !util::is_correct_name(&name) {
-		return HttpResponse::NotFound().finish();
-	}
-	let version = Version::try_from(version.as_str()).unwrap(); // TODO Handle error
-
-	// Getting package
-	let package = Package::get(&name.to_owned(), &version).unwrap(); // TODO Handle error
-
-	match package {
-		Some(package) => {
-			let archive_path = package.get_archive_path();
-			let file = File::open(archive_path).unwrap(); // TODO Handle error
-			let size = file.metadata().unwrap().len(); // TODO Handle error
-
-			HttpResponse::Ok().json(PackageSizeResponse {
-				size,
-			})
-		}
-
-		None => {
-			let json = json!({
-				"error": format!("Package `{}` with version `{}` not found", name, version),
-			});
-			HttpResponse::NotFound().set(ContentType::json()).body(json)
-		}
+		None => HttpResponse::NotFound().finish(),
 	}
 }
 
@@ -83,26 +42,23 @@ async fn archive(
 	web::Path((name, version)): web::Path<(String, String)>,
 	data: web::Data<Mutex<GlobalData>>,
 ) -> impl Responder {
+	if !util::is_correct_name(&name) {
+		return HttpResponse::NotFound().finish();
+	}
 	let version = Version::try_from(version.as_str()).unwrap(); // TODO Handle error
 
-	// Getting package
-	let package = Package::get(&name.to_owned(), &version).unwrap(); // TODO Handle error
+	let repo = &data.lock().unwrap().repo;
+	let package = repo.get_package(&name, &version).unwrap(); // TODO Handle error
 
-	match package {
-		Some(package) => {
-			let archive_path = package.get_archive_path();
-			// TODO Handle error
-			NamedFile::open(archive_path)
-				.unwrap()
-				.into_response(&req)
-				.unwrap()
-		}
+	if package.is_some() {
+		let archive_path = repo.get_archive_path(&name, &version);
 
-		None => {
-			let json = json!({
-				"error": format!("Package `{}` with version `{}` not found", name, version),
-			});
-			HttpResponse::NotFound().set(ContentType::json()).body(json)
-		}
+		// TODO Handle error
+		NamedFile::open(archive_path)
+			.unwrap()
+			.into_response(&req)
+			.unwrap()
+	} else {
+		HttpResponse::NotFound().finish()
 	}
 }

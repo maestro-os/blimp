@@ -81,10 +81,7 @@ impl Package {
 	///
 	/// If the package doesn't exist, the function returns None.
 	pub fn load(path: PathBuf) -> io::Result<Option<Package>> {
-		let mut desc_path = path;
-		desc_path.push("desc");
-
-		match fs::read_to_string(desc_path) {
+		match fs::read_to_string(path.join("desc")) {
 			Ok(content) => Ok(Some(serde_json::from_str(&content)?)),
 			Err(e) if e.kind() == ErrorKind::NotFound => Ok(None),
 			Err(e) => Err(e),

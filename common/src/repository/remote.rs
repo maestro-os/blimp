@@ -3,7 +3,6 @@
 use crate::download::DownloadTask;
 use crate::package::Package;
 use crate::repository::Repository;
-use crate::request::PackageSizeResponse;
 use std::error::Error;
 use std::fs::File;
 use std::fs::OpenOptions;
@@ -101,22 +100,20 @@ impl Remote {
 	/// Returns the download size of the package `package` in bytes.
 	pub async fn get_size(&self, package: &Package) -> Result<u64, String> {
 		let url = format!(
-			"http://{}/package/{}/version/{}/size",
+			"http://{}/package/{}/version/{}/archive",
 			self.host,
 			package.get_name(),
 			package.get_version()
 		);
-		let response = reqwest::get(url)
+		let client = reqwest::Client::new();
+		let response = client.head(url)
+			.send()
 			.await
 			.or_else(|e| Err(format!("HTTP request failed: {}", e)))?;
-		let content = response
-			.text()
-			.await
-			.or_else(|e| Err(format!("HTTP request failed: {}", e)))?;
+		let len = response.content_length()
+			.ok_or_else(|| "Content-Length field not present in response".to_owned())?;
 
-		let json: PackageSizeResponse = serde_json::from_str(&content)
-			.or_else(|e| Err(format!("Failed to parse JSON response: {}", e)))?;
-		Ok(json.size)
+		Ok(len)
 	}
 
 	/// Downloads the archive of package `package` to the given repository `repo`.

@@ -5,7 +5,6 @@ pub mod install;
 pub mod lockfile;
 pub mod package;
 pub mod repository;
-pub mod request;
 pub mod util;
 pub mod version;
 

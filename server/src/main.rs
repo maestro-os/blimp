@@ -15,6 +15,7 @@ use actix_web::{
 use common::repository::Repository;
 use config::Config;
 use global_data::GlobalData;
+use std::env;
 use std::sync::Mutex;
 
 /// The server's version.
@@ -45,7 +46,7 @@ async fn main() -> std::io::Result<()> {
 	}));
 
 	// Enabling logging
-	std::env::set_var("RUST_LOG", "actix_web=info");
+	env::set_var("RUST_LOG", "actix_web=info");
 	env_logger::init();
 
 	HttpServer::new(move || {
@@ -58,7 +59,6 @@ async fn main() -> std::io::Result<()> {
 			.service(motd)
 			.service(package::list)
 			.service(package::info)
-			.service(package::size)
 			.service(package::archive)
 	})
 	.bind(format!("0.0.0.0:{}", port))?

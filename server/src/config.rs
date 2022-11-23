@@ -28,8 +28,4 @@ impl Config {
 	pub fn read() -> io::Result<Self> {
 		util::read_json(&Path::new(CONFIG_FILE))
 	}
-
-	pub fn write(&self) -> io::Result<()> {
-		util::write_json(&Path::new(CONFIG_FILE), self)
-	}
 }

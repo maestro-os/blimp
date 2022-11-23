@@ -62,6 +62,18 @@ impl Repository {
 		self.remote.as_ref()
 	}
 
+	/// Returns the path to the descriptor of the package with the given name `name` and version
+	/// `version`.
+	pub fn get_desc_path(&self, name: &str, version: &Version) -> PathBuf {
+		let mut path = self.path.clone();
+		path.push(&self.path);
+		path.push(name);
+		path.push(version.to_string());
+		path.push("desc");
+
+		path
+	}
+
 	/// Returns the path to the archive of the package with the given name `name` and version
 	/// `version`.
 	pub fn get_archive_path(&self, name: &str, version: &Version) -> PathBuf {
@@ -85,14 +97,47 @@ impl Repository {
 		Package::load(path)
 	}
 
+	/// Returns the list of packages with each versions in the repository.
+	pub fn list_packages(&self) -> io::Result<Vec<Package>> {
+		fs::read_dir(&self.path)?
+			.filter_map(|ent| {
+				let ent = ent.ok()?;
+				if !ent.file_type().ok()?.is_dir() {
+					return None;
+				}
+
+				let name = ent.file_name().to_str()?.to_owned();
+				let ent_path = self.path.join(name);
+
+				let iter = fs::read_dir(&ent_path)
+					.ok()?
+					.into_iter()
+					.filter_map(|ent| {
+						let ent = ent.ok()?;
+						if !ent.file_type().ok()?.is_dir() {
+							return None;
+						}
+
+						let ent_name = ent.file_name().to_str()?.to_owned();
+						let version = Version::try_from(ent_name.as_ref()).ok()?;
+
+						let ent_path = ent_path.join(version.to_string());
+						Package::load(ent_path).transpose()
+					})
+					.collect::<Vec<_>>()
+					.into_iter();
+
+				Some(iter)
+			})
+			.flatten()
+			.collect()
+	}
+
 	/// Returns the latest version of the package with name `name`.
 	///
 	/// If the package doesn't exist, the function returns None.
 	pub fn get_latest_package(&self, name: &str) -> io::Result<Option<Package>> {
-		let mut path = self.path.clone();
-		path.push(name);
-
-		let latest_version = fs::read_dir(path)?
+		let latest_version = fs::read_dir(self.path.join(name))?
 			.into_iter()
 			.filter_map(|ent| {
 				let ent = ent.ok()?;

@@ -88,10 +88,15 @@ fn build(from: PathBuf, to: PathBuf) {
 		exit(1);
 	});
 
+	println!("[INFO] Fetching sources...");
+	// TODO Progress bars
+
 	build_process.fetch_sources().unwrap_or_else(|e| {
 		eprintln!("Cannot fetch sources: {}", e);
 		exit(1);
 	});
+
+	println!("[INFO] Compilation...");
 
 	let success = build_process.build(jobs, &host, &target).unwrap_or_else(|e| {
 		eprintln!("Cannot build package: {}", e);
@@ -101,6 +106,8 @@ fn build(from: PathBuf, to: PathBuf) {
 		eprintln!("Package build failed!");
 		exit(1);
 	}
+
+	println!("[INFO] Creating archive...");
 
 	build_process.create_archive(&to).unwrap_or_else(|e| {
 		eprintln!("Cannot create archive: {}", e);
