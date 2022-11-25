@@ -7,6 +7,9 @@ use std::fs::OpenOptions;
 use std::fs;
 use std::path::Path;
 
+/// The directory containing blimp's files.
+const BLIMP_PATH: &str = "/usr/lib/blimp";
+
 /// The directory containing cached packages.
 const LOCKFILE_PATH: &str = "/usr/lib/blimp/.lock";
 
@@ -37,8 +40,11 @@ pub fn unlock(path: &Path) {
 ///
 /// If the lock cannot be aquired, the function returns an error.
 pub fn lock_wrap<T, F: FnOnce() -> T>(f: F, sysroot: &Path) -> Result<T, Box<dyn Error>> {
-	let path = util::concat_paths(sysroot, Path::new(LOCKFILE_PATH));
+	// Create blimp directory if not present
+	let blimp_path = util::concat_paths(sysroot, Path::new(BLIMP_PATH));
+	let _ = fs::create_dir_all(blimp_path);
 
+	let path = util::concat_paths(sysroot, Path::new(LOCKFILE_PATH));
 	if !lock(&path) {
 		return Err(format!("failed to acquire lockfile {}", path.display()).into());
 	}
