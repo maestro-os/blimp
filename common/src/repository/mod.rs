@@ -85,6 +85,15 @@ impl Repository {
 		path
 	}
 
+	/// Tells whether the **archive** of the package with name `name` and version `version` is
+	/// present in the repository.
+	///
+	/// Note: A package can be present in a repository with its archive.
+	pub fn is_in_cache(&self, name: &str, version: &Version) -> bool {
+		let path = self.get_archive_path(name, version);
+		path.exists()
+	}
+
 	/// Returns the package with name `name` and version `version`.
 	///
 	/// If the package doesn't exist, the function returns None.

@@ -23,7 +23,7 @@ pub fn update(sysroot: &Path) -> bool {
 	let rt = Runtime::new().unwrap();
 	let mut futures = Vec::new();
 
-	for r in remotes {
+	for r in remotes.iter() {
 		let host = r.get_host();
 		futures.push((host, r.fetch_list()));
 	}

@@ -2,11 +2,13 @@
 //! Packages are usualy downloaded from a remote host.
 
 use crate::install;
+use crate::repository::Repository;
 use crate::version::Version;
 use serde::Deserialize;
 use serde::Serialize;
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::fmt;
 use std::fs;
 use std::io::ErrorKind;
 use std::io;
@@ -18,8 +20,47 @@ pub const SERVER_PACKAGES_DESC_DIR: &str = "public_desc";
 /// The directory storing packages' archives on the serverside.
 pub const SERVER_PACKAGES_DIR: &str = "public_packages";
 
+pub enum ResolveError {
+	/// The dependency cannot be found.
+	NotFound {
+		/// The name of the package.
+		name: String,
+		/// The version of the package.
+		version: Version,
+	},
+
+	/// The dependency version conflicts another package or dependency.
+	VersionConflict {
+		/// The name of the package.
+		name: String,
+
+		/// Version of the required dependency.
+		v0: Version,
+		/// Version of the other element.
+		v1: Version,
+	},
+}
+
+impl fmt::Display for ResolveError {
+	fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+		match self {
+			Self::NotFound {
+				name,
+				version,
+			} => write!(fmt, "Unresolved dependency `{}` version `{}`!", name, version),
+
+			Self::VersionConflict {
+				name,
+
+				v0,
+				v1,
+			} => write!(fmt, "Conflicting version `{}` and `{}` on `{}`!", v0, v1, name),
+		}
+	}
+}
+
 /// Structure representing a package dependency.
-#[derive(Clone, Eq, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Eq, Hash, Serialize)]
 pub struct Dependency {
 	/// The dependency's name.
 	name: String,
@@ -60,7 +101,7 @@ impl PartialEq for Dependency {
 }
 
 /// Structure representing a package.
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Package {
 	/// The package's name.
 	name: String,
@@ -113,7 +154,6 @@ impl Package {
 		&self.run_deps
 	}
 
-	// TODO Move printing out of this function
 	/// Resolves the dependencies of the package and inserts them into the given HashMap
 	/// `packages`.
 	///
@@ -121,58 +161,69 @@ impl Package {
 	/// - `sysroot` is the path to the system's root.
 	/// - `f` is a function used to get a package from its name and version.
 	///
-	/// If the package doesn't exist, the function returns None.
-	///
 	/// The function makes use of packages that are already in the HashMap and those which are
 	/// already installed to determine if there is a dependency error.
 	///
-	/// If an error occurs, the function returns `false`.
-	pub fn resolve_dependencies<F>(
+	/// If one or more packages cannot be resolved, the function returns the list of errors.
+	pub fn resolve_dependencies<'r, F>(
 		&self,
 		sysroot: &Path,
-		packages: &mut HashMap<String, Self>,
+		packages: &mut HashMap<Self, &'r Repository>,
 		f: &mut F,
-	) -> io::Result<bool>
-		where F: FnMut(&str, &Version) -> Option<Self>,
+	) -> io::Result<Result<(), Vec<ResolveError>>>
+		where F: FnMut(&str, &Version) -> Option<(Self, &'r Repository)>,
 	{
-		// Tells whether dependencies are valid
-		let mut valid = true;
+		let mut errors = vec![];
 
 		for d in &self.run_deps {
 			// Getting the package. Either in the installation list or already installed
-			let pkg = install::get_installed(sysroot, d.get_name())?
-				.or_else(|| Some(packages.get(d.get_name())?.clone()));
+			let pkg = install::get_installed(sysroot, d.get_name())?;
+			let pkg = pkg.as_ref()
+				.or_else(|| {
+					packages.iter()
+						.map(|(p, _)| p)
+						.filter(|p| p.get_name() == d.get_name())
+						.next()
+				});
 
 			// Checking for version conflict
 			if let Some(p) = pkg {
 				// If versions don't correspond, error
 				if d.get_version() != p.get_version() {
-					eprintln!(
-						"Conflicting version `{}` and `{}` on `{}`!",
-						d.get_version(),
-						p.get_version(),
-						d.get_name()
-					);
-					valid = false;
+					errors.push(ResolveError::VersionConflict {
+						v0: d.get_version().clone(),
+						v1: d.get_version().clone(),
+
+						name: d.get_name().clone(),
+					});
 				}
 
 				continue;
 			}
 
 			// Resolving the package, then resolving its dependencies
-			if let Some(p) = f(d.get_name(), d.get_version()) {
-				p.resolve_dependencies(sysroot, packages, f)?; // FIXME Possible stack overflow
-				packages.insert(p.get_name().to_owned(), p);
+			if let Some((p, repo)) = f(d.get_name(), d.get_version()) {
+				let res = p.resolve_dependencies(sysroot, packages, f)?; // FIXME Possible stack overflow
+				match res {
+					Ok(_) => {},
+					Err(errs) => return Ok(Err(errs)),
+				}
+
+				packages.insert(p, repo);
 			} else {
-				eprintln!(
-					"Unresolved dependency `{}` version `{}`!",
-					d.get_name(),
-					d.get_version()
-				);
-				valid = false;
+				errors.push(ResolveError::NotFound {
+					name: d.get_name().clone(),
+					version: d.get_version().clone(),
+				});
 			}
 		}
 
-		Ok(valid)
+		let res = if errors.is_empty() {
+			Ok(())
+		} else {
+			Err(errors)
+		};
+
+		Ok(res)
 	}
 }

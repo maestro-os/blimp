@@ -13,7 +13,7 @@ use std::fmt::Formatter;
 use std::num::ParseIntError;
 
 /// Structure representing a version.
-#[derive(Clone, Eq)]
+#[derive(Clone, Eq, Hash)]
 pub struct Version {
 	/// Vector containing the version numbers.
 	numbers: Vec<u32>,

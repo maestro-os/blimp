@@ -244,7 +244,9 @@ fn main_(sysroot: &Path, local_repos: &[PathBuf]) -> Result<bool, Box<dyn Error>
 
 fn main() {
 	// Getting the sysroot
-	let sysroot = env::var("SYSROOT").unwrap_or("/".to_string());
+	let sysroot = env::var("SYSROOT")
+		.map(PathBuf::from)
+		.unwrap_or(PathBuf::from("/"));
 	let local_repos = env::var("LOCAL_REPOSITORIES")
 		.map(|s| s.split(":").map(|s| PathBuf::from(s)).collect())
 		.unwrap_or(vec![]);
@@ -256,5 +258,7 @@ fn main() {
 			eprintln!("{}", e);
 			exit(1);
 		}
+
+		_ => {},
 	}
 }

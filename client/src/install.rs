@@ -5,7 +5,6 @@ use common::repository::Repository;
 use common::repository::remote::Remote;
 use common::repository;
 use common::util;
-use common::version::Version;
 use crate::confirm;
 use std::collections::HashMap;
 use std::error::Error;
@@ -30,16 +29,16 @@ pub fn install(
 	// The list of repositories
 	let repos = Repository::load_all(sysroot, local_repos)?;
 	// The list of packages to install with their respective repository
-	let mut packages = HashMap::<String, (Package, &Repository)>::new();
+	let mut packages = HashMap::<Package, &Repository>::new();
 
-	for p in names {
-		match repository::get_latest_package(&repos, &p)? {
+	for name in names {
+		match repository::get_latest_package(&repos, &name)? {
 			Some((repo, package)) => {
-				packages.insert(p.to_owned(), (package, repo));
+				packages.insert(package, repo);
 			}
 
 			None => {
-				eprintln!("Package `{}` not found!", p);
+				eprintln!("Package `{}` not found!", name);
 				failed = true;
 			}
 		}
@@ -54,27 +53,38 @@ pub fn install(
 	let mut total_packages = packages.clone();
 
 	// Resolving dependencies
-	for (_, (package, _)) in packages {
-		let valid = package.resolve_dependencies(
+	for (package, _) in packages {
+		let res = package.resolve_dependencies(
 			sysroot,
 			&mut total_packages,
-			|name, version| {
-				let r = repository::get_package(&repos, name, &version)
+			&mut |name, version| {
+				let res = repository::get_package(&repos, name, &version)
 					.or_else(|e| {
 						eprintln!("error: {}", e);
 						Err(())
 					})
 					.ok()?;
 
-				// TODO If not present, check on remote
+				// If not present, check on remote
+				if res.is_none() {
+					// TODO
+					todo!();
+				}
 
-				let (remote, package) = r?;
-				Some((package, remote))
+				let (repo, pkg) = res?;
+				Some((pkg, repo))
 			},
 		)?;
+		match res {
+			Err(errs) => {
+				for e in errs {
+					eprintln!("{}", e);
+				}
 
-		if !valid {
-			failed = true;
+				failed = true;
+			},
+
+			_ => {},
 		}
 	}
 	if failed {
@@ -83,28 +93,34 @@ pub fn install(
 
 	// Creating the async runtime
 	let rt = Runtime::new().unwrap();
-	let mut futures = Vec::new();
 
 	println!("Packages to be installed:");
 
-	for (name, (package, repo)) in &total_packages {
-		// TODO get size from local or remote
-		// TODO print size for each package
+	// The total download size in bytes
+	let mut total_size = 0;
 
-		if package.get_package() {
-			println!("\t- {} ({}) - cached", name, package.get_version());
-		} else {
-			println!("\t- {} ({})", name, package.get_version());
+	for (pkg, repo) in &total_packages {
+		let name = pkg.get_name();
+		let version = pkg.get_version();
+
+		match repo.get_package(name, version)? {
+			Some(_) => println!("\t- {} ({}) - cached", name, version),
+
+			None => {
+				let remote = repo.get_remote().unwrap();
+
+				// Get package size from remote
+				let size = rt.block_on(async {
+					remote.get_size(pkg).await
+				})?;
+				total_size += size;
+
+				println!("\t- {} ({}) - download size: {}", name, version, size);
+			},
 		}
 	}
 
-	// The total download size in bytes
-	let mut total_size = 0;
-	for f in futures {
-		total_size += rt.block_on(f)?;
-	}
-
-	print!("Download size: ");
+	print!("Total download size: ");
 	util::print_size(total_size);
 	println!();
 
@@ -116,38 +132,45 @@ pub fn install(
 	println!("Downloading packages...");
 	let mut futures = Vec::new();
 
-	for (name, (package, repo)) in &total_packages {
-		if package.is_in_cache(sysroot) {
-			println!("`{}` is in cache.", name);
+	for (pkg, repo) in &total_packages {
+		if repo.is_in_cache(pkg.get_name(), pkg.get_version()) {
+			println!("`{}` is in cache.", pkg.get_name());
 			continue;
 		}
 
 		if let Some(remote) = repo.get_remote() {
-			futures.push(Remote::fetch_archive(remote, repo, package));
+			futures.push((
+				pkg.get_name(),
+				pkg.get_version(),
+				Remote::fetch_archive(remote, repo, pkg)
+			));
 		}
 	}
 
 	// TODO Add progress bar
-	for f in futures {
-		if !rt.block_on(f) {
-			failed = true;
+	for (name, version, f) in futures {
+		match rt.block_on(f) {
+			Ok(_task) => {
+				// TODO
+			},
+
+			Err(e) => eprintln!("Failed to download `{}` version `{}`: {}", name, version, e),
 		}
 	}
-
 	if failed {
 		return Ok(());
 	}
-	println!();
 
+	println!();
 	println!("Installing packages...");
 
 	// Installing all packages
-	for (name, (pack, repo)) in total_packages {
-		println!("Installing `{}`...", name);
+	for (pkg, repo) in total_packages {
+		println!("Installing `{}`...", pkg.get_name());
 
-		let archive_path = repo.get_archive_path(pack.get_name(), pack.get_version());
-		if let Err(e) = common::install::install(sysroot, &pack, &archive_path) {
-			eprintln!("Failed to install `{}`: {}", name, e);
+		let archive_path = repo.get_archive_path(pkg.get_name(), pkg.get_version());
+		if let Err(e) = common::install::install(sysroot, &pkg, &archive_path) {
+			eprintln!("Failed to install `{}`: {}", pkg.get_name(), e);
 		}
 	}
 
