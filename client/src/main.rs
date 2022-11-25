@@ -173,7 +173,6 @@ fn main_(sysroot: &Path, local_repos: &[PathBuf]) -> Result<bool, Box<dyn Error>
 				}
 
 				install(names, &sysroot, local_repos)?;
-				println!("Done! :)");
 				Ok(true)
 			},
 			sysroot,
@@ -255,7 +254,8 @@ fn main() {
 		Ok(false) => exit(1),
 
 		Err(e) => {
-			eprintln!("{}", e);
+			eprintln!();
+			eprintln!("error: {}", e);
 			exit(1);
 		}
 

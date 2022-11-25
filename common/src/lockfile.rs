@@ -1,28 +1,22 @@
 //! The lock file allows to prevent several instances of the package manager from running at the
 //! same time.
 
+use crate::util;
 use std::error::Error;
 use std::fs::OpenOptions;
 use std::fs;
 use std::path::Path;
 
-/// Blimp's path.
-const BLIMP_PATH: &str = "/usr/lib/blimp";
-
 /// The directory containing cached packages.
 const LOCKFILE_PATH: &str = "/usr/lib/blimp/.lock";
 
-/// Creates the lock file if not present. If the file was successfuly created, the function returns
-/// `true`. Else, it returns `false`.
-/// `sysroot` is the system's root.
-pub fn lock(sysroot: &Path) -> bool {
-	// Creating directories
-	let blimp_dir = sysroot.join(BLIMP_PATH);
-	let _ = fs::create_dir_all(blimp_dir);
-
-	let path = sysroot.join(LOCKFILE_PATH);
-	// Trying to create the file and failing if it already exist, allowing to avoid TOCTOU race
-	// conditions
+/// Creates the lock file if not present.
+///
+/// `path` is the path to the lockfile.
+///
+/// If the file was successfuly created, the function returns `true`. Else, it returns `false`.
+pub fn lock(path: &Path) -> bool {
+	// Trying to create the file and failing if it already exist, preventing TOCTOU race conditions
 	OpenOptions::new()
 		.write(true)
 		.create_new(true)
@@ -31,23 +25,27 @@ pub fn lock(sysroot: &Path) -> bool {
 }
 
 /// Removes the lock file.
-/// `sysroot` is the system's root.
-pub fn unlock(sysroot: &Path) {
-	let path = sysroot.join(LOCKFILE_PATH);
+///
+/// `path` is the path to the lockfile.
+pub fn unlock(path: &Path) {
 	let _ = fs::remove_file(path);
 }
 
 /// Executes the given closure `f` while locking.
-/// If the lock cannot be aquired, the function returns an error.
+///
 /// `sysroot` is the system's root.
+///
+/// If the lock cannot be aquired, the function returns an error.
 pub fn lock_wrap<T, F: FnOnce() -> T>(f: F, sysroot: &Path) -> Result<T, Box<dyn Error>> {
-	if !lock(sysroot) {
-		return Err("failed to acquire lockfile".into());
+	let path = util::concat_paths(sysroot, Path::new(LOCKFILE_PATH));
+
+	if !lock(&path) {
+		return Err(format!("failed to acquire lockfile {}", path.display()).into());
 	}
 
 	let result = f();
 
-	unlock(sysroot);
+	unlock(&path);
 
 	Ok(result)
 }

@@ -225,3 +225,16 @@ pub fn write_json<T: Serialize>(file: &Path, data: &T) -> io::Result<()> {
 		Err(io::Error::new(io::ErrorKind::Other, msg))
 	})
 }
+
+/// Concatenates the given paths.
+///
+/// If the second path begins at the root of the filesystem, this doesn't ignore the first path,
+/// as opposed to the `join` function available in `Path`.
+pub fn concat_paths(path0: &Path, path1: &Path) -> PathBuf {
+	let path1 = match path1.to_str() {
+		Some(path1_str) if path1_str.chars().next() == Some('/') => Path::new(&path1_str[1..]),
+		_ => path1,
+	};
+
+	path0.join(path1)
+}

@@ -149,8 +149,7 @@ pub fn remove(
 ///
 /// If the package isn't installed, the function returns None.
 pub fn get_installed(sysroot: &Path, name: &str) -> io::Result<Option<Package>> {
-	let mut path = sysroot.to_path_buf();
-	path.push(INSTALLED_FILE);
+	let path = util::concat_paths(sysroot, Path::new(INSTALLED_FILE));
 
 	// Reading the file
 	let Ok(packages) = util::read_json::<Vec<Package>>(&path) else {
@@ -179,8 +178,7 @@ pub fn is_installed(sysroot: &Path, name: &str) -> bool {
 
 /// Inserts the current package in the list of installed packages.
 pub fn insert_installed(sysroot: &Path, package: &Package) -> io::Result<()> {
-	let mut path = sysroot.to_path_buf();
-	path.push(INSTALLED_FILE);
+	let path = util::concat_paths(sysroot, Path::new(INSTALLED_FILE));
 
 	// Reading the file
 	let mut packages: Vec<Package> = match util::read_json(&path) {
@@ -196,8 +194,7 @@ pub fn insert_installed(sysroot: &Path, package: &Package) -> io::Result<()> {
 
 /// Removes the current package from the list of installed packages.
 pub fn remove_installed(sysroot: &Path, name: &str) -> io::Result<()> {
-	let mut path = sysroot.to_path_buf();
-	path.push(INSTALLED_FILE);
+	let path = util::concat_paths(sysroot, Path::new(INSTALLED_FILE));
 
 	// Reading the file
 	let Ok(mut packages) = util::read_json::<Vec<Package>>(&path) else {

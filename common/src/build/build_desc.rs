@@ -13,16 +13,6 @@ use std::process::Command;
 #[cfg(feature = "network")]
 use crate::download::DownloadTask;
 
-/// TODO doc
-fn concat_paths(build_dir: &Path, location: &str) -> PathBuf {
-	let loc = match location.chars().next() {
-		Some(c) if c == '/' => &location[1..],
-		_ => location,
-	};
-
-	build_dir.to_path_buf().join(loc)
-}
-
 /// Structure representing the location of sources and where to unpack them.
 #[derive(Deserialize, Serialize)]
 #[serde(untagged)]
@@ -30,7 +20,7 @@ pub enum Source {
 	/// Downloading a tarball from an URL.
 	Url {
 		/// The location relative to the build directory where the archive will be unpacked.
-		location: String,
+		location: PathBuf,
 
 		/// The URL of the sources.
 		url: String,
@@ -42,7 +32,7 @@ pub enum Source {
 	/// Cloning the given repository.
 	Git {
 		/// The location relative to the build directory where the archive will be unpacked.
-		location: String,
+		location: PathBuf,
 
 		/// The URL to the Git repository.
 		git_url: String,
@@ -51,7 +41,7 @@ pub enum Source {
 	/// Copying from a local path.
 	Local {
 		/// The location relative to the build directory where the archive will be unpacked.
-		location: String,
+		location: PathBuf,
 
 		/// The path to the local tarball or directory.
 		path: String,
@@ -94,7 +84,7 @@ this feature enabled");
 
 				unwrap,
 			} => {
-				let dest_path = concat_paths(build_dir, &location);
+				let dest_path = util::concat_paths(build_dir, &location);
 
 				// Downloading
 				let (path, _) = util::create_tmp_file()?;
@@ -110,7 +100,7 @@ this feature enabled");
 
 				git_url,
 			} => {
-				let dest_path = concat_paths(build_dir, &location);
+				let dest_path = util::concat_paths(build_dir, &location);
 
 				let status = Command::new("git")
 					.args([

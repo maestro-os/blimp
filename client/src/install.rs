@@ -44,7 +44,7 @@ pub fn install(
 		}
 	}
 	if failed {
-		return Ok(());
+		return Err("installation failed".into());
 	}
 
 	println!("Resolving dependencies...");
@@ -88,7 +88,7 @@ pub fn install(
 		}
 	}
 	if failed {
-		return Ok(());
+		return Err("installation failed".into());
 	}
 
 	// Creating the async runtime
@@ -158,7 +158,7 @@ pub fn install(
 		}
 	}
 	if failed {
-		return Ok(());
+		return Err("installation failed".into());
 	}
 
 	println!();
