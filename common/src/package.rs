@@ -4,9 +4,9 @@
 use crate::install;
 use crate::repository::Repository;
 use crate::version::Version;
+use crate::version::VersionConstraint;
 use serde::Deserialize;
 use serde::Serialize;
-use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt;
 use std::fs;
@@ -60,12 +60,15 @@ impl fmt::Display for ResolveError {
 }
 
 /// Structure representing a package dependency.
-#[derive(Clone, Deserialize, Eq, Hash, Serialize)]
+#[derive(Clone, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Dependency {
 	/// The dependency's name.
 	name: String,
-	/// The dependency's version.
-	version: Version, // TODO Add constraints (less, equal or greater)
+
+	/// The dependency's version constraints.
+	///
+	/// The version of the package must match the intersection of all the constraints.
+	version_constraints: Vec<VersionConstraint>,
 }
 
 impl Dependency {
@@ -75,28 +78,14 @@ impl Dependency {
 	}
 
 	/// Returns the version of the package.
-	pub fn get_version(&self) -> &Version {
-		&self.version
+	pub fn get_version_constraints(&self) -> &[VersionConstraint] {
+		&self.version_constraints
 	}
-}
 
-impl Ord for Dependency {
-	fn cmp(&self, other: &Self) -> Ordering {
-		self.name
-			.cmp(&other.name)
-			.then_with(|| self.version.cmp(&other.version))
-	}
-}
-
-impl PartialOrd for Dependency {
-	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-		Some(self.cmp(other))
-	}
-}
-
-impl PartialEq for Dependency {
-	fn eq(&self, other: &Self) -> bool {
-		self.name == other.name && self.version == other.version
+	/// Tells whether the given version matches every containts.
+	pub fn is_valid(&self, version: &Version) -> bool {
+		self.version_constraints.iter()
+			.all(|c| c.is_valid(version))
 	}
 }
 
@@ -189,13 +178,15 @@ impl Package {
 			// Checking for version conflict
 			if let Some(p) = pkg {
 				// If versions don't correspond, error
-				if d.get_version() != p.get_version() {
-					errors.push(ResolveError::VersionConflict {
+				if !d.is_valid(p.get_version()) {
+					// TODO
+					/*errors.push(ResolveError::VersionConflict {
 						v0: d.get_version().clone(),
 						v1: d.get_version().clone(),
 
 						name: d.get_name().clone(),
-					});
+					});*/
+					todo!();
 				}
 
 				continue;

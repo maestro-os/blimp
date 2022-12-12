@@ -94,3 +94,80 @@ impl Display for Version {
 		Ok(())
 	}
 }
+
+/// Enumeration of contraints on a package's dependencies.
+#[derive(Clone, Eq, Hash, PartialEq)]
+pub enum VersionConstraint {
+	/// The version must be equal to the given version.
+	Equal(Version),
+	/// The version must be less than or equal to the given version.
+	LessOrEqual(Version),
+	/// The version must be less than the given version.
+	Less(Version),
+	/// The version must be greater than or equal to the given version.
+	GreaterOrEqual(Version),
+	/// The version must be greater than the given version.
+	Greater(Version),
+}
+
+impl Serialize for VersionConstraint {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: Serializer,
+	{
+		serializer.serialize_str(&self.to_string())
+	}
+}
+
+impl<'de> Deserialize<'de> for VersionConstraint {
+	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+	where
+		D: Deserializer<'de>,
+	{
+		let s: String = Deserialize::deserialize(deserializer)?;
+		s.as_str()
+			.try_into()
+			.map_err(D::Error::custom)
+	}
+}
+
+impl TryFrom<&str> for VersionConstraint {
+	type Error = ParseIntError;
+
+	fn try_from(value: &str) -> Result<Self, Self::Error> {
+		match value {
+			s if s.starts_with("=") => Ok(Self::Equal(Version::try_from(&s[1..])?)),
+			s if s.starts_with("<=") => Ok(Self::Equal(Version::try_from(&s[2..])?)),
+			s if s.starts_with("<") => Ok(Self::Equal(Version::try_from(&s[1..])?)),
+			s if s.starts_with(">=") => Ok(Self::Equal(Version::try_from(&s[2..])?)),
+			s if s.starts_with(">") => Ok(Self::Equal(Version::try_from(&s[1..])?)),
+
+			_ => todo!(), // TODO
+		}
+	}
+}
+
+impl VersionConstraint {
+	/// Tells whether the given version matches the constraint.
+	pub fn is_valid(&self, version: &Version) -> bool {
+		match self {
+			Self::Equal(v) => matches!(version.cmp(&v), Ordering::Equal),
+			Self::LessOrEqual(v) => matches!(version.cmp(&v), Ordering::Less | Ordering::Equal),
+			Self::Less(v) => matches!(version.cmp(&v), Ordering::Less),
+			Self::GreaterOrEqual(v) => matches!(version.cmp(&v), Ordering::Greater | Ordering::Equal),
+			Self::Greater(v) => matches!(version.cmp(&v), Ordering::Greater),
+		}
+	}
+}
+
+impl Display for VersionConstraint {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		match self {
+			Self::Equal(v) => write!(f, "={}", v),
+			Self::LessOrEqual(v) => write!(f, "<={}", v),
+			Self::Less(v) => write!(f, "<{}", v),
+			Self::GreaterOrEqual(v) => write!(f, ">={}", v),
+			Self::Greater(v) => write!(f, ">{}", v),
+		}
+	}
+}
