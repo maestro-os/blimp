@@ -7,6 +7,7 @@ pub mod remote;
 
 use crate::package::Package;
 use crate::version::Version;
+use crate::version::VersionConstraint;
 use std::fs;
 use std::io;
 use std::path::Path;
@@ -141,11 +142,17 @@ impl Repository {
 			.collect()
 	}
 
-	/// Returns the latest version of the package with name `name`.
+	/// Returns the package with name `name` fitting the given constraints `version_constraints`.
+	///
+	/// Specifying no constraint returns the latest package.
 	///
 	/// If the package doesn't exist, the function returns None.
-	pub fn get_latest_package(&self, name: &str) -> io::Result<Option<Package>> {
-		let latest_version = fs::read_dir(self.path.join(name))?
+	pub fn get_package_with_constraints(
+		&self,
+		name: &str,
+		version_constraints: &[VersionConstraint]
+	) -> io::Result<Option<Package>> {
+		let version = fs::read_dir(self.path.join(name))?
 			.into_iter()
 			.filter_map(|ent| {
 				let ent = ent.ok()?;
@@ -157,10 +164,11 @@ impl Repository {
 					None
 				}
 			})
+			.filter(|version| version_constraints.iter().all(|c| c.is_valid(version)))
 			.max();
 
-		match latest_version {
-			Some(latest_version) => self.get_package(name, &latest_version),
+		match version {
+			Some(version) => self.get_package(name, &version),
 			None => Ok(None),
 		}
 	}
@@ -189,19 +197,20 @@ pub fn get_package<'a>(
 }
 
 // TODO Handle error reporting
-/// Returns the latest version of the package with name `name` along with its associated
-/// repository.
+/// Returns the package with name `name` fitting the given constraints `version_constraints` with
+/// the associated reprository.
 ///
-/// `repos` is the list of repositories to check on.
+/// Specifying no constraint returns the latest package.
 ///
 /// If the package doesn't exist, the function returns None.
-pub fn get_latest_package<'a>(
+pub fn get_package_with_constraints<'a>(
 	repos: &'a [Repository],
 	name: &str,
+	version_constraints: &[VersionConstraint]
 ) -> io::Result<Option<(&'a Repository, Package)>> {
 	Ok(repos.iter()
 		.filter_map(|repo| {
-			match repo.get_latest_package(name) {
+			match repo.get_package_with_constraints(name, version_constraints) {
 				Ok(Some(pack)) => Some((repo, pack)),
 				_ => None,
 			}

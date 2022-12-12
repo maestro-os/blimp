@@ -137,12 +137,12 @@ impl TryFrom<&str> for VersionConstraint {
 	fn try_from(value: &str) -> Result<Self, Self::Error> {
 		match value {
 			s if s.starts_with("=") => Ok(Self::Equal(Version::try_from(&s[1..])?)),
-			s if s.starts_with("<=") => Ok(Self::Equal(Version::try_from(&s[2..])?)),
-			s if s.starts_with("<") => Ok(Self::Equal(Version::try_from(&s[1..])?)),
-			s if s.starts_with(">=") => Ok(Self::Equal(Version::try_from(&s[2..])?)),
-			s if s.starts_with(">") => Ok(Self::Equal(Version::try_from(&s[1..])?)),
+			s if s.starts_with("<=") => Ok(Self::LessOrEqual(Version::try_from(&s[2..])?)),
+			s if s.starts_with("<") => Ok(Self::Less(Version::try_from(&s[1..])?)),
+			s if s.starts_with(">=") => Ok(Self::GreaterOrEqual(Version::try_from(&s[2..])?)),
+			s if s.starts_with(">") => Ok(Self::Greater(Version::try_from(&s[1..])?)),
 
-			_ => todo!(), // TODO
+			_ => Ok(Self::Equal(Version::try_from(value)?)),
 		}
 	}
 }

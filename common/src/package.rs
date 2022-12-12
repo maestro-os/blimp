@@ -1,7 +1,6 @@
 //! A package is a software that can be installed using the package manager.
 //! Packages are usualy downloaded from a remote host.
 
-use crate::install;
 use crate::repository::Repository;
 use crate::version::Version;
 use crate::version::VersionConstraint;
@@ -23,10 +22,10 @@ pub const SERVER_PACKAGES_DIR: &str = "public_packages";
 pub enum ResolveError {
 	/// The dependency cannot be found.
 	NotFound {
-		/// The name of the package.
+		/// The name of the dependency.
 		name: String,
-		/// The version of the package.
-		version: Version,
+		/// The version constraints on the dependency.
+		version_constraints: Vec<VersionConstraint>,
 	},
 
 	/// The dependency version conflicts another package or dependency.
@@ -46,16 +45,26 @@ impl fmt::Display for ResolveError {
 		match self {
 			Self::NotFound {
 				name,
-				version,
-			} => write!(fmt, "Unresolved dependency `{}` version `{}`!", name, version),
+				version_constraints,
+			} => {
+				write!(fmt, "Unresolved dependency `{}` for constraints:\n", name)?;
+
+				for c in version_constraints {
+					write!(fmt, "- `{}`\n", c)?;
+				}
+			},
 
 			Self::VersionConflict {
 				name,
 
 				v0,
 				v1,
-			} => write!(fmt, "Conflicting version `{}` and `{}` on `{}`!", v0, v1, name),
+			} => {
+				write!(fmt, "Conflicting version `{}` and `{}` on `{}`!", v0, v1, name)?;
+			},
 		}
+
+		Ok(())
 	}
 }
 
@@ -160,26 +169,20 @@ impl Package {
 		packages: &mut HashMap<Self, &'r Repository>,
 		f: &mut F,
 	) -> io::Result<Result<(), Vec<ResolveError>>>
-		where F: FnMut(&str, &Version) -> Option<(Self, &'r Repository)>,
+		where F: FnMut(&str, &[VersionConstraint]) -> Option<(Self, &'r Repository)>,
 	{
 		let mut errors = vec![];
 
+		// TODO Add support for build dependencies
 		for d in &self.run_deps {
-			// Getting the package. Either in the installation list or already installed
-			let pkg = install::get_installed(sysroot, d.get_name())?;
-			let pkg = pkg.as_ref()
-				.or_else(|| {
-					packages.iter()
-						.map(|(p, _)| p)
-						.filter(|p| p.get_name() == d.get_name())
-						.next()
-				});
-
-			// Checking for version conflict
-			if let Some(p) = pkg {
-				// If versions don't correspond, error
-				if !d.is_valid(p.get_version()) {
-					// TODO
+			// Get package in the installation list
+			let pkg = packages.iter()
+				.map(|(p, _)| p)
+				.filter(|p| p.get_name() == d.get_name())
+				.next();
+			// Check for conflict
+			if let Some(pkg) = pkg {
+				if !d.is_valid(pkg.get_version()) {
 					/*errors.push(ResolveError::VersionConflict {
 						v0: d.get_version().clone(),
 						v1: d.get_version().clone(),
@@ -192,19 +195,21 @@ impl Package {
 				continue;
 			}
 
-			// Resolving the package, then resolving its dependencies
-			if let Some((p, repo)) = f(d.get_name(), d.get_version()) {
-				let res = p.resolve_dependencies(sysroot, packages, f)?; // FIXME Possible stack overflow
+			// Resolve package, then resolve its dependencies
+			if let Some((p, repo)) = f(d.get_name(), d.get_version_constraints()) {
+				// TODO Check for dependency cycles
+				// FIXME Possible stack overflow
+				let res = p.resolve_dependencies(sysroot, packages, f)?;
 				match res {
-					Ok(_) => {},
-					Err(errs) => return Ok(Err(errs)),
+					Err(e) => return Ok(Err(e)),
+					_ => {},
 				}
 
 				packages.insert(p, repo);
 			} else {
 				errors.push(ResolveError::NotFound {
 					name: d.get_name().clone(),
-					version: d.get_version().clone(),
+					version_constraints: d.get_version_constraints().to_vec(),
 				});
 			}
 		}
@@ -214,7 +219,6 @@ impl Package {
 		} else {
 			Err(errors)
 		};
-
 		Ok(res)
 	}
 }

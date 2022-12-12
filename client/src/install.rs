@@ -1,5 +1,6 @@
 //! This module handles package installation.
 
+use common::install;
 use common::package::Package;
 use common::repository::Repository;
 use common::repository::remote::Remote;
@@ -32,7 +33,12 @@ pub fn install(
 	let mut packages = HashMap::<Package, &Repository>::new();
 
 	for name in names {
-		match repository::get_latest_package(&repos, &name)? {
+		if install::is_installed(sysroot, name) {
+			// TODO package is already installed, ignore (print message)
+			continue;
+		}
+
+		match repository::get_package_with_constraints(&repos, &name, &[])? {
 			Some((repo, package)) => {
 				packages.insert(package, repo);
 			}
@@ -57,8 +63,12 @@ pub fn install(
 		let res = package.resolve_dependencies(
 			sysroot,
 			&mut total_packages,
-			&mut |name, version| {
-				let res = repository::get_package(&repos, name, &version)
+			&mut |name, version_constraints| {
+				let res = repository::get_package_with_constraints(
+					&repos,
+					name,
+					version_constraints
+				)
 					.or_else(|e| {
 						eprintln!("error: {}", e);
 						Err(())
