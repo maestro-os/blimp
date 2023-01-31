@@ -33,8 +33,12 @@ pub fn install(
 	let mut packages = HashMap::<Package, &Repository>::new();
 
 	for name in names {
-		if install::is_installed(sysroot, name) {
-			// TODO package is already installed, ignore (print message)
+		if let Some(pkg) = get_installed(sysroot, name) {
+			println!(
+				"Package `{}` version `{}` is already installed. Skipping...",
+				name, pkg.get_version()
+			);
+
 			continue;
 		}
 

@@ -19,6 +19,7 @@ pub const SERVER_PACKAGES_DESC_DIR: &str = "public_desc";
 /// The directory storing packages' archives on the serverside.
 pub const SERVER_PACKAGES_DIR: &str = "public_packages";
 
+/// Enumeration of possible package dependencies resolution error.
 pub enum ResolveError {
 	/// The dependency cannot be found.
 	NotFound {
