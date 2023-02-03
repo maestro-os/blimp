@@ -1,6 +1,6 @@
 //! This module handles package installation.
 
-use common::install;
+use common::install::get_installed;
 use common::package::Package;
 use common::repository::Repository;
 use common::repository::remote::Remote;
@@ -33,7 +33,7 @@ pub fn install(
 	let mut packages = HashMap::<Package, &Repository>::new();
 
 	for name in names {
-		if let Some(pkg) = get_installed(sysroot, name) {
+		if let Some(pkg) = get_installed(sysroot, name)? {
 			println!(
 				"Package `{}` version `{}` is already installed. Skipping...",
 				name, pkg.get_version()

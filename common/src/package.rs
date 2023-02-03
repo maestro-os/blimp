@@ -78,7 +78,7 @@ pub struct Dependency {
 	/// The dependency's version constraints.
 	///
 	/// The version of the package must match the intersection of all the constraints.
-	version_constraints: Vec<VersionConstraint>,
+	version: Vec<VersionConstraint>,
 }
 
 impl Dependency {
@@ -89,12 +89,12 @@ impl Dependency {
 
 	/// Returns the version of the package.
 	pub fn get_version_constraints(&self) -> &[VersionConstraint] {
-		&self.version_constraints
+		&self.version
 	}
 
 	/// Tells whether the given version matches every containts.
 	pub fn is_valid(&self, version: &Version) -> bool {
-		self.version_constraints.iter()
+		self.version.iter()
 			.all(|c| c.is_valid(version))
 	}
 }

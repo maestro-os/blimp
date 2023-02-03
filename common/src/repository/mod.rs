@@ -164,7 +164,7 @@ impl Repository {
 					None
 				}
 			})
-			.filter(|version| version_constraints.iter().all(|c| c.is_valid(version)))
+			// TODO .filter(|version| version_constraints.iter().all(|c| c.is_valid(version)))
 			.max();
 
 		match version {

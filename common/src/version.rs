@@ -98,6 +98,8 @@ impl Display for Version {
 /// Enumeration of contraints on a package's dependencies.
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub enum VersionConstraint {
+	/// Any version match.
+	Any,
 	/// The version must be equal to the given version.
 	Equal(Version),
 	/// The version must be less than or equal to the given version.
@@ -136,6 +138,7 @@ impl TryFrom<&str> for VersionConstraint {
 
 	fn try_from(value: &str) -> Result<Self, Self::Error> {
 		match value {
+			"*" => Ok(Self::Any),
 			s if s.starts_with("=") => Ok(Self::Equal(Version::try_from(&s[1..])?)),
 			s if s.starts_with("<=") => Ok(Self::LessOrEqual(Version::try_from(&s[2..])?)),
 			s if s.starts_with("<") => Ok(Self::Less(Version::try_from(&s[1..])?)),
@@ -151,6 +154,7 @@ impl VersionConstraint {
 	/// Tells whether the given version matches the constraint.
 	pub fn is_valid(&self, version: &Version) -> bool {
 		match self {
+			Self::Any => true,
 			Self::Equal(v) => matches!(version.cmp(&v), Ordering::Equal),
 			Self::LessOrEqual(v) => matches!(version.cmp(&v), Ordering::Less | Ordering::Equal),
 			Self::Less(v) => matches!(version.cmp(&v), Ordering::Less),
@@ -163,6 +167,7 @@ impl VersionConstraint {
 impl Display for VersionConstraint {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
 		match self {
+			Self::Any => write!(f, "*"),
 			Self::Equal(v) => write!(f, "={}", v),
 			Self::LessOrEqual(v) => write!(f, "<={}", v),
 			Self::Less(v) => write!(f, "<{}", v),
