@@ -2,5 +2,5 @@
 
 set -e
 
-mkdir -pv /usr/share/blimp
+mkdir -pv /usr/lib/blimp
 cp -v target/release/blimp /usr/bin/
