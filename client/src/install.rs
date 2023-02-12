@@ -1,6 +1,5 @@
 //! This module handles package installation.
 
-use common::install::get_installed;
 use common::package::Package;
 use common::repository::Repository;
 use common::repository::remote::Remote;
