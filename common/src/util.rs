@@ -1,16 +1,17 @@
 //! This module implements utility functions.
 
+use bzip2::read::BzDecoder;
 use flate2::read::GzDecoder;
 use serde::Deserialize;
 use serde::Serialize;
 use std::error::Error;
-use std::fs;
 use std::fs::File;
 use std::fs::OpenOptions;
-use std::io;
+use std::fs;
 use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Read;
+use std::io;
 use std::os::unix;
 use std::path::Component::Normal;
 use std::path::Path;
@@ -112,6 +113,17 @@ pub fn uncompress(
 	{
 		let file = File::open(&src)?;
 		let tar = XzDecoder::new(file);
+		let archive = Archive::new(tar);
+
+		if uncompress_(archive, &dest, unwrap).is_ok() {
+			return Ok(());
+		}
+	}
+
+	// Trying to uncompress .tar.bz2
+	{
+		let file = File::open(&src)?;
+		let tar = BzDecoder::new(file);
 		let archive = Archive::new(tar);
 
 		uncompress_(archive, &dest, unwrap)

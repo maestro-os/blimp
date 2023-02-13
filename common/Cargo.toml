@@ -8,6 +8,7 @@ path = "src/lib.rs"
 
 [dependencies]
 bytes = "1.2.1"
+bzip2 = "0.4.4"
 flate2 = "1.0.22"
 futures = "0.3.19"
 futures-util = "0.3.21"
