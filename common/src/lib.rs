@@ -11,15 +11,23 @@ pub mod version;
 pub mod download;
 
 use package::Package;
+use repository::Repository;
 use std::error::Error;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 
+/// The directory containing cached packages.
+const LOCKFILE_PATH: &str = "/usr/lib/blimp/.lock";
 /// The path to the file storing the list of installed packages.
 const INSTALLED_FILE: &str = "/usr/lib/blimp/installed";
 
 /// An instance of a Blimp environment.
+///
+/// On creation, the environment creates a lockfile to ensure no other instance can access it at
+/// the same time.
+///
+/// The lockfile is destroyed when the environment is dropped.
 pub struct Environment {
 	/// The path to the sysroot of the environment.
 	sysroot: PathBuf,
@@ -27,11 +35,43 @@ pub struct Environment {
 
 impl Environment {
 	/// Returns an instance for the environment with the given sysroot.
-	pub fn with_root(sysroot: PathBuf) -> Self {
-		Self {
-			sysroot,
+	///
+	/// The function tries to lock the environment so that no other instance can access it at the same time.
+	/// If already locked, the function returns `None`.
+	pub fn with_root(sysroot: PathBuf) -> Option<Self> {
+		let path = util::concat_paths(&sysroot, Path::new(LOCKFILE_PATH));
+
+		if lockfile::lock(&path) {
+			Some(Self {
+				sysroot,
+			})
+		} else {
+			None
 		}
 	}
+
+	/// Returns the sysroot of the current environement.
+	pub fn get_sysroot(&self) -> &Path {
+		&self.sysroot
+	}
+
+	/// Loads and returns the list of all repositories.
+	///
+	/// Arguments:
+	/// - `local_repos` is the list of paths of local repositories.
+	pub fn list_repositories(&self, local_repos: &[PathBuf]) -> io::Result<Vec<Repository>> {
+		let mut repos = vec![];
+
+		// TODO List from blimp directory using sysroot
+
+		let mut local_repos = local_repos.iter()
+			.map(|path| Repository::load(path.clone()))
+			.collect::<Result<Vec<_>, _>>()?;
+		repos.append(&mut local_repos);
+
+		Ok(repos)
+	}
+
 
 	/// Inserts the current package in the list of installed packages.
 	fn insert_installed(&self, package: &Package) -> io::Result<()> {
@@ -205,10 +245,20 @@ impl Environment {
 			}
 
 			Ok(())
-		})?;
+		})??;
 
 		self.remove_installed(name)?;
 
 		Ok(())
+	}
+
+	/// Unlocks the environment.
+	pub fn unlock(self) {}
+}
+
+impl Drop for Environment {
+	fn drop(&mut self) {
+		let path = util::concat_paths(&self.sysroot, Path::new(LOCKFILE_PATH));
+		lockfile::unlock(&path);
 	}
 }

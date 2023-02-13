@@ -1,5 +1,6 @@
 //! This module handles package installation.
 
+use common::Environment;
 use common::package::Package;
 use common::repository::Repository;
 use common::repository::remote::Remote;
@@ -8,7 +9,6 @@ use common::util;
 use crate::confirm;
 use std::collections::HashMap;
 use std::error::Error;
-use std::path::Path;
 use std::path::PathBuf;
 use tokio::runtime::Runtime;
 
@@ -17,22 +17,22 @@ use tokio::runtime::Runtime;
 ///
 /// Arguments:
 /// - `names` is the list of packages to install.
-/// - `sysroot` is the path to the root of the system on which the packages will be installed.
+/// - `env` is the blimp environment.
 /// - `local_repos` is the list of paths to local package repositories.
 pub fn install(
 	names: &[String],
-	sysroot: &Path,
+	env: &mut Environment,
 	local_repos: &[PathBuf],
 ) -> Result<(), Box<dyn Error>> {
 	let mut failed = false;
 
 	// The list of repositories
-	let repos = Repository::load_all(sysroot, local_repos)?;
+	let repos = env.list_repositories(local_repos)?;
 	// The list of packages to install with their respective repository
 	let mut packages = HashMap::<Package, &Repository>::new();
 
 	for name in names {
-		if let Some(pkg) = get_installed(sysroot, name)? {
+		if let Some(pkg) = env.get_installed(name)? {
 			println!(
 				"Package `{}` version `{}` is already installed. Skipping...",
 				name, pkg.get_version()
@@ -64,7 +64,6 @@ pub fn install(
 	// Resolving dependencies
 	for (package, _) in packages {
 		let res = package.resolve_dependencies(
-			sysroot,
 			&mut total_packages,
 			&mut |name, version_constraints| {
 				let res = repository::get_package_with_constraints(
@@ -182,7 +181,7 @@ pub fn install(
 		println!("Installing `{}`...", pkg.get_name());
 
 		let archive_path = repo.get_archive_path(pkg.get_name(), pkg.get_version());
-		if let Err(e) = common::install::install(sysroot, &pkg, &archive_path) {
+		if let Err(e) = env.install(&pkg, &archive_path) {
 			eprintln!("Failed to install `{}`: {}", pkg.get_name(), e);
 		}
 	}

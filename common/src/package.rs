@@ -11,7 +11,6 @@ use std::fmt;
 use std::fs;
 use std::io::ErrorKind;
 use std::io;
-use std::path::Path;
 use std::path::PathBuf;
 
 /// The directory storing packages' descriptions on the serverside.
@@ -157,7 +156,6 @@ impl Package {
 	/// `packages`.
 	///
 	/// Arguments:
-	/// - `sysroot` is the path to the system's root.
 	/// - `f` is a function used to get a package from its name and version.
 	///
 	/// The function makes use of packages that are already in the HashMap and those which are
@@ -166,7 +164,6 @@ impl Package {
 	/// If one or more packages cannot be resolved, the function returns the list of errors.
 	pub fn resolve_dependencies<'r, F>(
 		&self,
-		sysroot: &Path,
 		packages: &mut HashMap<Self, &'r Repository>,
 		f: &mut F,
 	) -> io::Result<Result<(), Vec<ResolveError>>>
@@ -200,7 +197,7 @@ impl Package {
 			if let Some((p, repo)) = f(d.get_name(), d.get_version_constraints()) {
 				// TODO Check for dependency cycles
 				// FIXME Possible stack overflow
-				let res = p.resolve_dependencies(sysroot, packages, f)?;
+				let res = p.resolve_dependencies(packages, f)?;
 				match res {
 					Err(e) => return Ok(Err(e)),
 					_ => {},

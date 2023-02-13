@@ -1,27 +1,22 @@
 //! This module handles packages list updating.
 
+use common::Environment;
 use common::repository::remote::Remote;
-use std::path::Path;
+use std::error::Error;
 use tokio::runtime::Runtime;
 
 /// Updates the packages list.
-///
-/// `sysroot` is the path to the root of the system.
-pub fn update(sysroot: &Path) -> bool {
-	let remotes = match Remote::load_list(sysroot) {
-		Ok(remotes) => remotes,
-
-		Err(e) => {
-			eprintln!("Could not update packages list: {}", e);
-			return false;
-		}
-	};
+pub fn update(env: &mut Environment) -> Result<(), Box<dyn Error>> {
+	let remotes = Remote::load_list(env)
+		.map_err(|e| format!("Could not update packages list: {}", e))?;
 
 	println!("Updating from remotes...");
 
 	// Creating the async runtime
 	let rt = Runtime::new().unwrap();
 	let mut futures = Vec::new();
+
+	let mut err = false;
 
 	for r in remotes.iter() {
 		let host = r.get_host();
@@ -34,11 +29,18 @@ pub fn update(sysroot: &Path) -> bool {
 
 				// TODO
 				todo!();
-			},
+			}
 
-			Err(e) => eprintln!("Remote `{}`: {}", host, e), // TODO return false
+			Err(e) => {
+				eprintln!("Remote `{}`: {}", host, e);
+				err = true;
+			}
 		}
 	}
 
-	true
+	if err {
+		Err("update failed".into())
+	} else {
+		Ok(())
+	}
 }

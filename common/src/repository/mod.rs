@@ -10,7 +10,6 @@ use crate::version::Version;
 use crate::version::VersionConstraint;
 use std::fs;
 use std::io;
-use std::path::Path;
 use std::path::PathBuf;
 
 #[cfg(feature = "network")]
@@ -27,24 +26,6 @@ pub struct Repository {
 }
 
 impl Repository {
-	/// Loads and returns the list of all repositories.
-	///
-	/// Arguments:
-	/// - `sysroot` is the path to the system's root.
-	/// - `local_repos` is the list of paths of local repositories.
-	pub fn load_all(_sysroot: &Path, local_repos: &[PathBuf]) -> io::Result<Vec<Self>> {
-		let mut repos = vec![];
-
-		// TODO List from blimp directory using sysroot
-
-		let mut local_repos = local_repos.iter()
-			.map(|path| Self::load(path.clone()))
-			.collect::<Result<Vec<_>, _>>()?;
-		repos.append(&mut local_repos);
-
-		Ok(repos)
-	}
-
 	/// Loads the repository at the given path.
 	///
 	/// If the repository is invalid, the function returns an error.

@@ -1,5 +1,6 @@
 //! A remote is a remote host from which packages can be downloaded.
 
+use crate::Environment;
 use crate::download::DownloadTask;
 use crate::package::Package;
 use crate::repository::Repository;
@@ -11,7 +12,6 @@ use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Write;
 use std::io;
-use std::path::Path;
 
 // TODO Use https
 
@@ -34,9 +34,8 @@ impl Remote {
 	}
 
 	/// Loads and returns the list of remote hosts.
-	/// `sysroot` is the path to the system's root.
-	pub fn load_list(sysroot: &Path) -> io::Result<Vec<Self>> {
-		let path = sysroot.join(REMOTES_FILE);
+	pub fn load_list(env: &Environment) -> io::Result<Vec<Self>> {
+		let path = env.get_sysroot().join(REMOTES_FILE);
 		let file = File::open(path)?;
 		let reader = BufReader::new(file);
 
@@ -47,8 +46,8 @@ impl Remote {
 	}
 
 	/// Saves the list of remote hosts.
-	pub fn save_list(sysroot: &Path, remotes: &[Self]) -> io::Result<()> {
-		let path = sysroot.join(REMOTES_FILE);
+	pub fn save_list(env: &Environment, remotes: &[Self]) -> io::Result<()> {
+		let path = env.get_sysroot().join(REMOTES_FILE);
 		let file = OpenOptions::new()
 			.read(true)
 			.write(true)
