@@ -32,10 +32,10 @@ pub fn install(
 	let mut packages = HashMap::<Package, &Repository>::new();
 
 	for name in names {
-		if let Some(pkg) = env.get_installed(name)? {
+		if let Some(installed) = env.get_installed(name)? {
 			println!(
 				"Package `{}` version `{}` is already installed. Skipping...",
-				name, pkg.get_version()
+				name, installed.desc.get_version()
 			);
 
 			continue;

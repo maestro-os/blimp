@@ -10,6 +10,7 @@ pub mod version;
 #[cfg(feature = "network")]
 pub mod download;
 
+use package::InstalledPackage;
 use package::Package;
 use repository::Repository;
 use std::error::Error;
@@ -115,16 +116,16 @@ impl Environment {
 	/// Returns the installed package with name `name`.
 	///
 	/// If the package isn't installed, the function returns None.
-	pub fn get_installed(&self, name: &str) -> io::Result<Option<Package>> {
+	pub fn get_installed(&self, name: &str) -> io::Result<Option<InstalledPackage>> {
 		let path = util::concat_paths(&self.sysroot, Path::new(INSTALLED_FILE));
 
 		// Reading the file
-		let Ok(packages) = util::read_json::<Vec<Package>>(&path) else {
+		let Ok(packages) = util::read_json::<Vec<InstalledPackage>>(&path) else {
 			return Ok(None);
 		};
 
 		for p in packages {
-			if p.get_name() == name {
+			if p.desc.get_name() == name {
 				return Ok(Some(p));
 			}
 		}
@@ -140,7 +141,8 @@ impl Environment {
 	///
 	/// If the package is already installed, the function does nothing.
 	///
-	/// TODO
+	/// The function does not resolve dependencies. It is the caller's responsibility to install
+	/// them beforehand.
 	pub fn install(&self, package: &Package, archive_path: &Path) -> Result<(), Box<dyn Error>> {
 		if self.get_installed(package.get_name())?.is_some() {
 			return Ok(());
@@ -184,6 +186,8 @@ impl Environment {
 	/// Arguments:
 	/// - `package` is the package to be updated.
 	/// - `archive_path` is the path to the archive of the new version of the package.
+	///
+	/// If the package is not installed, the behaviour is undefined.
 	pub fn update(&self, package: &Package, archive_path: &Path) -> Result<(), Box<dyn Error>> {
 		// Uncompressing the package
 		util::uncompress_wrap(archive_path, |tmp_dir| {
@@ -221,7 +225,16 @@ impl Environment {
 	/// Arguments:
 	/// - `name` is the name of the package.
 	/// - `archive_path` is the path to the archive of the new version of the package.
+	///
+	/// If the package is not installed, the behaviour is undefined.
+	///
+	/// This function does not check dependency breakage. It is the caller's responsibility to
+	/// ensure no other package depend on the package to be removed.
 	pub fn remove(&self, name: &str, archive_path: &Path) -> Result<(), Box<dyn Error>> {
+		let Some(installed) = self.get_installed(name)? else {
+			return Ok(());
+		};
+
 		// Uncompressing the package
 		util::uncompress_wrap(archive_path, |tmp_dir| {
 			let mut pre_remove_hook_path: PathBuf = tmp_dir.to_path_buf();
@@ -233,7 +246,11 @@ impl Environment {
 				));
 			}
 
-			// TODO Remove files corresponding to the ones in inner data archive
+			// Remove the package's files
+			for sys_path in installed.files {
+				let path = util::concat_paths(&self.sysroot, &sys_path);
+				util::recursive_remove(&path)?;
+			}
 
 			let mut post_remove_hook_path: PathBuf = tmp_dir.to_path_buf();
 			post_remove_hook_path.push("post-remove-hook");

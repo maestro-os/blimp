@@ -98,7 +98,7 @@ impl Dependency {
 	}
 }
 
-/// Structure representing a package.
+/// A package's description.
 #[derive(Clone, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Package {
 	/// The package's name.
@@ -219,4 +219,14 @@ impl Package {
 		};
 		Ok(res)
 	}
+}
+
+/// Information on a package that is already installed on the system.
+#[derive(Clone, Deserialize, Serialize)]
+pub struct InstalledPackage {
+	/// The package's description.
+	pub desc: Package,
+
+	/// The list of absolute pathes to installed files.
+	pub files: Vec<PathBuf>,
 }

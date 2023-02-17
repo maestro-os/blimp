@@ -2,11 +2,13 @@
 
 mod confirm;
 mod install;
+mod remove;
 mod update;
 
 use common::Environment;
 use common::repository::remote::Remote;
 use install::install;
+use remove::remove;
 use std::env;
 use std::error::Error;
 use std::path::PathBuf;
@@ -185,9 +187,10 @@ fn main_(sysroot: PathBuf, local_repos: &[PathBuf]) -> Result<bool, Box<dyn Erro
 				return Ok(false);
 			}
 
-			let _env = get_env(sysroot)?;
-			// TODO
-			todo!();
+			let mut env = get_env(sysroot)?;
+			remove(names, &mut env, local_repos)?;
+
+			Ok(true)
 		}
 
 		"clean" => {

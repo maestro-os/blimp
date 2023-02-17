@@ -193,6 +193,26 @@ pub fn recursive_copy(src: &Path, dst: &Path) -> io::Result<()> {
 	Ok(())
 }
 
+/// Removes the file(s) at the given path recursively.
+pub fn recursive_remove(path: &Path) -> io::Result<()> {
+	let file_type = fs::metadata(path)?.file_type();
+	if file_type.is_dir() {
+		for entry in fs::read_dir(path)? {
+			let entry = entry?;
+			let file_type = entry.file_type()?;
+			let entry_path = entry.path();
+
+			if file_type.is_dir() {
+				recursive_remove(&entry_path)?;
+			} else {
+				fs::remove_file(&entry_path)?;
+			}
+		}
+	}
+
+	fs::remove_file(path)
+}
+
 /// Prints the given size in bytes into a human-readable form.
 pub fn print_size(mut size: u64) {
 	let mut level = 0;
