@@ -7,6 +7,8 @@ use crate::version::VersionConstraint;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
+use std::fmt::Display;
+use std::fmt::Formatter;
 use std::fmt;
 use std::fs;
 use std::io::ErrorKind;
@@ -95,6 +97,22 @@ impl Dependency {
 	pub fn is_valid(&self, version: &Version) -> bool {
 		self.version.iter()
 			.all(|c| c.is_valid(version))
+	}
+}
+
+impl Display for Dependency {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		write!(f, "{}: ", self.name)?;
+
+		for (i, c) in self.version.iter().enumerate() {
+			write!(f, "{}", c)?;
+
+			if i + 1 < self.version.len() {
+				write!(f, ", ")?;
+			}
+		}
+
+		Ok(())
 	}
 }
 
@@ -229,4 +247,26 @@ pub struct InstalledPackage {
 
 	/// The list of absolute pathes to installed files.
 	pub files: Vec<PathBuf>,
+}
+
+/// For the given list of packages, returns the list of dependencies that are not matched.
+pub fn list_unmatched_dependencies<'p>(
+	pkgs: &'p HashMap<String, InstalledPackage>
+) -> Vec<(&'p InstalledPackage, &'p Dependency)> {
+	pkgs.iter()
+		.map(|(_, pkg)| {
+			pkg.desc.get_run_deps()
+				.iter()
+				.filter(|dep| {
+					let matching = pkgs.get(dep.get_name())
+						.map(|p| dep.is_valid(p.desc.get_version()))
+						.unwrap_or(false);
+
+					!matching
+				})
+				.map(|dep| (pkg, dep))
+				.collect::<Vec<_>>()
+		})
+		.flatten()
+		.collect()
 }

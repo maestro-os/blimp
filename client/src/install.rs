@@ -24,6 +24,8 @@ pub fn install(
 	env: &mut Environment,
 	local_repos: &[PathBuf],
 ) -> Result<(), Box<dyn Error>> {
+	let installed = env.get_installed_list()?;
+
 	let mut failed = false;
 
 	// The list of repositories
@@ -32,7 +34,7 @@ pub fn install(
 	let mut packages = HashMap::<Package, &Repository>::new();
 
 	for name in names {
-		if let Some(installed) = env.get_installed(name)? {
+		if let Some(installed) = installed.get(name) {
 			println!(
 				"Package `{}` version `{}` is already installed. Skipping...",
 				name, installed.desc.get_version()
@@ -186,6 +188,5 @@ pub fn install(
 		}
 	}
 
-	println!();
 	Ok(())
 }

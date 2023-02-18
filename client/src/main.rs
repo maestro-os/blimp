@@ -188,7 +188,7 @@ fn main_(sysroot: PathBuf, local_repos: &[PathBuf]) -> Result<bool, Box<dyn Erro
 			}
 
 			let mut env = get_env(sysroot)?;
-			remove(names, &mut env, local_repos)?;
+			remove(names, &mut env)?;
 
 			Ok(true)
 		}

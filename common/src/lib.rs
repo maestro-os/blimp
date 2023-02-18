@@ -1,5 +1,7 @@
 //! This library contains common code between the client and the server.
 
+#![feature(io_error_more)]
+
 pub mod build;
 pub mod lockfile;
 pub mod package;
@@ -13,7 +15,10 @@ pub mod download;
 use package::InstalledPackage;
 use package::Package;
 use repository::Repository;
+use std::collections::HashMap;
 use std::error::Error;
+use std::fs;
+use std::io::ErrorKind;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
@@ -73,83 +78,49 @@ impl Environment {
 		Ok(repos)
 	}
 
-
-	/// Inserts the current package in the list of installed packages.
-	fn insert_installed(&self, package: &Package) -> io::Result<()> {
-		let path = util::concat_paths(&self.sysroot, Path::new(INSTALLED_FILE));
-
-		// Reading the file
-		let mut packages: Vec<Package> = match util::read_json(&path) {
-			Ok(packages) => packages,
-			Err(_) => vec![],
-		};
-
-		packages.push(package.clone());
-
-		// Writing the file
-		util::write_json(&path, &packages)
-	}
-
-	/// Removes the current package from the list of installed packages.
-	fn remove_installed(&self, name: &str) -> io::Result<()> {
-		let path = util::concat_paths(&self.sysroot, Path::new(INSTALLED_FILE));
-
-		// Reading the file
-		let Ok(mut packages) = util::read_json::<Vec<Package>>(&path) else {
-			return Ok(());
-		};
-
-		// Removing the entry
-		let mut i = 0;
-		while i < packages.len() {
-			if packages[i].get_name() == name {
-				packages.remove(i);
-			}
-
-			i += 1;
-		}
-
-		// Writing the file
-		util::write_json(&path, &packages)
-	}
-
-	/// Returns the installed package with name `name`.
+	/// Returns the list of installed packages.
 	///
-	/// If the package isn't installed, the function returns None.
-	pub fn get_installed(&self, name: &str) -> io::Result<Option<InstalledPackage>> {
+	/// The key is the name of the package and the value is the installed package.
+	pub fn get_installed_list(&self) -> io::Result<HashMap<String, InstalledPackage>> {
 		let path = util::concat_paths(&self.sysroot, Path::new(INSTALLED_FILE));
 
-		// Reading the file
-		let Ok(packages) = util::read_json::<Vec<InstalledPackage>>(&path) else {
-			return Ok(None);
-		};
+		match util::read_json::<HashMap<String, InstalledPackage>>(&path) {
+			Ok(pkgs) => Ok(pkgs),
 
-		for p in packages {
-			if p.desc.get_name() == name {
-				return Ok(Some(p));
-			}
+			Err(e) if e.kind() == ErrorKind::NotFound => Ok(HashMap::new()),
+
+			Err(e) => Err(e),
 		}
+	}
 
-		Ok(None)
+	/// Updates the list of installed packages to the disk.
+	pub fn update_installed_list(
+		&self, list: &HashMap<String, InstalledPackage>
+	) -> io::Result<()> {
+		let path = util::concat_paths(&self.sysroot, Path::new(INSTALLED_FILE));
+		util::write_json(&path, list)
 	}
 
 	/// Installs the given package.
 	///
 	/// Arguments:
-	/// - `package` is the package to be installed.
+	/// - `pkg` is the package to be installed.
 	/// - `archive_path` is the path to the archive of the package.
 	///
 	/// If the package is already installed, the function does nothing.
 	///
 	/// The function does not resolve dependencies. It is the caller's responsibility to install
 	/// them beforehand.
-	pub fn install(&self, package: &Package, archive_path: &Path) -> Result<(), Box<dyn Error>> {
-		if self.get_installed(package.get_name())?.is_some() {
+	pub fn install(&self, pkg: &Package, archive_path: &Path) -> Result<(), Box<dyn Error>> {
+		let mut installed = self.get_installed_list()?;
+
+		// If the package is installed, do nothing
+		if installed.contains_key(pkg.get_name()) {
 			return Ok(());
 		}
 
 		// Uncompressing the package
-		util::uncompress_wrap(archive_path, |tmp_dir| {
+		let files = util::uncompress_wrap(archive_path, |tmp_dir| {
 			let mut pre_install_hook_path: PathBuf = tmp_dir.to_path_buf();
 			pre_install_hook_path.push("pre-install-hook");
 			if !util::run_hook(&pre_install_hook_path, &self.sysroot)? {
@@ -164,6 +135,8 @@ impl Environment {
 			data_path.push("data");
 			util::recursive_copy(&data_path, &self.sysroot)?;
 
+			let files = todo!(); // TODO
+
 			let mut post_install_hook_path: PathBuf = tmp_dir.to_path_buf();
 			post_install_hook_path.push("post-install-hook");
 			if !util::run_hook(&post_install_hook_path, &self.sysroot)? {
@@ -173,10 +146,15 @@ impl Environment {
 				));
 			}
 
-			Ok(())
+			Ok(files)
 		})??;
 
-		self.insert_installed(package)?;
+		installed.insert(pkg.get_name().to_owned(), InstalledPackage {
+			desc: pkg.clone(),
+
+			files,
+		});
+		self.update_installed_list(&installed)?;
 
 		Ok(())
 	}
@@ -184,13 +162,20 @@ impl Environment {
 	/// Installs a new verion of the package, removing the previous.
 	///
 	/// Arguments:
-	/// - `package` is the package to be updated.
+	/// - `pkg` is the package to be updated.
 	/// - `archive_path` is the path to the archive of the new version of the package.
 	///
-	/// If the package is not installed, the behaviour is undefined.
-	pub fn update(&self, package: &Package, archive_path: &Path) -> Result<(), Box<dyn Error>> {
+	/// If the package is not installed, the function does nothing.
+	pub fn update(&self, pkg: &Package, archive_path: &Path) -> Result<(), Box<dyn Error>> {
+		let mut installed = self.get_installed_list()?;
+
+		// If the package is not installed, do nothing
+		if !installed.contains_key(pkg.get_name()) {
+			return Ok(());
+		}
+
 		// Uncompressing the package
-		util::uncompress_wrap(archive_path, |tmp_dir| {
+		let files = util::uncompress_wrap(archive_path, |tmp_dir| {
 			let mut pre_upgrade_hook_path: PathBuf = tmp_dir.to_path_buf();
 			pre_upgrade_hook_path.push("pre-upgrade-hook");
 			if !util::run_hook(&pre_upgrade_hook_path, &self.sysroot)? {
@@ -202,6 +187,8 @@ impl Environment {
 
 			// TODO Patch files corresponding to the ones in inner data archive
 
+			let files = todo!(); // TODO
+
 			let mut post_upgrade_hook_path: PathBuf = tmp_dir.to_path_buf();
 			post_upgrade_hook_path.push("post-upgrade-hook");
 			if !util::run_hook(&post_upgrade_hook_path, &self.sysroot)? {
@@ -211,60 +198,77 @@ impl Environment {
 				));
 			}
 
-			Ok(())
+			Ok(files)
 		})??;
 
-		self.remove_installed(package.get_name())?;
-		self.insert_installed(package)?;
+		installed.insert(pkg.get_name().to_owned(), InstalledPackage {
+			desc: pkg.clone(),
+
+			files,
+		});
+		self.update_installed_list(&installed)?;
 
 		Ok(())
 	}
 
-	/// Removes the package with the given name.
-	///
-	/// Arguments:
-	/// - `name` is the name of the package.
-	/// - `archive_path` is the path to the archive of the new version of the package.
-	///
-	/// If the package is not installed, the behaviour is undefined.
+	/// Removes the given package.
 	///
 	/// This function does not check dependency breakage. It is the caller's responsibility to
 	/// ensure no other package depend on the package to be removed.
-	pub fn remove(&self, name: &str, archive_path: &Path) -> Result<(), Box<dyn Error>> {
-		let Some(installed) = self.get_installed(name)? else {
+	///
+	/// If the package is not installed, the function does nothing.
+	pub fn remove(&self, pkg: &InstalledPackage) -> Result<(), Box<dyn Error>> {
+		let mut installed = self.get_installed_list()?;
+
+		// If the package is not installed, do nothing
+		if !installed.contains_key(pkg.desc.get_name()) {
 			return Ok(());
-		};
+		}
 
-		// Uncompressing the package
-		util::uncompress_wrap(archive_path, |tmp_dir| {
-			let mut pre_remove_hook_path: PathBuf = tmp_dir.to_path_buf();
-			pre_remove_hook_path.push("pre-remove-hook");
-			if !util::run_hook(&pre_remove_hook_path, &self.sysroot)? {
-				return Err(io::Error::new(
-					io::ErrorKind::Other,
-					"Pre-remove hook failed!",
-				));
+		// TODO must keep a copy at installation
+		/*let mut pre_remove_hook_path: PathBuf = tmp_dir.to_path_buf();
+		pre_remove_hook_path.push("pre-remove-hook");
+		if !util::run_hook(&pre_remove_hook_path, &self.sysroot)? {
+			return Err(io::Error::new(
+				io::ErrorKind::Other,
+				"Pre-remove hook failed!",
+			));
+		}*/
+
+		// Remove the package's files
+		// Removing is made in reverse order to ensure inner files are removed first
+		let mut files = pkg.files.clone();
+		files.sort_unstable_by(|a, b| a.cmp(b).reverse());
+		for sys_path in &pkg.files {
+			let path = util::concat_paths(&self.sysroot, &sys_path);
+
+			let file_type = fs::metadata(&path)?.file_type();
+			if file_type.is_dir() {
+				match fs::remove_dir(&path) {
+					Ok(_) => {},
+
+					// If the directory is not empty, ignore error
+					Err(e) if e.kind() == ErrorKind::DirectoryNotEmpty => {},
+
+					Err(e) => return Err(e.into()),
+				}
+			} else {
+				fs::remove_file(&path)?;
 			}
+		}
 
-			// Remove the package's files
-			for sys_path in installed.files {
-				let path = util::concat_paths(&self.sysroot, &sys_path);
-				util::recursive_remove(&path)?;
-			}
+		// TODO must keep a copy at installation
+		/*let mut post_remove_hook_path: PathBuf = tmp_dir.to_path_buf();
+		post_remove_hook_path.push("post-remove-hook");
+		if !util::run_hook(&post_remove_hook_path, &self.sysroot)? {
+			return Err(io::Error::new(
+				io::ErrorKind::Other,
+				"Post-remove hook failed!",
+			));
+		}*/
 
-			let mut post_remove_hook_path: PathBuf = tmp_dir.to_path_buf();
-			post_remove_hook_path.push("post-remove-hook");
-			if !util::run_hook(&post_remove_hook_path, &self.sysroot)? {
-				return Err(io::Error::new(
-					io::ErrorKind::Other,
-					"Post-remove hook failed!",
-				));
-			}
-
-			Ok(())
-		})??;
-
-		self.remove_installed(name)?;
+		installed.remove(pkg.desc.get_name());
+		self.update_installed_list(&installed)?;
 
 		Ok(())
 	}
