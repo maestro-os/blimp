@@ -108,18 +108,9 @@ impl Environment {
 	/// - `pkg` is the package to be installed.
 	/// - `archive_path` is the path to the archive of the package.
 	///
-	/// If the package is already installed, the function does nothing.
-	///
 	/// The function does not resolve dependencies. It is the caller's responsibility to install
 	/// them beforehand.
 	pub fn install(&self, pkg: &Package, archive_path: &Path) -> Result<(), Box<dyn Error>> {
-		let mut installed = self.get_installed_list()?;
-
-		// If the package is installed, do nothing
-		if installed.contains_key(pkg.get_name()) {
-			return Ok(());
-		}
-
 		// Read archive
 		let mut archive = util::read_package_archive(archive_path)?;
 
@@ -160,6 +151,7 @@ impl Environment {
 		// TODO Execute post-install-hook
 
 		// Update installed list
+		let mut installed = self.get_installed_list()?;
 		installed.insert(pkg.get_name().to_owned(), InstalledPackage {
 			desc: pkg.clone(),
 			files,
@@ -174,16 +166,7 @@ impl Environment {
 	/// Arguments:
 	/// - `pkg` is the package to be updated.
 	/// - `archive_path` is the path to the archive of the new version of the package.
-	///
-	/// If the package is not installed, the function does nothing.
 	pub fn update(&self, pkg: &Package, archive_path: &Path) -> Result<(), Box<dyn Error>> {
-		let mut installed = self.get_installed_list()?;
-
-		// If the package is not installed, do nothing
-		if !installed.contains_key(pkg.get_name()) {
-			return Ok(());
-		}
-
 		// Read archive
 		let _archive = util::read_package_archive(archive_path)?;
 
@@ -199,6 +182,7 @@ impl Environment {
 		// TODO Execute post-update-hook
 
 		// Update installed list
+		let mut installed = self.get_installed_list()?;
 		installed.insert(pkg.get_name().to_owned(), InstalledPackage {
 			desc: pkg.clone(),
 			files,
@@ -212,16 +196,7 @@ impl Environment {
 	///
 	/// This function does not check dependency breakage. It is the caller's responsibility to
 	/// ensure no other package depend on the package to be removed.
-	///
-	/// If the package is not installed, the function does nothing.
 	pub fn remove(&self, pkg: &InstalledPackage) -> Result<(), Box<dyn Error>> {
-		let mut installed = self.get_installed_list()?;
-
-		// If the package is not installed, do nothing
-		if !installed.contains_key(pkg.desc.get_name()) {
-			return Ok(());
-		}
-
 		// TODO Get hooks (pre-remove-hook and post-remove-hook. Copy at installation?)
 
 		// TODO Execute pre-remove-hook
@@ -252,9 +227,10 @@ impl Environment {
 			}
 		}
 
-		// Execute post-remove-hook
+		// TODO Execute post-remove-hook
 
 		// Update installed list
+		let mut installed = self.get_installed_list()?;
 		installed.remove(pkg.desc.get_name());
 		self.update_installed_list(&installed)?;
 
