@@ -17,6 +17,7 @@ use package::Package;
 use repository::Repository;
 use std::collections::HashMap;
 use std::error::Error;
+use std::ffi::OsStr;
 use std::fs;
 use std::io::ErrorKind;
 use std::io;
@@ -119,39 +120,48 @@ impl Environment {
 			return Ok(());
 		}
 
-		// Uncompressing the package
-		let files = util::uncompress_wrap(archive_path, |tmp_dir| {
-			let mut pre_install_hook_path: PathBuf = tmp_dir.to_path_buf();
-			pre_install_hook_path.push("pre-install-hook");
-			if !util::run_hook(&pre_install_hook_path, &self.sysroot)? {
-				return Err(io::Error::new(
-					io::ErrorKind::Other,
-					"Pre-install hook failed!",
-				));
+		// Read archive
+		let mut archive = util::read_package_archive(archive_path)?;
+
+		// TODO Get hooks (pre-install-hook and post-install-hook)
+
+		// TODO Execute pre-install-hook
+
+		// The list of installed files
+		let mut files = vec![];
+
+		// Copy files
+		for e in archive.entries()? {
+			let mut e = e?;
+			let path = e.path()?;
+			let mut path_iter = path.iter();
+
+			// Exclude files that are not in the `data` directory
+			if path_iter.next() != Some(OsStr::new("data")) {
+				continue;
 			}
 
-			// Installing the package's files
-			let mut data_path = tmp_dir.to_path_buf();
-			data_path.push("data");
-			util::recursive_copy(&data_path, &self.sysroot)?;
-
-			let files = todo!(); // TODO
-
-			let mut post_install_hook_path: PathBuf = tmp_dir.to_path_buf();
-			post_install_hook_path.push("post-install-hook");
-			if !util::run_hook(&post_install_hook_path, &self.sysroot)? {
-				return Err(io::Error::new(
-					io::ErrorKind::Other,
-					"Post-install hook failed!",
-				));
+			let sys_path = path_iter.filter(|c| !c.is_empty()).collect::<PathBuf>();
+			if sys_path.components().count() == 0 {
+				continue;
 			}
 
-			Ok(files)
-		})??;
+			let dst = self.sysroot.join(&sys_path);
 
+			// Create parent directories
+			if let Some(parent) = dst.parent() {
+				fs::create_dir_all(parent)?;
+			}
+
+			e.unpack(dst)?;
+			files.push(sys_path);
+		}
+
+		// TODO Execute post-install-hook
+
+		// Update installed list
 		installed.insert(pkg.get_name().to_owned(), InstalledPackage {
 			desc: pkg.clone(),
-
 			files,
 		});
 		self.update_installed_list(&installed)?;
@@ -174,36 +184,23 @@ impl Environment {
 			return Ok(());
 		}
 
-		// Uncompressing the package
-		let files = util::uncompress_wrap(archive_path, |tmp_dir| {
-			let mut pre_upgrade_hook_path: PathBuf = tmp_dir.to_path_buf();
-			pre_upgrade_hook_path.push("pre-upgrade-hook");
-			if !util::run_hook(&pre_upgrade_hook_path, &self.sysroot)? {
-				return Err(io::Error::new(
-					io::ErrorKind::Other,
-					"Pre-upgrade hook failed!",
-				));
-			}
+		// Read archive
+		let _archive = util::read_package_archive(archive_path)?;
 
-			// TODO Patch files corresponding to the ones in inner data archive
+		// TODO Get hooks (pre-update-hook and post-update-hook)
 
-			let files = todo!(); // TODO
+		// TODO Execute pre-update-hook
 
-			let mut post_upgrade_hook_path: PathBuf = tmp_dir.to_path_buf();
-			post_upgrade_hook_path.push("post-upgrade-hook");
-			if !util::run_hook(&post_upgrade_hook_path, &self.sysroot)? {
-				return Err(io::Error::new(
-					io::ErrorKind::Other,
-					"Post-upgrade hook failed!",
-				));
-			}
+		// The list of installed files
+		let files = vec![];
 
-			Ok(files)
-		})??;
+		// TODO Patch files corresponding to the ones in inner data archive
 
+		// TODO Execute post-update-hook
+
+		// Update installed list
 		installed.insert(pkg.get_name().to_owned(), InstalledPackage {
 			desc: pkg.clone(),
-
 			files,
 		});
 		self.update_installed_list(&installed)?;
@@ -225,48 +222,39 @@ impl Environment {
 			return Ok(());
 		}
 
-		// TODO must keep a copy at installation
-		/*let mut pre_remove_hook_path: PathBuf = tmp_dir.to_path_buf();
-		pre_remove_hook_path.push("pre-remove-hook");
-		if !util::run_hook(&pre_remove_hook_path, &self.sysroot)? {
-			return Err(io::Error::new(
-				io::ErrorKind::Other,
-				"Pre-remove hook failed!",
-			));
-		}*/
+		// TODO Get hooks (pre-remove-hook and post-remove-hook. Copy at installation?)
+
+		// TODO Execute pre-remove-hook
 
 		// Remove the package's files
 		// Removing is made in reverse order to ensure inner files are removed first
 		let mut files = pkg.files.clone();
 		files.sort_unstable_by(|a, b| a.cmp(b).reverse());
-		for sys_path in &pkg.files {
+		for sys_path in &files {
 			let path = util::concat_paths(&self.sysroot, &sys_path);
 
-			let file_type = fs::metadata(&path)?.file_type();
-			if file_type.is_dir() {
-				match fs::remove_dir(&path) {
-					Ok(_) => {},
-
-					// If the directory is not empty, ignore error
-					Err(e) if e.kind() == ErrorKind::DirectoryNotEmpty => {},
-
-					Err(e) => return Err(e.into()),
-				}
+			let dir = fs::metadata(&path)
+				.map(|m| m.file_type().is_dir())
+				.unwrap_or(false);
+			let result = if dir {
+				fs::remove_dir(&path)
 			} else {
-				fs::remove_file(&path)?;
+				fs::remove_file(&path)
+			};
+
+			match result {
+				Ok(_) => {},
+				Err(e) if matches!(
+					e.kind(), ErrorKind::DirectoryNotEmpty | ErrorKind::NotFound
+				) => {},
+
+				Err(e) => return Err(e.into()),
 			}
 		}
 
-		// TODO must keep a copy at installation
-		/*let mut post_remove_hook_path: PathBuf = tmp_dir.to_path_buf();
-		post_remove_hook_path.push("post-remove-hook");
-		if !util::run_hook(&post_remove_hook_path, &self.sysroot)? {
-			return Err(io::Error::new(
-				io::ErrorKind::Other,
-				"Post-remove hook failed!",
-			));
-		}*/
+		// Execute post-remove-hook
 
+		// Update installed list
 		installed.remove(pkg.desc.get_name());
 		self.update_installed_list(&installed)?;
 

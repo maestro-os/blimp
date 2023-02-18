@@ -149,6 +149,11 @@ pub fn uncompress_wrap<T, F: FnOnce(&Path) -> T>(
 	Ok(v)
 }
 
+/// Reads the package archive at the given path and returns an instance for it.
+pub fn read_package_archive(path: &Path) -> io::Result<Archive<GzDecoder<File>>> {
+	Ok(Archive::new(GzDecoder::new(File::open(path)?)))
+}
+
 /// Run the hook at the given path.
 ///
 /// Arguments:

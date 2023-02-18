@@ -160,6 +160,7 @@ impl BuildProcess {
 		tar.follow_symlinks(false);
 		tar.append_path_with_name(build_desc_path, "package.json")?;
 		tar.append_dir_all("data", sysroot)?;
+		// TODO add install/update/remove hooks
 
 		tar.finish()
 	}
