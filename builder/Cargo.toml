@@ -8,3 +8,7 @@ common = { path = "../common" }
 flate2 = "1.0.22"
 tar = "0.4.38"
 tokio = "1.21.2"
+
+[features]
+default = []
+network = ["common/network"]

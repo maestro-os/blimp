@@ -4,5 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-common = { path = "../common", features = ["network"] }
+common = { path = "../common" }
 tokio = "1.21.2"
+
+[features]
+default = []
+network = ["common/network"]
