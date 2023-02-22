@@ -3,17 +3,20 @@
 mod confirm;
 mod install;
 mod remove;
+
+#[cfg(feature = "network")]
 mod update;
 
 use common::Environment;
-use common::repository::remote::Remote;
 use install::install;
 use remove::remove;
 use std::env;
 use std::error::Error;
 use std::path::PathBuf;
 use std::process::exit;
-use update::update;
+
+#[cfg(feature = "network")]
+use common::repository::remote::Remote;
 
 /// The software's current version.
 const VERSION: &str = "0.1";
@@ -54,6 +57,12 @@ stored locally (the SYSROOT variable doesn't apply to these paths)"
 	);
 }
 
+/// Prints the message to tell that the required feature is not available.
+#[allow(unused)]
+fn network_not_enabled() {
+	eprintln!("This feature is not enabled. To use it, recompile with the feature `network`");
+}
+
 /// Returns an environment for the given sysroot.
 ///
 /// If the environment's lockfile cannot be acquired, the function returns an error.
@@ -62,6 +71,7 @@ fn get_env(sysroot: PathBuf) -> Result<Environment, Box<dyn Error>> {
 }
 
 /// Lists remotes.
+#[cfg(feature = "network")]
 fn remote_list(env: &Environment) -> Result<(), Box<dyn Error>> {
 	let remotes = Remote::load_list(env)
 		.map_err(|e| -> Box<dyn Error> {
@@ -87,6 +97,7 @@ fn remote_list(env: &Environment) -> Result<(), Box<dyn Error>> {
 /// Arguments:
 /// - `env` is the environment.
 /// - `remotes` is the list of remotes to add.
+#[cfg(feature = "network")]
 fn remote_add(env: &mut Environment, remotes: &[String]) -> Result<(), Box<dyn Error>> {
 	let mut list = Remote::load_list(env)?;
 	list.sort();
@@ -107,6 +118,7 @@ fn remote_add(env: &mut Environment, remotes: &[String]) -> Result<(), Box<dyn E
 /// Arguments:
 /// - `env` is the environment.
 /// - `remotes` is the list of remotes to remove.
+#[cfg(feature = "network")]
 fn remote_remove(env: &mut Environment, remotes: &[String]) -> Result<(), Box<dyn Error>> {
 	let mut list = Remote::load_list(env)?;
 	list.sort();
@@ -148,9 +160,10 @@ fn main_(sysroot: PathBuf, local_repos: &[PathBuf]) -> Result<bool, Box<dyn Erro
 			todo!();
 		}
 
+		#[cfg(feature = "network")]
 		"update" => {
 			let mut env = get_env(sysroot)?;
-			update(&mut env)?;
+			update::update(&mut env)?;
 
 			Ok(true)
 		}
@@ -199,6 +212,7 @@ fn main_(sysroot: PathBuf, local_repos: &[PathBuf]) -> Result<bool, Box<dyn Erro
 			todo!();
 		}
 
+		#[cfg(feature = "network")]
 		"remote-list" => {
 			let env = get_env(sysroot)?;
 			remote_list(&env)?;
@@ -206,6 +220,7 @@ fn main_(sysroot: PathBuf, local_repos: &[PathBuf]) -> Result<bool, Box<dyn Erro
 			Ok(true)
 		}
 
+		#[cfg(feature = "network")]
 		"remote-add" => {
 			let names = &args[2..];
 			if names.is_empty() {
@@ -219,6 +234,7 @@ fn main_(sysroot: PathBuf, local_repos: &[PathBuf]) -> Result<bool, Box<dyn Erro
 			Ok(true)
 		}
 
+		#[cfg(feature = "network")]
 		"remote-remove" => {
 			let names = &args[2..];
 			if names.is_empty() {
@@ -230,6 +246,12 @@ fn main_(sysroot: PathBuf, local_repos: &[PathBuf]) -> Result<bool, Box<dyn Erro
 			remote_remove(&mut env, names)?;
 
 			Ok(true)
+		}
+
+		#[cfg(not(feature = "network"))]
+		"update" | "remote-list" | "remote-add" | "remote-remove" => {
+			network_not_enabled();
+			Ok(false)
 		}
 
 		_ => {

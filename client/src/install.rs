@@ -3,7 +3,6 @@
 use common::Environment;
 use common::package::Package;
 use common::repository::Repository;
-use common::repository::remote::Remote;
 use common::repository;
 use common::util;
 use crate::confirm;
@@ -11,6 +10,9 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::path::PathBuf;
 use tokio::runtime::Runtime;
+
+#[cfg(feature = "network")]
+use common::repository::remote::Remote;
 
 // TODO Clean
 /// Installs the given list of packages.
@@ -105,74 +107,78 @@ pub fn install(
 		return Err("installation failed".into());
 	}
 
-	// Creating the async runtime
-	let rt = Runtime::new().unwrap();
 
 	println!("Packages to be installed:");
 
-	// The total download size in bytes
-	let mut total_size = 0;
+	#[cfg(feature = "network")]
+	{
+		// Creating the async runtime
+		let rt = Runtime::new().unwrap();
 
-	for (pkg, repo) in &total_packages {
-		let name = pkg.get_name();
-		let version = pkg.get_version();
+		// The total download size in bytes
+		let mut total_size = 0;
 
-		match repo.get_package(name, version)? {
-			Some(_) => println!("\t- {} ({}) - cached", name, version),
+		for (pkg, repo) in &total_packages {
+			let name = pkg.get_name();
+			let version = pkg.get_version();
 
-			None => {
-				let remote = repo.get_remote().unwrap();
+			match repo.get_package(name, version)? {
+				Some(_) => println!("\t- {} ({}) - cached", name, version),
 
-				// Get package size from remote
-				let size = rt.block_on(async {
-					remote.get_size(pkg).await
-				})?;
-				total_size += size;
+				None => {
+					let remote = repo.get_remote().unwrap();
 
-				println!("\t- {} ({}) - download size: {}", name, version, size);
-			},
-		}
-	}
+					// Get package size from remote
+					let size = rt.block_on(async {
+						remote.get_size(pkg).await
+					})?;
+					total_size += size;
 
-	print!("Total download size: ");
-	util::print_size(total_size);
-	println!();
-
-	if !confirm::prompt() {
-		println!("Aborting.");
-		return Ok(());
-	}
-
-	println!("Downloading packages...");
-	let mut futures = Vec::new();
-
-	for (pkg, repo) in &total_packages {
-		if repo.is_in_cache(pkg.get_name(), pkg.get_version()) {
-			println!("`{}` is in cache.", pkg.get_name());
-			continue;
+					println!("\t- {} ({}) - download size: {}", name, version, size);
+				}
+			}
 		}
 
-		if let Some(remote) = repo.get_remote() {
-			futures.push((
-				pkg.get_name(),
-				pkg.get_version(),
-				Remote::fetch_archive(remote, repo, pkg)
-			));
-		}
-	}
+		print!("Total download size: ");
+		util::print_size(total_size);
+		println!();
 
-	// TODO Add progress bar
-	for (name, version, f) in futures {
-		match rt.block_on(f) {
-			Ok(_task) => {
-				// TODO
-			},
-
-			Err(e) => eprintln!("Failed to download `{}` version `{}`: {}", name, version, e),
+		if !confirm::prompt() {
+			println!("Aborting.");
+			return Ok(());
 		}
-	}
-	if failed {
-		return Err("installation failed".into());
+
+		println!("Downloading packages...");
+		let mut futures = Vec::new();
+
+		for (pkg, repo) in &total_packages {
+			if repo.is_in_cache(pkg.get_name(), pkg.get_version()) {
+				println!("`{}` is in cache.", pkg.get_name());
+				continue;
+			}
+
+			if let Some(remote) = repo.get_remote() {
+				futures.push((
+					pkg.get_name(),
+					pkg.get_version(),
+					Remote::fetch_archive(remote, repo, pkg)
+				));
+			}
+		}
+
+		// TODO Add progress bar
+		for (name, version, f) in futures {
+			match rt.block_on(f) {
+				Ok(_task) => {
+					// TODO
+				},
+
+				Err(e) => eprintln!("Failed to download `{}` version `{}`: {}", name, version, e),
+			}
+		}
+		if failed {
+			return Err("installation failed".into());
+		}
 	}
 
 	println!();
