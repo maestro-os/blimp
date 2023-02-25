@@ -3,8 +3,8 @@
 
 export TARGET=i686-unknown-linux-musl
 
-export CC=clang
-export CFLAGS="-target $TARGET --sysroot $TOOLCHAIN"
+export CC="clang"
+export CFLAGS="-target $TARGET --sysroot $TOOLCHAIN -I$TOOLCHAIN/usr/include -I$TOOLCHAIN/include"
 
 export LD=ld.lld
 export LDFLAGS="-target $TARGET --sysroot $TOOLCHAIN -L$TOOLCHAIN/usr/lib -L$TOOLCHAIN/lib -fuse-ld=lld --rtlib=compiler-rt"
