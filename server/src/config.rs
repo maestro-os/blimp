@@ -1,11 +1,11 @@
 //! This module handles the server's configuration file.
 
-use std::path::PathBuf;
 use common::util;
 use serde::Deserialize;
 use serde::Serialize;
 use std::io;
 use std::path::Path;
+use std::path::PathBuf;
 
 /// The path to the configuration file.
 const CONFIG_FILE: &str = "config.json";

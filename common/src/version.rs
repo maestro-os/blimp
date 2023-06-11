@@ -34,9 +34,7 @@ impl<'de> Deserialize<'de> for Version {
 		D: Deserializer<'de>,
 	{
 		let s: String = Deserialize::deserialize(deserializer)?;
-		s.as_str()
-			.try_into()
-			.map_err(D::Error::custom)
+		s.as_str().try_into().map_err(D::Error::custom)
 	}
 }
 
@@ -44,7 +42,8 @@ impl TryFrom<&str> for Version {
 	type Error = ParseIntError;
 
 	fn try_from(value: &str) -> Result<Self, Self::Error> {
-		value.split(".")
+		value
+			.split(".")
 			.map(|n| n.parse::<u32>())
 			.collect::<Result<Vec<_>, _>>()
 			.map(|numbers| Self {
@@ -127,9 +126,7 @@ impl<'de> Deserialize<'de> for VersionConstraint {
 		D: Deserializer<'de>,
 	{
 		let s: String = Deserialize::deserialize(deserializer)?;
-		s.as_str()
-			.try_into()
-			.map_err(D::Error::custom)
+		s.as_str().try_into().map_err(D::Error::custom)
 	}
 }
 
@@ -158,7 +155,9 @@ impl VersionConstraint {
 			Self::Equal(v) => matches!(version.cmp(&v), Ordering::Equal),
 			Self::LessOrEqual(v) => matches!(version.cmp(&v), Ordering::Less | Ordering::Equal),
 			Self::Less(v) => matches!(version.cmp(&v), Ordering::Less),
-			Self::GreaterOrEqual(v) => matches!(version.cmp(&v), Ordering::Greater | Ordering::Equal),
+			Self::GreaterOrEqual(v) => {
+				matches!(version.cmp(&v), Ordering::Greater | Ordering::Equal)
+			}
 			Self::Greater(v) => matches!(version.cmp(&v), Ordering::Greater),
 		}
 	}

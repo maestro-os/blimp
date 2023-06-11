@@ -131,7 +131,7 @@ impl Repository {
 	pub fn get_package_with_constraints(
 		&self,
 		name: &str,
-		version_constraints: &[VersionConstraint]
+		version_constraints: &[VersionConstraint],
 	) -> io::Result<Option<Package>> {
 		let version = fs::read_dir(self.path.join(name))?
 			.into_iter()
@@ -167,12 +167,11 @@ pub fn get_package<'a>(
 	name: &str,
 	version: &Version,
 ) -> io::Result<Option<(&'a Repository, Package)>> {
-	Ok(repos.iter()
-		.filter_map(|repo| {
-			match repo.get_package(name, version) {
-				Ok(Some(pack)) => Some((repo, pack)),
-				_ => None,
-			}
+	Ok(repos
+		.iter()
+		.filter_map(|repo| match repo.get_package(name, version) {
+			Ok(Some(pack)) => Some((repo, pack)),
+			_ => None,
 		})
 		.next())
 }
@@ -187,14 +186,15 @@ pub fn get_package<'a>(
 pub fn get_package_with_constraints<'a>(
 	repos: &'a [Repository],
 	name: &str,
-	version_constraints: &[VersionConstraint]
+	version_constraints: &[VersionConstraint],
 ) -> io::Result<Option<(&'a Repository, Package)>> {
-	Ok(repos.iter()
-		.filter_map(|repo| {
-			match repo.get_package_with_constraints(name, version_constraints) {
+	Ok(repos
+		.iter()
+		.filter_map(
+			|repo| match repo.get_package_with_constraints(name, version_constraints) {
 				Ok(Some(pack)) => Some((repo, pack)),
 				_ => None,
-			}
-		})
+			},
+		)
 		.max_by(|(_, p0), (_, p1)| p0.get_version().cmp(p1.get_version())))
 }

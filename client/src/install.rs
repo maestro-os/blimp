@@ -1,11 +1,11 @@
 //! This module handles package installation.
 
-use common::Environment;
-use common::package::Package;
-use common::repository::Repository;
-use common::repository;
-use common::util;
 use crate::confirm;
+use common::package::Package;
+use common::repository;
+use common::repository::Repository;
+use common::util;
+use common::Environment;
 use std::collections::HashMap;
 use std::error::Error;
 use std::path::PathBuf;
@@ -39,7 +39,8 @@ pub fn install(
 		if let Some(installed) = installed.get(name) {
 			println!(
 				"Package `{}` version `{}` is already installed. Skipping...",
-				name, installed.desc.get_version()
+				name,
+				installed.desc.get_version()
 			);
 
 			continue;
@@ -70,16 +71,13 @@ pub fn install(
 		let res = package.resolve_dependencies(
 			&mut total_packages,
 			&mut |name, version_constraints| {
-				let res = repository::get_package_with_constraints(
-					&repos,
-					name,
-					version_constraints
-				)
-					.or_else(|e| {
-						eprintln!("error: {}", e);
-						Err(())
-					})
-					.ok()?;
+				let res =
+					repository::get_package_with_constraints(&repos, name, version_constraints)
+						.or_else(|e| {
+							eprintln!("error: {}", e);
+							Err(())
+						})
+						.ok()?;
 
 				// If not present, check on remote
 				if res.is_none() {
@@ -98,15 +96,14 @@ pub fn install(
 				}
 
 				failed = true;
-			},
+			}
 
-			_ => {},
+			_ => {}
 		}
 	}
 	if failed {
 		return Err("installation failed".into());
 	}
-
 
 	println!("Packages to be installed:");
 
@@ -129,9 +126,7 @@ pub fn install(
 					let remote = repo.get_remote().unwrap();
 
 					// Get package size from remote
-					let size = rt.block_on(async {
-						remote.get_size(pkg).await
-					})?;
+					let size = rt.block_on(async { remote.get_size(pkg).await })?;
 					total_size += size;
 
 					println!("\t- {} ({}) - download size: {}", name, version, size);
@@ -161,7 +156,7 @@ pub fn install(
 				futures.push((
 					pkg.get_name(),
 					pkg.get_version(),
-					Remote::fetch_archive(remote, repo, pkg)
+					Remote::fetch_archive(remote, repo, pkg),
 				));
 			}
 		}
@@ -171,7 +166,7 @@ pub fn install(
 			match rt.block_on(f) {
 				Ok(_task) => {
 					// TODO
-				},
+				}
 
 				Err(e) => eprintln!("Failed to download `{}` version `{}`: {}", name, version, e),
 			}

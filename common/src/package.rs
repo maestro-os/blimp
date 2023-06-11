@@ -7,12 +7,12 @@ use crate::version::VersionConstraint;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
+use std::fmt;
 use std::fmt::Display;
 use std::fmt::Formatter;
-use std::fmt;
 use std::fs;
-use std::io::ErrorKind;
 use std::io;
+use std::io::ErrorKind;
 use std::path::PathBuf;
 
 /// The directory storing packages' descriptions on the serverside.
@@ -54,7 +54,7 @@ impl fmt::Display for ResolveError {
 				for c in version_constraints {
 					write!(fmt, "- `{}`\n", c)?;
 				}
-			},
+			}
 
 			Self::VersionConflict {
 				name,
@@ -62,8 +62,12 @@ impl fmt::Display for ResolveError {
 				v0,
 				v1,
 			} => {
-				write!(fmt, "Conflicting version `{}` and `{}` on `{}`!", v0, v1, name)?;
-			},
+				write!(
+					fmt,
+					"Conflicting version `{}` and `{}` on `{}`!",
+					v0, v1, name
+				)?;
+			}
 		}
 
 		Ok(())
@@ -95,8 +99,7 @@ impl Dependency {
 
 	/// Tells whether the given version matches every containts.
 	pub fn is_valid(&self, version: &Version) -> bool {
-		self.version.iter()
-			.all(|c| c.is_valid(version))
+		self.version.iter().all(|c| c.is_valid(version))
 	}
 }
 
@@ -185,14 +188,16 @@ impl Package {
 		packages: &mut HashMap<Self, &'r Repository>,
 		f: &mut F,
 	) -> io::Result<Result<(), Vec<ResolveError>>>
-		where F: FnMut(&str, &[VersionConstraint]) -> Option<(Self, &'r Repository)>,
+	where
+		F: FnMut(&str, &[VersionConstraint]) -> Option<(Self, &'r Repository)>,
 	{
 		let mut errors = vec![];
 
 		// TODO Add support for build dependencies
 		for d in &self.run_deps {
 			// Get package in the installation list
-			let pkg = packages.iter()
+			let pkg = packages
+				.iter()
 				.map(|(p, _)| p)
 				.filter(|p| p.get_name() == d.get_name())
 				.next();
@@ -218,7 +223,7 @@ impl Package {
 				let res = p.resolve_dependencies(packages, f)?;
 				match res {
 					Err(e) => return Ok(Err(e)),
-					_ => {},
+					_ => {}
 				}
 
 				packages.insert(p, repo);
@@ -250,14 +255,16 @@ pub struct InstalledPackage {
 
 /// For the given list of packages, returns the list of dependencies that are not matched.
 pub fn list_unmatched_dependencies<'p>(
-	pkgs: &'p HashMap<String, InstalledPackage>
+	pkgs: &'p HashMap<String, InstalledPackage>,
 ) -> Vec<(&'p InstalledPackage, &'p Dependency)> {
 	pkgs.iter()
 		.map(|(_, pkg)| {
-			pkg.desc.get_run_deps()
+			pkg.desc
+				.get_run_deps()
 				.iter()
 				.filter(|dep| {
-					let matching = pkgs.get(dep.get_name())
+					let matching = pkgs
+						.get(dep.get_name())
 						.map(|p| dep.is_valid(p.desc.get_version()))
 						.unwrap_or(false);
 

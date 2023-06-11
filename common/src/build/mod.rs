@@ -4,11 +4,11 @@ pub mod build_desc;
 
 use crate::build::build_desc::BuildDescriptor;
 use crate::util;
-use flate2::Compression;
 use flate2::write::GzEncoder;
+use flate2::Compression;
 use std::error::Error;
-use std::fs::File;
 use std::fs;
+use std::fs::File;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
@@ -93,7 +93,8 @@ impl BuildProcess {
 		};
 
 		let runtime = Runtime::new()?;
-		let futures = build_desc.sources
+		let futures = build_desc
+			.sources
 			.iter()
 			.map(|s| s.fetch(&build_dir))
 			.collect::<Vec<_>>();
@@ -113,12 +114,7 @@ impl BuildProcess {
 	/// - `target` is the triplet of the target machine.
 	///
 	/// On success, the function returns `true`.
-	pub fn build(
-		&self,
-		jobs: u32,
-		host: &str,
-		target: &str,
-	) -> io::Result<bool> {
+	pub fn build(&self, jobs: u32, host: &str, target: &str) -> io::Result<bool> {
 		let (
 			Some(build_dir),
 			Some(sysroot),
@@ -177,15 +173,15 @@ impl Drop for BuildProcess {
 			match self.build_dir {
 				Some(ref path) => {
 					let _ = fs::remove_dir_all(path);
-				},
-				None => {},
+				}
+				None => {}
 			}
 
 			match self.sysroot {
 				Some(ref path) => {
 					let _ = fs::remove_dir_all(path);
-				},
-				None => {},
+				}
+				None => {}
 			}
 		}
 	}
@@ -195,9 +191,7 @@ impl Drop for BuildProcess {
 ///
 /// If the triplet cannot be retrieved, the function returns None.
 pub fn get_host_triplet() -> Option<String> {
-	let output = Command::new("cc")
-		.arg("-dumpmachine")
-		.output();
+	let output = Command::new("cc").arg("-dumpmachine").output();
 
 	if let Ok(out) = output {
 		if let Ok(triplet) = str::from_utf8(&out.stdout) {

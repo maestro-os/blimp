@@ -74,9 +74,7 @@ fn get_env(sysroot: PathBuf) -> Result<Environment, Box<dyn Error>> {
 #[cfg(feature = "network")]
 fn remote_list(env: &Environment) -> Result<(), Box<dyn Error>> {
 	let remotes = Remote::load_list(env)
-		.map_err(|e| -> Box<dyn Error> {
-			format!("IO error: {}", e).into()
-		})?;
+		.map_err(|e| -> Box<dyn Error> { format!("IO error: {}", e).into() })?;
 
 	println!("Remotes list:");
 
@@ -282,6 +280,6 @@ fn main() {
 			exit(1);
 		}
 
-		_ => {},
+		_ => {}
 	}
 }

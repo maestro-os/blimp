@@ -3,15 +3,7 @@ mod global_data;
 mod package;
 mod util;
 
-use actix_web::{
-	App,
-	HttpResponse,
-	HttpServer,
-	Responder,
-	get,
-	middleware,
-	web,
-};
+use actix_web::{get, middleware, web, App, HttpResponse, HttpServer, Responder};
 use common::repository::Repository;
 use config::Config;
 use global_data::GlobalData;

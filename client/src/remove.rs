@@ -1,7 +1,7 @@
 //! TODO doc
 
-use common::Environment;
 use common::package;
+use common::Environment;
 use std::error::Error;
 
 // TODO ask for confirm before remove
@@ -11,10 +11,7 @@ use std::error::Error;
 /// Arguments:
 /// - `names` is the list of packages to remove.
 /// - `env` is the blimp environment.
-pub fn remove(
-	names: &[String],
-	env: &mut Environment,
-) -> Result<(), Box<dyn Error>> {
+pub fn remove(names: &[String], env: &mut Environment) -> Result<(), Box<dyn Error>> {
 	// The list of remaining packages after the remove operation
 	let remaining = {
 		let mut installed = env.get_installed_list()?;
@@ -31,7 +28,9 @@ pub fn remove(
 		for (pkg, dep) in unmatched_deps {
 			eprintln!(
 				"- for package `{}` (version `{}`): {}",
-				pkg.desc.get_name(), pkg.desc.get_version(), dep
+				pkg.desc.get_name(),
+				pkg.desc.get_version(),
+				dep
 			);
 		}
 
@@ -46,7 +45,11 @@ pub fn remove(
 	for name in names {
 		if let Some(installed) = installed.get(name) {
 			env.remove(&installed).map_err(|e| {
-				format!("failed to remove package `{}`: {}", installed.desc.get_name(), e)
+				format!(
+					"failed to remove package `{}`: {}",
+					installed.desc.get_name(),
+					e
+				)
 			})?;
 		} else {
 			eprintln!("Package `{}` not found!", name);

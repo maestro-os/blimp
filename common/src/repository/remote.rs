@@ -1,17 +1,17 @@
 //! A remote is a remote host from which packages can be downloaded.
 
-use crate::Environment;
 use crate::download::DownloadTask;
 use crate::package::Package;
 use crate::repository::Repository;
+use crate::Environment;
 use std::error::Error;
 use std::fs::File;
 use std::fs::OpenOptions;
+use std::io;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Write;
-use std::io;
 
 // TODO Use https
 
@@ -105,11 +105,13 @@ impl Remote {
 			package.get_version()
 		);
 		let client = reqwest::Client::new();
-		let response = client.head(url)
+		let response = client
+			.head(url)
 			.send()
 			.await
 			.or_else(|e| Err(format!("HTTP request failed: {}", e)))?;
-		let len = response.content_length()
+		let len = response
+			.content_length()
 			.ok_or_else(|| "Content-Length field not present in response".to_owned())?;
 
 		Ok(len)

@@ -1,14 +1,12 @@
+use crate::global_data::GlobalData;
+use crate::util;
 use actix_files::NamedFile;
 use actix_web::{get, web, HttpRequest, HttpResponse, Responder};
 use common::version::Version;
-use crate::global_data::GlobalData;
-use crate::util;
 use std::sync::Mutex;
 
 #[get("/package")]
-async fn list(
-	data: web::Data<Mutex<GlobalData>>,
-) -> impl Responder {
+async fn list(data: web::Data<Mutex<GlobalData>>) -> impl Responder {
 	let repo = &data.lock().unwrap().repo;
 
 	match repo.list_packages() {

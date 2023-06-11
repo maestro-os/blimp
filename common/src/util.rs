@@ -5,13 +5,13 @@ use flate2::read::GzDecoder;
 use serde::Deserialize;
 use serde::Serialize;
 use std::error::Error;
+use std::fs;
 use std::fs::File;
 use std::fs::OpenOptions;
-use std::fs;
+use std::io;
 use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Read;
-use std::io;
 use std::os::unix;
 use std::path::Component::Normal;
 use std::path::Path;
@@ -93,11 +93,7 @@ fn uncompress_<R: Read>(
 ///
 /// If the tarball contains directories at the root, the unwrap operation unwraps their content
 /// instead of the directories themselves.
-pub fn uncompress(
-	src: &Path,
-	dest: &Path,
-	unwrap: bool,
-) -> Result<(), Box<dyn Error>> {
+pub fn uncompress(src: &Path, dest: &Path, unwrap: bool) -> Result<(), Box<dyn Error>> {
 	// Trying to uncompress .tar.gz
 	{
 		let file = File::open(&src)?;

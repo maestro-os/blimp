@@ -1,8 +1,8 @@
 //! The lock file allows to prevent several instances of the package manager from running at the
 //! same time.
 
-use std::fs::OpenOptions;
 use std::fs;
+use std::fs::OpenOptions;
 use std::path::Path;
 
 /// Creates the lock file if not present.

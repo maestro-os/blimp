@@ -70,9 +70,11 @@ impl Source {
 			}
 
 			_ => {
-				panic!("Feature `network` is not enabled! Please recompile blimp common with \
-this feature enabled");
-			},
+				panic!(
+					"Feature `network` is not enabled! Please recompile blimp common with \
+this feature enabled"
+				);
+			}
 		}
 
 		#[cfg(feature = "network")]
@@ -106,7 +108,7 @@ this feature enabled");
 					.args([
 						OsString::from("clone"),
 						OsString::from(git_url),
-						dest_path.into()
+						dest_path.into(),
 					])
 					.status()?;
 
@@ -115,7 +117,7 @@ this feature enabled");
 				}
 			}
 
-			_ => {},
+			_ => {}
 		}
 
 		// TODO Remove the archive?
