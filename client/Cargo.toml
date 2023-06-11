@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 common = { path = "../common" }
-tokio = "1.21.2"
+tokio = "1.28.2"
 
 [features]
 default = []

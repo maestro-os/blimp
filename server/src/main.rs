@@ -8,7 +8,6 @@ use common::repository::Repository;
 use config::Config;
 use global_data::GlobalData;
 use std::env;
-use std::sync::Mutex;
 
 /// The server's version.
 const VERSION: &str = "0.1";
@@ -20,9 +19,8 @@ async fn root() -> impl Responder {
 }
 
 #[get("/motd")]
-async fn motd(data: web::Data<Mutex<GlobalData>>) -> impl Responder {
-	let data = data.lock().unwrap();
-	HttpResponse::Ok().body(&data.motd)
+async fn motd(data: web::Data<GlobalData>) -> impl Responder {
+	HttpResponse::Ok().body(data.motd.clone())
 }
 
 #[actix_web::main]
@@ -31,11 +29,11 @@ async fn main() -> std::io::Result<()> {
 	let config = Config::read().unwrap(); // TODO Handle error
 	let port = config.port;
 
-	let data = web::Data::new(Mutex::new(GlobalData {
+	let data = web::Data::new(GlobalData {
 		motd: config.motd,
 
-		repo: Repository::load(config.repo_path.clone()).unwrap(), // TODO Handle error
-	}));
+		repo: Repository::load(config.repo_path.clone())?,
+	});
 
 	// Enabling logging
 	env::set_var("RUST_LOG", "actix_web=info");
