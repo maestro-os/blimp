@@ -101,7 +101,6 @@ impl Repository {
 
 				let iter = fs::read_dir(&ent_path)
 					.ok()?
-					.into_iter()
 					.filter_map(|ent| {
 						let ent = ent.ok()?;
 						if !ent.file_type().ok()?.is_dir() {
@@ -134,7 +133,6 @@ impl Repository {
 		version_constraints: &[VersionConstraint],
 	) -> io::Result<Option<Package>> {
 		let version = fs::read_dir(self.path.join(name))?
-			.into_iter()
 			.filter_map(|ent| {
 				let ent = ent.ok()?;
 

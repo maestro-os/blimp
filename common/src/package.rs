@@ -49,10 +49,10 @@ impl fmt::Display for ResolveError {
 				name,
 				version_constraints,
 			} => {
-				write!(fmt, "Unresolved dependency `{}` for constraints:\n", name)?;
+				writeln!(fmt, "Unresolved dependency `{}` for constraints:", name)?;
 
 				for c in version_constraints {
-					write!(fmt, "- `{}`\n", c)?;
+					writeln!(fmt, "- `{}`", c)?;
 				}
 			}
 
@@ -199,8 +199,7 @@ impl Package {
 			let pkg = packages
 				.iter()
 				.map(|(p, _)| p)
-				.filter(|p| p.get_name() == d.get_name())
-				.next();
+				.find(|p| p.get_name() == d.get_name());
 			// Check for conflict
 			if let Some(pkg) = pkg {
 				if !d.is_valid(pkg.get_version()) {
@@ -221,9 +220,8 @@ impl Package {
 				// TODO Check for dependency cycles
 				// FIXME Possible stack overflow
 				let res = p.resolve_dependencies(packages, f)?;
-				match res {
-					Err(e) => return Ok(Err(e)),
-					_ => {}
+				if let Err(e) = res {
+					return Ok(Err(e));
 				}
 
 				packages.insert(p, repo);
@@ -254,11 +252,11 @@ pub struct InstalledPackage {
 }
 
 /// For the given list of packages, returns the list of dependencies that are not matched.
-pub fn list_unmatched_dependencies<'p>(
-	pkgs: &'p HashMap<String, InstalledPackage>,
-) -> Vec<(&'p InstalledPackage, &'p Dependency)> {
+pub fn list_unmatched_dependencies(
+	pkgs: &HashMap<String, InstalledPackage>,
+) -> Vec<(&InstalledPackage, &Dependency)> {
 	pkgs.iter()
-		.map(|(_, pkg)| {
+		.flat_map(|(_, pkg)| {
 			pkg.desc
 				.get_run_deps()
 				.iter()
@@ -273,6 +271,5 @@ pub fn list_unmatched_dependencies<'p>(
 				.map(|dep| (pkg, dep))
 				.collect::<Vec<_>>()
 		})
-		.flatten()
 		.collect()
 }

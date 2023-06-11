@@ -52,7 +52,7 @@ specify a version"
 	eprintln!("ENVIRONMENT VARIABLES:");
 	eprintln!("\tSYSROOT: Specifies the path to the system's root");
 	eprintln!(
-		"\tLOCAL_REPOSITORIES: Specifies paths separated by `:` at which packages are \
+		"\tLOCAL_REPO: Specifies paths separated by `:` at which packages are \
 stored locally (the SYSROOT variable doesn't apply to these paths)"
 	);
 }
@@ -73,8 +73,7 @@ fn get_env(sysroot: PathBuf) -> Result<Environment, Box<dyn Error>> {
 /// Lists remotes.
 #[cfg(feature = "network")]
 fn remote_list(env: &Environment) -> Result<(), Box<dyn Error>> {
-	let remotes = Remote::load_list(env)
-		.map_err(|e| -> Box<dyn Error> { format!("IO error: {}", e).into() })?;
+	let remotes = Remote::load_list(env)?;
 
 	println!("Remotes list:");
 
@@ -141,7 +140,7 @@ fn main_(sysroot: PathBuf, local_repos: &[PathBuf]) -> Result<bool, Box<dyn Erro
 
 	// If no argument is specified, print usage
 	if args.len() <= 1 {
-		print_usage(&bin);
+		print_usage(bin);
 		return Ok(false);
 	}
 
@@ -255,7 +254,7 @@ fn main_(sysroot: PathBuf, local_repos: &[PathBuf]) -> Result<bool, Box<dyn Erro
 		_ => {
 			eprintln!("Command `{}` doesn't exist", args[1]);
 			eprintln!();
-			print_usage(&bin);
+			print_usage(bin);
 
 			Ok(false)
 		}
@@ -267,8 +266,8 @@ fn main() {
 	let sysroot = env::var("SYSROOT")
 		.map(PathBuf::from)
 		.unwrap_or(PathBuf::from("/"));
-	let local_repos = env::var("LOCAL_REPOSITORIES")
-		.map(|s| s.split(":").map(|s| PathBuf::from(s)).collect())
+	let local_repos = env::var("LOCAL_REPO")
+		.map(|s| s.split(':').map(PathBuf::from).collect())
 		.unwrap_or(vec![]);
 
 	match main_(sysroot, &local_repos) {

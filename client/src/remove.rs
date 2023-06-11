@@ -44,7 +44,7 @@ pub fn remove(names: &[String], env: &mut Environment) -> Result<(), Box<dyn Err
 	// Remove packages
 	for name in names {
 		if let Some(installed) = installed.get(name) {
-			env.remove(&installed).map_err(|e| {
+			env.remove(installed).map_err(|e| {
 				format!(
 					"failed to remove package `{}`: {}",
 					installed.desc.get_name(),

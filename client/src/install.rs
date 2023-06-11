@@ -46,7 +46,7 @@ pub fn install(
 			continue;
 		}
 
-		match repository::get_package_with_constraints(&repos, &name, &[])? {
+		match repository::get_package_with_constraints(&repos, name, &[])? {
 			Some((repo, package)) => {
 				packages.insert(package, repo);
 			}
@@ -73,9 +73,8 @@ pub fn install(
 			&mut |name, version_constraints| {
 				let res =
 					repository::get_package_with_constraints(&repos, name, version_constraints)
-						.or_else(|e| {
+						.map_err(|e| {
 							eprintln!("error: {}", e);
-							Err(())
 						})
 						.ok()?;
 
@@ -89,16 +88,12 @@ pub fn install(
 				Some((pkg, repo))
 			},
 		)?;
-		match res {
-			Err(errs) => {
-				for e in errs {
-					eprintln!("{}", e);
-				}
-
-				failed = true;
+		if let Err(errs) = res {
+			for e in errs {
+				eprintln!("{}", e);
 			}
 
-			_ => {}
+			failed = true;
 		}
 	}
 	if failed {

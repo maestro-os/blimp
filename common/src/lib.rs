@@ -1,4 +1,4 @@
-//! This library contains common code between the client and the server.
+//! The blimp library is the core of the Blimp package manager.
 
 #![feature(io_error_more)]
 
@@ -214,7 +214,7 @@ impl Environment {
 		let mut files = pkg.files.clone();
 		files.sort_unstable_by(|a, b| a.cmp(b).reverse());
 		for sys_path in &files {
-			let path = util::concat_paths(&self.sysroot, &sys_path);
+			let path = util::concat_paths(&self.sysroot, sys_path);
 
 			let dir = fs::metadata(&path)
 				.map(|m| m.file_type().is_dir())

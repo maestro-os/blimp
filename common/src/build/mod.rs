@@ -96,7 +96,7 @@ impl BuildProcess {
 		let futures = build_desc
 			.sources
 			.iter()
-			.map(|s| s.fetch(&build_dir))
+			.map(|s| s.fetch(build_dir))
 			.collect::<Vec<_>>();
 
 		for f in futures {
@@ -170,18 +170,12 @@ impl BuildProcess {
 impl Drop for BuildProcess {
 	fn drop(&mut self) {
 		if self.clean_on_drop {
-			match self.build_dir {
-				Some(ref path) => {
-					let _ = fs::remove_dir_all(path);
-				}
-				None => {}
+			if let Some(ref path) = self.build_dir {
+				let _ = fs::remove_dir_all(path);
 			}
 
-			match self.sysroot {
-				Some(ref path) => {
-					let _ = fs::remove_dir_all(path);
-				}
-				None => {}
+			if let Some(ref path) = self.sysroot {
+				let _ = fs::remove_dir_all(path);
 			}
 		}
 	}

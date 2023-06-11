@@ -96,33 +96,33 @@ fn uncompress_<R: Read>(
 pub fn uncompress(src: &Path, dest: &Path, unwrap: bool) -> Result<(), Box<dyn Error>> {
 	// Trying to uncompress .tar.gz
 	{
-		let file = File::open(&src)?;
+		let file = File::open(src)?;
 		let tar = GzDecoder::new(file);
 		let archive = Archive::new(tar);
 
-		if uncompress_(archive, &dest, unwrap).is_ok() {
+		if uncompress_(archive, dest, unwrap).is_ok() {
 			return Ok(());
 		}
 	}
 
 	// Trying to uncompress .tar.xz
 	{
-		let file = File::open(&src)?;
+		let file = File::open(src)?;
 		let tar = XzDecoder::new(file);
 		let archive = Archive::new(tar);
 
-		if uncompress_(archive, &dest, unwrap).is_ok() {
+		if uncompress_(archive, dest, unwrap).is_ok() {
 			return Ok(());
 		}
 	}
 
 	// Trying to uncompress .tar.bz2
 	{
-		let file = File::open(&src)?;
+		let file = File::open(src)?;
 		let tar = BzDecoder::new(file);
 		let archive = Archive::new(tar);
 
-		uncompress_(archive, &dest, unwrap)
+		uncompress_(archive, dest, unwrap)
 	}
 }
 
@@ -222,9 +222,9 @@ pub fn read_json<T: for<'a> Deserialize<'a>>(file: &Path) -> io::Result<T> {
 	let file = File::open(file)?;
 	let reader = BufReader::new(file);
 
-	serde_json::from_reader(reader).or_else(|e| {
+	serde_json::from_reader(reader).map_err(|e| {
 		let msg = format!("JSON deserializing failed: {}", e);
-		Err(io::Error::new(io::ErrorKind::Other, msg))
+		io::Error::new(io::ErrorKind::Other, msg)
 	})
 }
 
@@ -233,9 +233,9 @@ pub fn write_json<T: Serialize>(file: &Path, data: &T) -> io::Result<()> {
 	let file = File::create(file)?;
 	let writer = BufWriter::new(file);
 
-	serde_json::to_writer_pretty(writer, &data).or_else(|e| {
+	serde_json::to_writer_pretty(writer, &data).map_err(|e| {
 		let msg = format!("JSON serializing failed: {}", e);
-		Err(io::Error::new(io::ErrorKind::Other, msg))
+		io::Error::new(io::ErrorKind::Other, msg)
 	})
 }
 
@@ -245,7 +245,7 @@ pub fn write_json<T: Serialize>(file: &Path, data: &T) -> io::Result<()> {
 /// as opposed to the `join` function available in `Path`.
 pub fn concat_paths(path0: &Path, path1: &Path) -> PathBuf {
 	let path1 = match path1.to_str() {
-		Some(path1_str) if path1_str.chars().next() == Some('/') => Path::new(&path1_str[1..]),
+		Some(path1_str) if path1_str.starts_with('/') => Path::new(&path1_str[1..]),
 		_ => path1,
 	};
 

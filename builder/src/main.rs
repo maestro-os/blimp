@@ -125,7 +125,7 @@ fn build(from: PathBuf, to: PathBuf) {
 		util::write_json(&desc_path, &build_desc.package).unwrap(); // TODO Handle error
 
 		let repo = Repository::load(to).unwrap(); // TODO Handle error
-		repo.get_archive_path(&name, &version)
+		repo.get_archive_path(name, version)
 	};
 
 	println!("[INFO] Creating archive...");
@@ -153,7 +153,7 @@ fn main() {
 
 	// If the argument count is incorrect, print usage
 	if args.len() != 3 {
-		print_usage(&bin);
+		print_usage(bin);
 		exit(1);
 	}
 
