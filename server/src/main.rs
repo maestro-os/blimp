@@ -8,6 +8,7 @@ use common::repository::Repository;
 use config::Config;
 use global_data::GlobalData;
 use std::env;
+use std::io;
 
 /// The server's version.
 const VERSION: &str = "0.1";
@@ -24,9 +25,9 @@ async fn motd(data: web::Data<GlobalData>) -> impl Responder {
 }
 
 #[actix_web::main]
-async fn main() -> std::io::Result<()> {
+async fn main() -> io::Result<()> {
 	// Reading config and initializing global data
-	let config = Config::read().unwrap(); // TODO Handle error
+	let config = Config::read()?;
 	let port = config.port;
 
 	let data = web::Data::new(GlobalData {

@@ -1,15 +1,15 @@
 use crate::global_data::GlobalData;
 use crate::util;
 use actix_files::NamedFile;
-use actix_web::{get, error, web, HttpRequest, HttpResponse, Responder};
+use actix_web::{error, get, web, HttpRequest, HttpResponse, Responder};
 use common::version::Version;
 
 #[get("/package")]
-async fn list(data: web::Data<GlobalData>) -> impl Responder {
-	match data.repo.list_packages() {
-		Ok(packages) => HttpResponse::Ok().json(packages),
-		Err(_) => HttpResponse::InternalServerError().finish(),
-	}
+async fn list(data: web::Data<GlobalData>) -> actix_web::Result<impl Responder> {
+	data.repo
+		.list_packages()
+		.map(|packages| HttpResponse::Ok().json(packages))
+		.map_err(|e| error::ErrorInternalServerError(e.to_string()))
 }
 
 #[get("/package/{name}/version/{version}")]
@@ -20,11 +20,14 @@ async fn info(
 	let (name, version) = path.into_inner();
 
 	if !util::is_correct_name(&name) {
-		return Ok(HttpResponse::NotFound().finish());
+		return Err(error::ErrorBadRequest("invalid package name `{name}`"));
 	}
-	let version = Version::try_from(version.as_str()).map_err(|e| error::ErrorNotFound(e.to_string()))?;
-
-	let package = data.repo.get_package(&name, &version).map_err(|e| error::ErrorInternalServerError(e.to_string()))?;
+	let version =
+		Version::try_from(version.as_str()).map_err(|e| error::ErrorNotFound(e.to_string()))?;
+	let package = data
+		.repo
+		.get_package(&name, &version)
+		.map_err(|e| error::ErrorInternalServerError(e.to_string()))?;
 
 	match package {
 		Some(p) => Ok(HttpResponse::Ok().json(p)),
@@ -41,11 +44,14 @@ async fn archive(
 	let (name, version) = path.into_inner();
 
 	if !util::is_correct_name(&name) {
-		return Ok(HttpResponse::NotFound().finish());
+		return Err(error::ErrorBadRequest("invalid package name `{name}`"));
 	}
-	let version = Version::try_from(version.as_str()).map_err(|e| error::ErrorNotFound(e.to_string()))?;
-
-	let package = data.repo.get_package(&name, &version).map_err(|e| error::ErrorInternalServerError(e.to_string()))?;
+	let version =
+		Version::try_from(version.as_str()).map_err(|e| error::ErrorNotFound(e.to_string()))?;
+	let package = data
+		.repo
+		.get_package(&name, &version)
+		.map_err(|e| error::ErrorInternalServerError(e.to_string()))?;
 
 	if package.is_some() {
 		let archive_path = data.repo.get_archive_path(&name, &version);

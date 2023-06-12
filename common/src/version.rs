@@ -33,8 +33,8 @@ impl<'de> Deserialize<'de> for Version {
 	where
 		D: Deserializer<'de>,
 	{
-		let s: String = Deserialize::deserialize(deserializer)?;
-		s.as_str().try_into().map_err(D::Error::custom)
+		let s: &str = Deserialize::deserialize(deserializer)?;
+		s.try_into().map_err(D::Error::custom)
 	}
 }
 

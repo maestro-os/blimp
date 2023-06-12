@@ -47,24 +47,16 @@ impl Repository {
 	/// Returns the path to the descriptor of the package with the given name `name` and version
 	/// `version`.
 	pub fn get_desc_path(&self, name: &str, version: &Version) -> PathBuf {
-		let mut path = self.path.clone();
-		path.push(&self.path);
-		path.push(name);
-		path.push(version.to_string());
-		path.push("desc");
-
-		path
+		self.path.join(name).join(version.to_string()).join("desc")
 	}
 
 	/// Returns the path to the archive of the package with the given name `name` and version
 	/// `version`.
 	pub fn get_archive_path(&self, name: &str, version: &Version) -> PathBuf {
-		let mut path = self.path.clone();
-		path.push(name);
-		path.push(version.to_string());
-		path.push("archive");
-
-		path
+		self.path
+			.join(name)
+			.join(version.to_string())
+			.join("archive")
 	}
 
 	/// Tells whether the **archive** of the package with name `name` and version `version` is
@@ -72,18 +64,14 @@ impl Repository {
 	///
 	/// Note: A package can be present in a repository with its archive.
 	pub fn is_in_cache(&self, name: &str, version: &Version) -> bool {
-		let path = self.get_archive_path(name, version);
-		path.exists()
+		self.get_archive_path(name, version).exists()
 	}
 
 	/// Returns the package with name `name` and version `version`.
 	///
 	/// If the package doesn't exist, the function returns None.
 	pub fn get_package(&self, name: &str, version: &Version) -> io::Result<Option<Package>> {
-		let mut path = self.path.clone();
-		path.push(name);
-		path.push(version.to_string());
-
+		let path = self.path.join(name).join(version.to_string());
 		Package::load(path)
 	}
 
