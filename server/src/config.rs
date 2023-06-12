@@ -26,6 +26,6 @@ pub struct Config {
 impl Config {
 	/// Reads the configuration from file.
 	pub fn read() -> io::Result<Self> {
-		util::read_json(&Path::new(CONFIG_FILE))
+		util::read_json(Path::new(CONFIG_FILE))
 	}
 }

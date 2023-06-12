@@ -64,7 +64,7 @@ impl Source {
 
 				unwrap,
 			} => {
-				let _dest_path = util::concat_paths(build_dir, &location);
+				let _dest_path = util::concat_paths(build_dir, location);
 
 				// TODO
 			}

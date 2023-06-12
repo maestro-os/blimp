@@ -88,9 +88,7 @@ impl Environment {
 
 		match util::read_json::<HashMap<String, InstalledPackage>>(&path) {
 			Ok(pkgs) => Ok(pkgs),
-
 			Err(e) if e.kind() == ErrorKind::NotFound => Ok(HashMap::new()),
-
 			Err(e) => Err(e),
 		}
 	}
@@ -251,6 +249,6 @@ impl Environment {
 impl Drop for Environment {
 	fn drop(&mut self) {
 		let path = util::concat_paths(&self.sysroot, Path::new(LOCKFILE_PATH));
-		lockfile::unlock(&path);
+		let _ = lockfile::unlock(&path);
 	}
 }
