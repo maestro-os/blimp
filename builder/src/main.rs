@@ -10,12 +10,9 @@ use std::process::exit;
 use std::str;
 use std::thread;
 
-/// The software's current version.
-const VERSION: &str = "0.1";
-
 /// Prints command line usage.
 fn print_usage(bin: &str) {
-	eprintln!("blimp package builder version {}", VERSION);
+	eprintln!("blimp package builder version {}", env!("CARGO_PKG_VERSION"));
 	eprintln!();
 	eprintln!("USAGE:");
 	eprintln!("\t{} <FROM> <TO>", bin);

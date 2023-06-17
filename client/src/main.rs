@@ -18,12 +18,9 @@ use std::process::exit;
 #[cfg(feature = "network")]
 use common::repository::remote::Remote;
 
-/// The software's current version.
-const VERSION: &str = "0.1";
-
 /// Prints command line usage.
 fn print_usage(bin: &str) {
-	eprintln!("blimp package manager version {}", VERSION);
+	eprintln!("blimp package manager version {}", env!("CARGO_PKG_VERSION"));
 	eprintln!();
 	eprintln!("USAGE:");
 	eprintln!("\t{} <COMMAND> [OPTIONS]", bin);

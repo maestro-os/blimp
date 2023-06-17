@@ -10,12 +10,9 @@ use global_data::GlobalData;
 use std::env;
 use std::io;
 
-/// The server's version.
-const VERSION: &str = "0.1";
-
 #[get("/")]
 async fn root() -> impl Responder {
-	let body = format!("Blimp server version {}", VERSION);
+	let body = format!("Blimp server version {}", env!("CARGO_PKG_VERSION"));
 	HttpResponse::Ok().body(body)
 }
 
