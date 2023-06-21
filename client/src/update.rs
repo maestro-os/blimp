@@ -1,19 +1,17 @@
 //! This module handles packages list updating.
 
-use common::Environment;
 use common::repository::remote::Remote;
+use common::Environment;
 use std::error::Error;
-use tokio::runtime::Runtime;
 
 /// Updates the packages list.
-pub fn update(env: &mut Environment) -> Result<(), Box<dyn Error>> {
-	let remotes = Remote::load_list(env)
-		.map_err(|e| format!("Could not update packages list: {}", e))?;
+pub async fn update(env: &mut Environment) -> Result<(), Box<dyn Error>> {
+	let remotes =
+		Remote::load_list(env).map_err(|e| format!("Could not update packages list: {}", e))?;
 
 	println!("Updating from remotes...");
 
 	// Creating the async runtime
-	let rt = Runtime::new().unwrap();
 	let mut futures = Vec::new();
 
 	let mut err = false;

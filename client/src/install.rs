@@ -9,7 +9,6 @@ use crate::confirm;
 use std::collections::HashMap;
 use std::error::Error;
 use std::path::PathBuf;
-use tokio::runtime::Runtime;
 
 #[cfg(feature = "network")]
 use common::repository::remote::Remote;
@@ -21,7 +20,7 @@ use common::repository::remote::Remote;
 /// - `names` is the list of packages to install.
 /// - `env` is the blimp environment.
 /// - `local_repos` is the list of paths to local package repositories.
-pub fn install(
+pub async fn install(
 	names: &[String],
 	env: &mut Environment,
 	local_repos: &[PathBuf],
@@ -36,24 +35,19 @@ pub fn install(
 	let mut packages = HashMap::<Package, &Repository>::new();
 
 	for name in names {
+        let pkg = repository::get_package_with_constraints(&repos, &name, &[])?;
+        let Some((repo, pkg)) = pkg else {
+            eprintln!("Package `{}` not found!", name);
+            failed = true;
+            continue;
+        };
+        packages.insert(pkg, repo);
+
 		if let Some(installed) = installed.get(name) {
 			println!(
-				"Package `{}` version `{}` is already installed. Skipping...",
+				"Package `{}` version `{}` is already installed. Reinstalling",
 				name, installed.desc.get_version()
 			);
-
-			continue;
-		}
-
-		match repository::get_package_with_constraints(&repos, &name, &[])? {
-			Some((repo, package)) => {
-				packages.insert(package, repo);
-			}
-
-			None => {
-				eprintln!("Package `{}` not found!", name);
-				failed = true;
-			}
 		}
 	}
 	if failed {
@@ -112,9 +106,6 @@ pub fn install(
 
 	#[cfg(feature = "network")]
 	{
-		// Creating the async runtime
-		let rt = Runtime::new().unwrap();
-
 		// The total download size in bytes
 		let mut total_size = 0;
 
@@ -129,9 +120,7 @@ pub fn install(
 					let remote = repo.get_remote().unwrap();
 
 					// Get package size from remote
-					let size = rt.block_on(async {
-						remote.get_size(pkg).await
-					})?;
+					let size = remote.get_size(pkg).await?;
 					total_size += size;
 
 					println!("\t- {} ({}) - download size: {}", name, version, size);
@@ -151,6 +140,7 @@ pub fn install(
 		println!("Downloading packages...");
 		let mut futures = Vec::new();
 
+        // TODO download biggest packets first (sort_unstable by decreasing size)
 		for (pkg, repo) in &total_packages {
 			if repo.is_in_cache(pkg.get_name(), pkg.get_version()) {
 				println!("`{}` is in cache.", pkg.get_name());
@@ -158,21 +148,26 @@ pub fn install(
 			}
 
 			if let Some(remote) = repo.get_remote() {
+                // TODO limit the number of packages downloaded concurrently
 				futures.push((
 					pkg.get_name(),
 					pkg.get_version(),
-					Remote::fetch_archive(remote, repo, pkg)
+					tokio::spawn(async {
+                        let mut task = Remote::fetch_archive(remote, repo, pkg).await?;
+                        while task.next().await? {
+                            // TODO update progress bar
+                        }
+
+                        Ok(())
+                    })
 				));
 			}
 		}
 
 		// TODO Add progress bar
 		for (name, version, f) in futures {
-			match rt.block_on(f) {
-				Ok(_task) => {
-					// TODO
-				},
-
+			match f.await? {
+				Ok(()) => continue,
 				Err(e) => eprintln!("Failed to download `{}` version `{}`: {}", name, version, e),
 			}
 		}
@@ -191,6 +186,7 @@ pub fn install(
 		let archive_path = repo.get_archive_path(pkg.get_name(), pkg.get_version());
 		if let Err(e) = env.install(&pkg, &archive_path) {
 			eprintln!("Failed to install `{}`: {}", pkg.get_name(), e);
+            // TODO fail function if at least one package could not be installed
 		}
 	}
 

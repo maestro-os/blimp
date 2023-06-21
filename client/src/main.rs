@@ -136,7 +136,7 @@ fn remote_remove(env: &mut Environment, remotes: &[String]) -> Result<(), Box<dy
 	Ok(())
 }
 
-fn main_(sysroot: PathBuf, local_repos: &[PathBuf]) -> Result<bool, Box<dyn Error>> {
+async fn main_(sysroot: PathBuf, local_repos: &[PathBuf]) -> Result<bool, Box<dyn Error>> {
 	let args: Vec<String> = env::args().collect();
 	// Name of the current binary file
 	let bin = args.first().map(|s| s.as_str()).unwrap_or("blimp");
@@ -176,7 +176,7 @@ fn main_(sysroot: PathBuf, local_repos: &[PathBuf]) -> Result<bool, Box<dyn Erro
 			}
 
 			let mut env = get_env(sysroot)?;
-			install(names, &mut env, local_repos)?;
+			install(names, &mut env, local_repos).await?;
 
 			Ok(true)
 		}
@@ -264,7 +264,8 @@ fn main_(sysroot: PathBuf, local_repos: &[PathBuf]) -> Result<bool, Box<dyn Erro
 	}
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
 	// Getting the sysroot
 	let sysroot = env::var("SYSROOT")
 		.map(PathBuf::from)
@@ -273,7 +274,7 @@ fn main() {
 		.map(|s| s.split(":").map(|s| PathBuf::from(s)).collect())
 		.unwrap_or(vec![]);
 
-	match main_(sysroot, &local_repos) {
+	match main_(sysroot, &local_repos).await {
 		Ok(false) => exit(1),
 
 		Err(e) => {

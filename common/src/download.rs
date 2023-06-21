@@ -13,7 +13,7 @@ use std::pin::Pin;
 /// A download task, running until the file has been downloaded entirely.
 pub struct DownloadTask {
 	/// The response byte stream.
-	stream: Pin<Box<dyn Stream<Item = Result<Bytes, reqwest::Error>>>>,
+	stream: Pin<Box<dyn Stream<Item = Result<Bytes, reqwest::Error>> + Send>>,
 	/// The total size to be downloaded in bytes. If unknown, the value is None.
 	total_size: Option<u64>,
 
