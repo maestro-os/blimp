@@ -1,8 +1,9 @@
 //! The lock file allows to prevent several instances of the package manager from running at the
 //! same time.
 
-use std::fs::OpenOptions;
 use std::fs;
+use std::fs::OpenOptions;
+use std::io;
 use std::path::Path;
 
 /// Creates the lock file if not present.
@@ -22,6 +23,6 @@ pub fn lock(path: &Path) -> bool {
 /// Removes the lock file.
 ///
 /// `path` is the path to the lockfile.
-pub fn unlock(path: &Path) {
-	let _ = fs::remove_file(path);
+pub fn unlock(path: &Path) -> io::Result<()> {
+	fs::remove_file(path)
 }

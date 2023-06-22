@@ -1,64 +1,66 @@
-use actix_files::NamedFile;
-use actix_web::{get, web, HttpRequest, HttpResponse, Responder};
-use common::version::Version;
 use crate::global_data::GlobalData;
 use crate::util;
-use std::sync::Mutex;
+use actix_files::NamedFile;
+use actix_web::{error, get, web, HttpRequest, HttpResponse, Responder};
+use common::version::Version;
 
 #[get("/package")]
-async fn list(
-	data: web::Data<Mutex<GlobalData>>,
-) -> impl Responder {
-	let repo = &data.lock().unwrap().repo;
-
-	match repo.list_packages() {
-		Ok(packages) => HttpResponse::Ok().json(packages),
-		Err(_) => HttpResponse::InternalServerError().finish(),
-	}
+async fn list(data: web::Data<GlobalData>) -> actix_web::Result<impl Responder> {
+	data.repo
+		.list_packages()
+		.map(|packages| HttpResponse::Ok().json(packages))
+		.map_err(|e| error::ErrorInternalServerError(e.to_string()))
 }
 
 #[get("/package/{name}/version/{version}")]
 async fn info(
-	web::Path((name, version)): web::Path<(String, String)>,
-	data: web::Data<Mutex<GlobalData>>,
-) -> impl Responder {
-	if !util::is_correct_name(&name) {
-		return HttpResponse::NotFound().finish();
-	}
-	let version = Version::try_from(version.as_str()).unwrap(); // TODO Handle error
+	path: web::Path<(String, String)>,
+	data: web::Data<GlobalData>,
+) -> actix_web::Result<impl Responder> {
+	let (name, version) = path.into_inner();
 
-	let repo = &data.lock().unwrap().repo;
-	let package = repo.get_package(&name, &version).unwrap(); // TODO Handle error
+	if !util::is_correct_name(&name) {
+		return Err(error::ErrorBadRequest("invalid package name `{name}`"));
+	}
+	let version =
+		Version::try_from(version.as_str()).map_err(|e| error::ErrorNotFound(e.to_string()))?;
+	let package = data
+		.repo
+		.get_package(&name, &version)
+		.map_err(|e| error::ErrorInternalServerError(e.to_string()))?;
 
 	match package {
-		Some(p) => HttpResponse::Ok().json(p),
-		None => HttpResponse::NotFound().finish(),
+		Some(p) => Ok(HttpResponse::Ok().json(p)),
+		None => Ok(HttpResponse::NotFound().finish()),
 	}
 }
 
 #[get("/package/{name}/version/{version}/archive")]
 async fn archive(
 	req: HttpRequest,
-	web::Path((name, version)): web::Path<(String, String)>,
-	data: web::Data<Mutex<GlobalData>>,
-) -> impl Responder {
-	if !util::is_correct_name(&name) {
-		return HttpResponse::NotFound().finish();
-	}
-	let version = Version::try_from(version.as_str()).unwrap(); // TODO Handle error
+	path: web::Path<(String, String)>,
+	data: web::Data<GlobalData>,
+) -> actix_web::Result<impl Responder> {
+	let (name, version) = path.into_inner();
 
-	let repo = &data.lock().unwrap().repo;
-	let package = repo.get_package(&name, &version).unwrap(); // TODO Handle error
+	if !util::is_correct_name(&name) {
+		return Err(error::ErrorBadRequest("invalid package name `{name}`"));
+	}
+	let version =
+		Version::try_from(version.as_str()).map_err(|e| error::ErrorNotFound(e.to_string()))?;
+	let package = data
+		.repo
+		.get_package(&name, &version)
+		.map_err(|e| error::ErrorInternalServerError(e.to_string()))?;
 
 	if package.is_some() {
-		let archive_path = repo.get_archive_path(&name, &version);
+		let archive_path = data.repo.get_archive_path(&name, &version);
 
-		// TODO Handle error
-		NamedFile::open(archive_path)
-			.unwrap()
-			.into_response(&req)
-			.unwrap()
+		let req = NamedFile::open(archive_path)
+			.map_err(|e| error::ErrorInternalServerError(e.to_string()))?
+			.into_response(&req);
+		Ok(req)
 	} else {
-		HttpResponse::NotFound().finish()
+		Ok(HttpResponse::NotFound().finish())
 	}
 }

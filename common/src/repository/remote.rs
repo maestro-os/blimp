@@ -1,17 +1,18 @@
 //! A remote is a remote host from which packages can be downloaded.
 
-use crate::Environment;
+use anyhow::anyhow;
+use anyhow::Result;
 use crate::download::DownloadTask;
 use crate::package::Package;
 use crate::repository::Repository;
-use std::error::Error;
+use crate::Environment;
 use std::fs::File;
 use std::fs::OpenOptions;
+use std::io;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Write;
-use std::io;
 
 // TODO Use https
 
@@ -83,7 +84,7 @@ impl Remote {
 	}
 
 	/// Fetches the list of all the packages from the remote.
-	pub async fn fetch_list(&self) -> Result<Vec<Package>, Box<dyn Error>> {
+	pub async fn fetch_list(&self) -> Result<Vec<Package>> {
 		let url = format!("http://{}/package", &self.host);
 		let response = reqwest::get(url).await?;
 		let status = response.status();
@@ -92,12 +93,12 @@ impl Remote {
 		match status {
 			reqwest::StatusCode::OK => Ok(serde_json::from_str(&content)?),
 
-			_ => Err(format!("Failed to retrieve packages list from remote: {}", status).into()),
+			_ => Err(anyhow!("Failed to retrieve packages list from remote: {}", status)),
 		}
 	}
 
 	/// Returns the download size of the package `package` in bytes.
-	pub async fn get_size(&self, package: &Package) -> Result<u64, String> {
+	pub async fn get_size(&self, package: &Package) -> Result<u64> {
 		let url = format!(
 			"http://{}/package/{}/version/{}/archive",
 			self.host,
@@ -105,12 +106,13 @@ impl Remote {
 			package.get_version()
 		);
 		let client = reqwest::Client::new();
-		let response = client.head(url)
+		let response = client
+			.head(url)
 			.send()
-			.await
-			.or_else(|e| Err(format!("HTTP request failed: {}", e)))?;
-		let len = response.content_length()
-			.ok_or_else(|| "Content-Length field not present in response".to_owned())?;
+			.await?;
+		let len = response
+			.content_length()
+			.ok_or_else(|| anyhow!("Content-Length field not present in response"))?;
 
 		Ok(len)
 	}
@@ -120,7 +122,7 @@ impl Remote {
 		&self,
 		repo: &Repository,
 		package: &Package,
-	) -> Result<DownloadTask, Box<dyn Error>> {
+	) -> Result<DownloadTask> {
 		let url = format!(
 			"http://{}/package/{}/version/{}/archive",
 			self.host,
@@ -129,6 +131,6 @@ impl Remote {
 		);
 
 		let path = repo.get_archive_path(package.get_name(), package.get_version());
-		DownloadTask::new(&url, &path).await
+		DownloadTask::new(&url, &path).await.map_err(Into::into)
 	}
 }

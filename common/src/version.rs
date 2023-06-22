@@ -13,7 +13,7 @@ use std::fmt::Formatter;
 use std::num::ParseIntError;
 
 /// Structure representing a version.
-#[derive(Clone, Eq, Hash)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub struct Version {
 	/// Vector containing the version numbers.
 	numbers: Vec<u32>,
@@ -34,9 +34,7 @@ impl<'de> Deserialize<'de> for Version {
 		D: Deserializer<'de>,
 	{
 		let s: String = Deserialize::deserialize(deserializer)?;
-		s.as_str()
-			.try_into()
-			.map_err(D::Error::custom)
+		s.as_str().try_into().map_err(D::Error::custom)
 	}
 }
 
@@ -44,7 +42,8 @@ impl TryFrom<&str> for Version {
 	type Error = ParseIntError;
 
 	fn try_from(value: &str) -> Result<Self, Self::Error> {
-		value.split(".")
+		value
+			.split('.')
 			.map(|n| n.parse::<u32>())
 			.collect::<Result<Vec<_>, _>>()
 			.map(|numbers| Self {
@@ -72,12 +71,6 @@ impl Ord for Version {
 impl PartialOrd for Version {
 	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
 		Some(self.cmp(other))
-	}
-}
-
-impl PartialEq for Version {
-	fn eq(&self, other: &Self) -> bool {
-		self.cmp(other) == Ordering::Equal
 	}
 }
 
@@ -127,9 +120,7 @@ impl<'de> Deserialize<'de> for VersionConstraint {
 		D: Deserializer<'de>,
 	{
 		let s: String = Deserialize::deserialize(deserializer)?;
-		s.as_str()
-			.try_into()
-			.map_err(D::Error::custom)
+		s.as_str().try_into().map_err(D::Error::custom)
 	}
 }
 
@@ -139,11 +130,11 @@ impl TryFrom<&str> for VersionConstraint {
 	fn try_from(value: &str) -> Result<Self, Self::Error> {
 		match value {
 			"*" => Ok(Self::Any),
-			s if s.starts_with("=") => Ok(Self::Equal(Version::try_from(&s[1..])?)),
+			s if s.starts_with('=') => Ok(Self::Equal(Version::try_from(&s[1..])?)),
 			s if s.starts_with("<=") => Ok(Self::LessOrEqual(Version::try_from(&s[2..])?)),
-			s if s.starts_with("<") => Ok(Self::Less(Version::try_from(&s[1..])?)),
+			s if s.starts_with('<') => Ok(Self::Less(Version::try_from(&s[1..])?)),
 			s if s.starts_with(">=") => Ok(Self::GreaterOrEqual(Version::try_from(&s[2..])?)),
-			s if s.starts_with(">") => Ok(Self::Greater(Version::try_from(&s[1..])?)),
+			s if s.starts_with('>') => Ok(Self::Greater(Version::try_from(&s[1..])?)),
 
 			_ => Ok(Self::Equal(Version::try_from(value)?)),
 		}
@@ -155,11 +146,13 @@ impl VersionConstraint {
 	pub fn is_valid(&self, version: &Version) -> bool {
 		match self {
 			Self::Any => true,
-			Self::Equal(v) => matches!(version.cmp(&v), Ordering::Equal),
-			Self::LessOrEqual(v) => matches!(version.cmp(&v), Ordering::Less | Ordering::Equal),
-			Self::Less(v) => matches!(version.cmp(&v), Ordering::Less),
-			Self::GreaterOrEqual(v) => matches!(version.cmp(&v), Ordering::Greater | Ordering::Equal),
-			Self::Greater(v) => matches!(version.cmp(&v), Ordering::Greater),
+			Self::Equal(v) => matches!(version.cmp(v), Ordering::Equal),
+			Self::LessOrEqual(v) => matches!(version.cmp(v), Ordering::Less | Ordering::Equal),
+			Self::Less(v) => matches!(version.cmp(v), Ordering::Less),
+			Self::GreaterOrEqual(v) => {
+				matches!(version.cmp(v), Ordering::Greater | Ordering::Equal)
+			}
+			Self::Greater(v) => matches!(version.cmp(v), Ordering::Greater),
 		}
 	}
 }

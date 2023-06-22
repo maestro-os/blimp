@@ -7,7 +7,7 @@ edition = "2021"
 common = { path = "../common" }
 flate2 = "1.0.22"
 tar = "0.4.38"
-tokio = "1.21.2"
+tokio = "1.28.2"
 
 [features]
 default = []

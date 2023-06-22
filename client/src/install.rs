@@ -1,13 +1,14 @@
 //! This module handles package installation.
 
-use common::Environment;
-use common::package::Package;
-use common::repository::Repository;
-use common::repository;
-use common::util;
+use anyhow::anyhow;
+use anyhow::Result;
 use crate::confirm;
+use common::package::Package;
+use common::repository;
+use common::repository::Repository;
+use common::util;
+use common::Environment;
 use std::collections::HashMap;
-use std::error::Error;
 use std::path::PathBuf;
 
 #[cfg(feature = "network")]
@@ -24,7 +25,7 @@ pub async fn install(
 	names: &[String],
 	env: &mut Environment,
 	local_repos: &[PathBuf],
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
 	let installed = env.get_installed_list()?;
 
 	let mut failed = false;
@@ -51,7 +52,7 @@ pub async fn install(
 		}
 	}
 	if failed {
-		return Err("installation failed".into());
+		return Err(anyhow!("installation failed"));
 	}
 
 	println!("Resolving dependencies...");
@@ -64,16 +65,12 @@ pub async fn install(
 		let res = package.resolve_dependencies(
 			&mut total_packages,
 			&mut |name, version_constraints| {
-				let res = repository::get_package_with_constraints(
-					&repos,
-					name,
-					version_constraints
-				)
-					.or_else(|e| {
-						eprintln!("error: {}", e);
-						Err(())
-					})
-					.ok()?;
+				let res =
+					repository::get_package_with_constraints(&repos, name, version_constraints)
+						.map_err(|e| {
+							eprintln!("error: {}", e);
+						})
+						.ok()?;
 
 				// If not present, check on remote
 				if res.is_none() {
@@ -85,58 +82,58 @@ pub async fn install(
 				Some((pkg, repo))
 			},
 		)?;
-		match res {
-			Err(errs) => {
-				for e in errs {
-					eprintln!("{}", e);
-				}
+		if let Err(errs) = res {
+			for e in errs {
+				eprintln!("{}", e);
+			}
 
-				failed = true;
-			},
-
-			_ => {},
+			failed = true;
 		}
 	}
 	if failed {
-		return Err("installation failed".into());
+		return Err(anyhow!("installation failed"));
 	}
-
 
 	println!("Packages to be installed:");
 
+    // List packages to be installed
+    if cfg!(feature = "network") {
+        let mut total_size = 0;
+        for (pkg, repo) in &total_packages {
+            let name = pkg.get_name();
+            let version = pkg.get_version();
+
+            match repo.get_package(name, version)? {
+                Some(_) => println!("\t- {} ({}) - cached", name, version),
+
+                None => {
+                    let remote = repo.get_remote().unwrap();
+
+                    // Get package size from remote
+                    let size = remote.get_size(pkg).await?;
+                    total_size += size;
+
+                    println!("\t- {} ({}) - download size: {}", name, version, size);
+                }
+            }
+        }
+
+        print!("Total download size: ");
+        util::print_size(total_size);
+        println!();
+    } else {
+        for (pkg, _) in &total_packages {
+            println!("\t- {} ({}) - cached", pkg.get_name(), pkg.get_version());
+        }
+    }
+
+    if !confirm::prompt() {
+        println!("Aborting.");
+        return Ok(());
+    }
+
 	#[cfg(feature = "network")]
 	{
-		// The total download size in bytes
-		let mut total_size = 0;
-
-		for (pkg, repo) in &total_packages {
-			let name = pkg.get_name();
-			let version = pkg.get_version();
-
-			match repo.get_package(name, version)? {
-				Some(_) => println!("\t- {} ({}) - cached", name, version),
-
-				None => {
-					let remote = repo.get_remote().unwrap();
-
-					// Get package size from remote
-					let size = remote.get_size(pkg).await?;
-					total_size += size;
-
-					println!("\t- {} ({}) - download size: {}", name, version, size);
-				}
-			}
-		}
-
-		print!("Total download size: ");
-		util::print_size(total_size);
-		println!();
-
-		if !confirm::prompt() {
-			println!("Aborting.");
-			return Ok(());
-		}
-
 		println!("Downloading packages...");
 		let mut futures = Vec::new();
 
@@ -152,27 +149,28 @@ pub async fn install(
 				futures.push((
 					pkg.get_name(),
 					pkg.get_version(),
-					tokio::spawn(async {
+                    // TODO spawn task
+					async {
                         let mut task = Remote::fetch_archive(remote, repo, pkg).await?;
                         while task.next().await? {
                             // TODO update progress bar
                         }
 
-                        Ok(())
-                    })
+                        Ok::<(), anyhow::Error>(())
+                    }
 				));
 			}
 		}
 
 		// TODO Add progress bar
 		for (name, version, f) in futures {
-			match f.await? {
+			match f.await {
 				Ok(()) => continue,
 				Err(e) => eprintln!("Failed to download `{}` version `{}`: {}", name, version, e),
 			}
 		}
 		if failed {
-			return Err("installation failed".into());
+			return Err(anyhow!("installation failed"));
 		}
 	}
 

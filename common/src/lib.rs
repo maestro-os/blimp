@@ -1,4 +1,4 @@
-//! This library contains common code between the client and the server.
+//! The blimp library is the core of the Blimp package manager.
 
 #![feature(io_error_more)]
 
@@ -19,8 +19,8 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::ffi::OsStr;
 use std::fs;
-use std::io::ErrorKind;
 use std::io;
+use std::io::ErrorKind;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -43,8 +43,8 @@ pub struct Environment {
 impl Environment {
 	/// Returns an instance for the environment with the given sysroot.
 	///
-	/// The function tries to lock the environment so that no other instance can access it at the same time.
-	/// If already locked, the function returns `None`.
+	/// The function tries to lock the environment so that no other instance can access it at the
+	/// same time. If already locked, the function returns `None`.
 	pub fn with_root(sysroot: PathBuf) -> Option<Self> {
 		let path = util::concat_paths(&sysroot, Path::new(LOCKFILE_PATH));
 
@@ -71,7 +71,8 @@ impl Environment {
 
 		// TODO List from blimp directory using sysroot
 
-		let mut local_repos = local_repos.iter()
+		let mut local_repos = local_repos
+			.iter()
 			.map(|path| Repository::load(path.clone()))
 			.collect::<Result<Vec<_>, _>>()?;
 		repos.append(&mut local_repos);
@@ -87,16 +88,15 @@ impl Environment {
 
 		match util::read_json::<HashMap<String, InstalledPackage>>(&path) {
 			Ok(pkgs) => Ok(pkgs),
-
 			Err(e) if e.kind() == ErrorKind::NotFound => Ok(HashMap::new()),
-
 			Err(e) => Err(e),
 		}
 	}
 
 	/// Updates the list of installed packages to the disk.
 	pub fn update_installed_list(
-		&self, list: &HashMap<String, InstalledPackage>
+		&self,
+		list: &HashMap<String, InstalledPackage>,
 	) -> io::Result<()> {
 		let path = util::concat_paths(&self.sysroot, Path::new(INSTALLED_FILE));
 		util::write_json(&path, list)
@@ -152,10 +152,13 @@ impl Environment {
 
 		// Update installed list
 		let mut installed = self.get_installed_list()?;
-		installed.insert(pkg.get_name().to_owned(), InstalledPackage {
-			desc: pkg.clone(),
-			files,
-		});
+		installed.insert(
+			pkg.get_name().to_owned(),
+			InstalledPackage {
+				desc: pkg.clone(),
+				files,
+			},
+		);
 		self.update_installed_list(&installed)?;
 
 		Ok(())
@@ -183,10 +186,13 @@ impl Environment {
 
 		// Update installed list
 		let mut installed = self.get_installed_list()?;
-		installed.insert(pkg.get_name().to_owned(), InstalledPackage {
-			desc: pkg.clone(),
-			files,
-		});
+		installed.insert(
+			pkg.get_name().to_owned(),
+			InstalledPackage {
+				desc: pkg.clone(),
+				files,
+			},
+		);
 		self.update_installed_list(&installed)?;
 
 		Ok(())
@@ -206,7 +212,7 @@ impl Environment {
 		let mut files = pkg.files.clone();
 		files.sort_unstable_by(|a, b| a.cmp(b).reverse());
 		for sys_path in &files {
-			let path = util::concat_paths(&self.sysroot, &sys_path);
+			let path = util::concat_paths(&self.sysroot, sys_path);
 
 			let dir = fs::metadata(&path)
 				.map(|m| m.file_type().is_dir())
@@ -218,10 +224,9 @@ impl Environment {
 			};
 
 			match result {
-				Ok(_) => {},
-				Err(e) if matches!(
-					e.kind(), ErrorKind::DirectoryNotEmpty | ErrorKind::NotFound
-				) => {},
+				Ok(_) => {}
+				Err(e)
+					if matches!(e.kind(), ErrorKind::DirectoryNotEmpty | ErrorKind::NotFound) => {}
 
 				Err(e) => return Err(e.into()),
 			}
@@ -244,6 +249,6 @@ impl Environment {
 impl Drop for Environment {
 	fn drop(&mut self) {
 		let path = util::concat_paths(&self.sysroot, Path::new(LOCKFILE_PATH));
-		lockfile::unlock(&path);
+		let _ = lockfile::unlock(&path);
 	}
 }

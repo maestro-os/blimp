@@ -10,12 +10,9 @@ use std::process::exit;
 use std::str;
 use std::thread;
 
-/// The software's current version.
-const VERSION: &str = "0.1";
-
 /// Prints command line usage.
 fn print_usage(bin: &str) {
-	eprintln!("blimp package builder version {}", VERSION);
+	eprintln!("blimp package builder version {}", env!("CARGO_PKG_VERSION"));
 	eprintln!();
 	eprintln!("USAGE:");
 	eprintln!("\t{} <FROM> <TO>", bin);
@@ -56,16 +53,15 @@ fn get_jobs_count() -> u32 {
 /// Returns the triplet of the host on which the package is to be built.
 fn get_host_triplet() -> String {
 	env::var("HOST").unwrap_or_else(|_| {
-		common::build::get_host_triplet()
-			.unwrap_or_else(|| {
-				let default = "x86_64-linux-gnu".to_owned();
-				eprintln!(
-					"Failed to retrieve host triplet. Defaulting to {}.",
-					default
-				);
-
+		common::build::get_host_triplet().unwrap_or_else(|| {
+			let default = "x86_64-linux-gnu".to_owned();
+			eprintln!(
+				"Failed to retrieve host triplet. Defaulting to {}.",
 				default
-			})
+			);
+
+			default
+		})
 	})
 }
 
@@ -79,8 +75,7 @@ fn build(from: PathBuf, to: PathBuf) {
 
 	let jobs = get_jobs_count();
 	let host = get_host_triplet();
-	let target = env::var("TARGET")
-		.unwrap_or_else(|_| host.clone());
+	let target = env::var("TARGET").unwrap_or_else(|_| host.clone());
 	println!("[INFO] Jobs: {}; Host: {}; Target: {}", jobs, host, target);
 
 	let mut build_process = BuildProcess::new(from);
@@ -101,10 +96,12 @@ fn build(from: PathBuf, to: PathBuf) {
 
 	println!("[INFO] Compilation...");
 
-	let success = build_process.build(jobs, &host, &target).unwrap_or_else(|e| {
-		eprintln!("Cannot build package: {}", e);
-		exit(1);
-	});
+	let success = build_process
+		.build(jobs, &host, &target)
+		.unwrap_or_else(|e| {
+			eprintln!("Cannot build package: {}", e);
+			exit(1);
+		});
 	if !success {
 		eprintln!("Package build failed!");
 		exit(1);
@@ -125,15 +122,17 @@ fn build(from: PathBuf, to: PathBuf) {
 		util::write_json(&desc_path, &build_desc.package).unwrap(); // TODO Handle error
 
 		let repo = Repository::load(to).unwrap(); // TODO Handle error
-		repo.get_archive_path(&name, &version)
+		repo.get_archive_path(name, version)
 	};
 
 	println!("[INFO] Creating archive...");
 
-	build_process.create_archive(&archive_path).unwrap_or_else(|e| {
-		eprintln!("Cannot create archive: {}", e);
-		exit(1);
-	});
+	build_process
+		.create_archive(&archive_path)
+		.unwrap_or_else(|e| {
+			eprintln!("Cannot create archive: {}", e);
+			exit(1);
+		});
 
 	if debug {
 		eprintln!(
@@ -147,13 +146,11 @@ fn build(from: PathBuf, to: PathBuf) {
 fn main() {
 	let args: Vec<String> = env::args().collect();
 	// The name of the binary file
-	let bin = args.first()
-		.map(|s| s.as_str())
-		.unwrap_or("blimp-builder");
+	let bin = args.first().map(|s| s.as_str()).unwrap_or("blimp-builder");
 
 	// If the argument count is incorrect, print usage
 	if args.len() != 3 {
-		print_usage(&bin);
+		print_usage(bin);
 		exit(1);
 	}
 

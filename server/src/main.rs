@@ -3,47 +3,35 @@ mod global_data;
 mod package;
 mod util;
 
-use actix_web::{
-	App,
-	HttpResponse,
-	HttpServer,
-	Responder,
-	get,
-	middleware,
-	web,
-};
+use actix_web::{get, middleware, web, App, HttpResponse, HttpServer, Responder};
 use common::repository::Repository;
 use config::Config;
 use global_data::GlobalData;
 use std::env;
-use std::sync::Mutex;
-
-/// The server's version.
-const VERSION: &str = "0.1";
+use std::io;
 
 #[get("/")]
 async fn root() -> impl Responder {
-	let body = format!("Blimp server version {}", VERSION);
+	let body = format!("Blimp server version {}", env!("CARGO_PKG_VERSION"));
 	HttpResponse::Ok().body(body)
 }
 
 #[get("/motd")]
-async fn motd(data: web::Data<Mutex<GlobalData>>) -> impl Responder {
-	let data = data.lock().unwrap();
-	HttpResponse::Ok().body(&data.motd)
+async fn motd(data: web::Data<GlobalData>) -> impl Responder {
+	HttpResponse::Ok().body(data.motd.clone())
 }
 
 #[actix_web::main]
-async fn main() -> std::io::Result<()> {
+async fn main() -> io::Result<()> {
 	// Reading config and initializing global data
-	let config = Config::read().unwrap(); // TODO Handle error
+	let config = Config::read()?;
 	let port = config.port;
 
-	let data = web::Data::new(Mutex::new(GlobalData {
+	let data = web::Data::new(GlobalData {
 		motd: config.motd,
 
-		repo: Repository::load(config.repo_path.clone()).unwrap(), // TODO Handle error
-	}));
+		repo: Repository::load(config.repo_path.clone())?,
+	});
 
 	// Enabling logging
 	env::set_var("RUST_LOG", "actix_web=info");

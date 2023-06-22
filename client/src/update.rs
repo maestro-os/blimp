@@ -11,26 +11,27 @@ pub async fn update(env: &mut Environment) -> Result<(), Box<dyn Error>> {
 
 	println!("Updating from remotes...");
 
-	// Creating the async runtime
 	let mut futures = Vec::new();
+	for r in remotes {
+		let host = r.get_host().to_owned();
+        // TODO limit the number of concurrent tasks running
+		futures.push((host, tokio::spawn(async move {
+            r.fetch_list().await
+        })));
+	}
 
 	let mut err = false;
-
-	for r in remotes.iter() {
-		let host = r.get_host();
-		futures.push((host, r.fetch_list()));
-	}
 	for (host, f) in futures {
-		match rt.block_on(f) {
+		match f.await? {
 			Ok(packages) => {
-				println!("Remote `{}`: Found {} package(s).", host, packages.len());
+				println!("Remote `{host}`: Found {} package(s).", packages.len());
 
 				// TODO
 				todo!();
 			}
 
 			Err(e) => {
-				eprintln!("Remote `{}`: {}", host, e);
+				eprintln!("Remote `{host}`: {e}");
 				err = true;
 			}
 		}

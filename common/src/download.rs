@@ -1,9 +1,9 @@
 //! This module handles files download.
 
+use anyhow::Result;
 use bytes::Bytes;
 use futures_util::stream::Stream;
 use futures_util::stream::StreamExt;
-use std::error::Error;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -32,7 +32,7 @@ impl DownloadTask {
 	/// Arguments:
 	/// - `url` is the URL to download the file from.
 	/// - `path` is the path to which the file has to be saved.
-	pub async fn new(url: &str, path: &Path) -> Result<Self, Box<dyn Error>> {
+	pub async fn new(url: &str, path: &Path) -> Result<Self> {
 		let response = reqwest::get(url).await?;
 		let total_size = response.content_length();
 		let stream = response.bytes_stream();
@@ -67,7 +67,7 @@ impl DownloadTask {
 	/// Pulls the next chunk of data.
 	///
 	/// If the task is over, the function returns `false`.
-	pub async fn next(&mut self) -> Result<bool, Box<dyn Error>> {
+	pub async fn next(&mut self) -> Result<bool> {
 		let mut running = true;
 
 		if let Some(chunk) = self.stream.next().await {

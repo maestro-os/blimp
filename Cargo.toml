@@ -6,3 +6,8 @@ members = [
 	"common",
 	"server",
 ]
+
+[profile.release]
+lto = true
+panic = "abort"
+strip = true

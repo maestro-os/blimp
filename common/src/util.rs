@@ -5,13 +5,13 @@ use flate2::read::GzDecoder;
 use serde::Deserialize;
 use serde::Serialize;
 use std::error::Error;
+use std::fs;
 use std::fs::File;
 use std::fs::OpenOptions;
-use std::fs;
+use std::io;
 use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Read;
-use std::io;
 use std::os::unix;
 use std::path::Component::Normal;
 use std::path::Path;
@@ -93,40 +93,36 @@ fn uncompress_<R: Read>(
 ///
 /// If the tarball contains directories at the root, the unwrap operation unwraps their content
 /// instead of the directories themselves.
-pub fn uncompress(
-	src: &Path,
-	dest: &Path,
-	unwrap: bool,
-) -> Result<(), Box<dyn Error>> {
+pub fn uncompress(src: &Path, dest: &Path, unwrap: bool) -> Result<(), Box<dyn Error>> {
 	// Trying to uncompress .tar.gz
 	{
-		let file = File::open(&src)?;
+		let file = File::open(src)?;
 		let tar = GzDecoder::new(file);
 		let archive = Archive::new(tar);
 
-		if uncompress_(archive, &dest, unwrap).is_ok() {
+		if uncompress_(archive, dest, unwrap).is_ok() {
 			return Ok(());
 		}
 	}
 
 	// Trying to uncompress .tar.xz
 	{
-		let file = File::open(&src)?;
+		let file = File::open(src)?;
 		let tar = XzDecoder::new(file);
 		let archive = Archive::new(tar);
 
-		if uncompress_(archive, &dest, unwrap).is_ok() {
+		if uncompress_(archive, dest, unwrap).is_ok() {
 			return Ok(());
 		}
 	}
 
 	// Trying to uncompress .tar.bz2
 	{
-		let file = File::open(&src)?;
+		let file = File::open(src)?;
 		let tar = BzDecoder::new(file);
 		let archive = Archive::new(tar);
 
-		uncompress_(archive, &dest, unwrap)
+		uncompress_(archive, dest, unwrap)
 	}
 }
 
@@ -198,6 +194,7 @@ pub fn recursive_copy(src: &Path, dst: &Path) -> io::Result<()> {
 	Ok(())
 }
 
+// TODO cleanup (reuse the version in maestro-utils?)
 /// Prints the given size in bytes into a human-readable form.
 pub fn print_size(mut size: u64) {
 	let mut level = 0;
@@ -207,18 +204,18 @@ pub fn print_size(mut size: u64) {
 	}
 
 	let suffix = match level {
-		0 => " bytes",
-		1 => " KiB",
-		2 => " MiB",
-		3 => " GiB",
-		4 => " TiB",
-		5 => " PiB",
-		6 => " EiB",
+		0 => "bytes",
+		1 => "KiB",
+		2 => "MiB",
+		3 => "GiB",
+		4 => "TiB",
+		5 => "PiB",
+		6 => "EiB",
 
 		_ => return,
 	};
 
-	print!("{}{}", size, suffix);
+	print!("{size} {suffix}");
 }
 
 /// Reads a JSON file.
@@ -226,9 +223,9 @@ pub fn read_json<T: for<'a> Deserialize<'a>>(file: &Path) -> io::Result<T> {
 	let file = File::open(file)?;
 	let reader = BufReader::new(file);
 
-	serde_json::from_reader(reader).or_else(|e| {
+	serde_json::from_reader(reader).map_err(|e| {
 		let msg = format!("JSON deserializing failed: {}", e);
-		Err(io::Error::new(io::ErrorKind::Other, msg))
+		io::Error::new(io::ErrorKind::Other, msg)
 	})
 }
 
@@ -237,9 +234,9 @@ pub fn write_json<T: Serialize>(file: &Path, data: &T) -> io::Result<()> {
 	let file = File::create(file)?;
 	let writer = BufWriter::new(file);
 
-	serde_json::to_writer_pretty(writer, &data).or_else(|e| {
+	serde_json::to_writer_pretty(writer, &data).map_err(|e| {
 		let msg = format!("JSON serializing failed: {}", e);
-		Err(io::Error::new(io::ErrorKind::Other, msg))
+		io::Error::new(io::ErrorKind::Other, msg)
 	})
 }
 
@@ -249,7 +246,7 @@ pub fn write_json<T: Serialize>(file: &Path, data: &T) -> io::Result<()> {
 /// as opposed to the `join` function available in `Path`.
 pub fn concat_paths(path0: &Path, path1: &Path) -> PathBuf {
 	let path1 = match path1.to_str() {
-		Some(path1_str) if path1_str.chars().next() == Some('/') => Path::new(&path1_str[1..]),
+		Some(path1_str) if path1_str.starts_with('/') => Path::new(&path1_str[1..]),
 		_ => path1,
 	};
 

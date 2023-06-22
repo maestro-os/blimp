@@ -7,6 +7,8 @@ mod remove;
 #[cfg(feature = "network")]
 mod update;
 
+use anyhow::Result;
+use anyhow::anyhow;
 use common::Environment;
 use install::install;
 use remove::remove;
@@ -18,12 +20,9 @@ use std::process::exit;
 #[cfg(feature = "network")]
 use common::repository::remote::Remote;
 
-/// The software's current version.
-const VERSION: &str = "0.1";
-
 /// Prints command line usage.
 fn print_usage(bin: &str) {
-	eprintln!("blimp package manager version {}", VERSION);
+	eprintln!("blimp package manager version {}", env!("CARGO_PKG_VERSION"));
 	eprintln!();
 	eprintln!("USAGE:");
 	eprintln!("\t{} <COMMAND> [OPTIONS]", bin);
@@ -52,7 +51,7 @@ specify a version"
 	eprintln!("ENVIRONMENT VARIABLES:");
 	eprintln!("\tSYSROOT: Specifies the path to the system's root");
 	eprintln!(
-		"\tLOCAL_REPOSITORIES: Specifies paths separated by `:` at which packages are \
+		"\tLOCAL_REPO: Specifies paths separated by `:` at which packages are \
 stored locally (the SYSROOT variable doesn't apply to these paths)"
 	);
 }
@@ -66,17 +65,14 @@ fn network_not_enabled() {
 /// Returns an environment for the given sysroot.
 ///
 /// If the environment's lockfile cannot be acquired, the function returns an error.
-fn get_env(sysroot: PathBuf) -> Result<Environment, Box<dyn Error>> {
-	Environment::with_root(sysroot).ok_or("failed to acquire lockfile".into())
+fn get_env(sysroot: PathBuf) -> Result<Environment> {
+	Environment::with_root(sysroot).ok_or(anyhow!("failed to acquire lockfile"))
 }
 
 /// Lists remotes.
 #[cfg(feature = "network")]
 fn remote_list(env: &Environment) -> Result<(), Box<dyn Error>> {
-	let remotes = Remote::load_list(env)
-		.map_err(|e| -> Box<dyn Error> {
-			format!("IO error: {}", e).into()
-		})?;
+	let remotes = Remote::load_list(env)?;
 
 	println!("Remotes list:");
 
@@ -143,7 +139,7 @@ async fn main_(sysroot: PathBuf, local_repos: &[PathBuf]) -> Result<bool, Box<dy
 
 	// If no argument is specified, print usage
 	if args.len() <= 1 {
-		print_usage(&bin);
+		print_usage(bin);
 		return Ok(false);
 	}
 
@@ -163,7 +159,7 @@ async fn main_(sysroot: PathBuf, local_repos: &[PathBuf]) -> Result<bool, Box<dy
 		#[cfg(feature = "network")]
 		"update" => {
 			let mut env = get_env(sysroot)?;
-			update::update(&mut env)?;
+			update::update(&mut env).await?;
 
 			Ok(true)
 		}
@@ -257,7 +253,7 @@ async fn main_(sysroot: PathBuf, local_repos: &[PathBuf]) -> Result<bool, Box<dy
 		_ => {
 			eprintln!("Command `{}` doesn't exist", args[1]);
 			eprintln!();
-			print_usage(&bin);
+			print_usage(bin);
 
 			Ok(false)
 		}
@@ -270,8 +266,8 @@ async fn main() {
 	let sysroot = env::var("SYSROOT")
 		.map(PathBuf::from)
 		.unwrap_or(PathBuf::from("/"));
-	let local_repos = env::var("LOCAL_REPOSITORIES")
-		.map(|s| s.split(":").map(|s| PathBuf::from(s)).collect())
+	let local_repos = env::var("LOCAL_REPO")
+		.map(|s| s.split(':').map(PathBuf::from).collect())
 		.unwrap_or(vec![]);
 
 	match main_(sysroot, &local_repos).await {
@@ -283,6 +279,6 @@ async fn main() {
 			exit(1);
 		}
 
-		_ => {},
+		_ => {}
 	}
 }
