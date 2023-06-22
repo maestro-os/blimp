@@ -36,7 +36,7 @@ pub async fn install(
 	let mut packages = HashMap::<Package, &Repository>::new();
 
 	for name in names {
-        let pkg = repository::get_package_with_constraints(&repos, &name, &[])?;
+        let pkg = repository::get_package_with_constraints(&repos, name, &[])?;
         let Some((repo, pkg)) = pkg else {
             eprintln!("Package `{}` not found!", name);
             failed = true;
@@ -97,7 +97,8 @@ pub async fn install(
 	println!("Packages to be installed:");
 
     // List packages to be installed
-    if cfg!(feature = "network") {
+    #[cfg(feature = "network")]
+    {
         let mut total_size = 0;
         for (pkg, repo) in &total_packages {
             let name = pkg.get_name();
@@ -121,8 +122,10 @@ pub async fn install(
         print!("Total download size: ");
         util::print_size(total_size);
         println!();
-    } else {
-        for (pkg, _) in &total_packages {
+    }
+    #[cfg(not(feature = "network"))]
+    {
+        for pkg in total_packages.keys() {
             println!("\t- {} ({}) - cached", pkg.get_name(), pkg.get_version());
         }
     }

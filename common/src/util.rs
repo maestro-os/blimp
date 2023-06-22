@@ -4,7 +4,6 @@ use bzip2::read::BzDecoder;
 use flate2::read::GzDecoder;
 use serde::Deserialize;
 use serde::Serialize;
-use std::error::Error;
 use std::fs;
 use std::fs::File;
 use std::fs::OpenOptions;
@@ -61,11 +60,7 @@ pub fn create_tmp_file() -> io::Result<(PathBuf, File)> {
 /// TODO doc
 ///
 /// `unwrap` tells whether the tarball shall be unwrapped.
-fn uncompress_<R: Read>(
-	mut archive: Archive<R>,
-	dest: &Path,
-	unwrap: bool,
-) -> Result<(), Box<dyn Error>> {
+fn uncompress_<R: Read>(mut archive: Archive<R>, dest: &Path, unwrap: bool) -> io::Result<()> {
 	if unwrap {
 		for entry in archive.entries()? {
 			let mut entry = entry?;
@@ -93,7 +88,7 @@ fn uncompress_<R: Read>(
 ///
 /// If the tarball contains directories at the root, the unwrap operation unwraps their content
 /// instead of the directories themselves.
-pub fn uncompress(src: &Path, dest: &Path, unwrap: bool) -> Result<(), Box<dyn Error>> {
+pub fn uncompress(src: &Path, dest: &Path, unwrap: bool) -> io::Result<()> {
 	// Trying to uncompress .tar.gz
 	{
 		let file = File::open(src)?;
@@ -129,10 +124,7 @@ pub fn uncompress(src: &Path, dest: &Path, unwrap: bool) -> Result<(), Box<dyn E
 /// Uncompresses the given .tar.gz file `archive` into a temporary directory, executes the given
 /// function `f` with the path to the temporary directory as argument, then removes the directory
 /// and returns the result of the call to `f`.
-pub fn uncompress_wrap<T, F: FnOnce(&Path) -> T>(
-	archive: &Path,
-	f: F,
-) -> Result<T, Box<dyn Error>> {
+pub fn uncompress_wrap<T, F: FnOnce(&Path) -> T>(archive: &Path, f: F) -> io::Result<T> {
 	// Uncompressing
 	let tmp_dir = create_tmp_dir()?;
 	uncompress(archive, &tmp_dir, false)?;

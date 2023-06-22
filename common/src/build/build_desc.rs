@@ -1,10 +1,11 @@
 //! This module implements the build descriptor structure.
 
+use anyhow::anyhow;
+use anyhow::Result;
 use crate::package::Package;
 use crate::util;
 use serde::Deserialize;
 use serde::Serialize;
-use std::error::Error;
 use std::ffi::OsString;
 use std::path::Path;
 use std::path::PathBuf;
@@ -54,7 +55,7 @@ pub enum Source {
 impl Source {
 	/// Fetches files from the source and uncompresses them if necessary.
 	/// Files are placed into the build directory `build_dir` according to the location.
-	pub async fn fetch(&self, build_dir: &Path) -> Result<(), Box<dyn Error>> {
+	pub async fn fetch(&self, build_dir: &Path) -> Result<()> {
 		#[cfg(not(feature = "network"))]
 		match self {
 			Self::Local {
@@ -86,7 +87,7 @@ this feature enabled"
 
 				unwrap,
 			} => {
-				let dest_path = util::concat_paths(build_dir, &location);
+				let dest_path = util::concat_paths(build_dir, location);
 
 				// Downloading
 				let (path, _) = util::create_tmp_file()?;
@@ -102,7 +103,7 @@ this feature enabled"
 
 				git_url,
 			} => {
-				let dest_path = util::concat_paths(build_dir, &location);
+				let dest_path = util::concat_paths(build_dir, location);
 
 				let status = Command::new("git")
 					.args([
@@ -113,7 +114,7 @@ this feature enabled"
 					.status()?;
 
 				if !status.success() {
-					return Err(format!("Cloning `{}` failed", git_url).into());
+					return Err(anyhow!("Cloning `{}` failed", git_url));
 				}
 			}
 

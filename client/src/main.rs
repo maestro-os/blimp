@@ -7,13 +7,13 @@ mod remove;
 #[cfg(feature = "network")]
 mod update;
 
+use std::io;
 use anyhow::Result;
 use anyhow::anyhow;
 use common::Environment;
 use install::install;
 use remove::remove;
 use std::env;
-use std::error::Error;
 use std::path::PathBuf;
 use std::process::exit;
 
@@ -71,7 +71,7 @@ fn get_env(sysroot: PathBuf) -> Result<Environment> {
 
 /// Lists remotes.
 #[cfg(feature = "network")]
-fn remote_list(env: &Environment) -> Result<(), Box<dyn Error>> {
+fn remote_list(env: &Environment) -> io::Result<()> {
 	let remotes = Remote::load_list(env)?;
 
 	println!("Remotes list:");
@@ -94,7 +94,7 @@ fn remote_list(env: &Environment) -> Result<(), Box<dyn Error>> {
 /// - `env` is the environment.
 /// - `remotes` is the list of remotes to add.
 #[cfg(feature = "network")]
-fn remote_add(env: &mut Environment, remotes: &[String]) -> Result<(), Box<dyn Error>> {
+fn remote_add(env: &mut Environment, remotes: &[String]) -> io::Result<()> {
 	let mut list = Remote::load_list(env)?;
 	list.sort();
 
@@ -115,7 +115,7 @@ fn remote_add(env: &mut Environment, remotes: &[String]) -> Result<(), Box<dyn E
 /// - `env` is the environment.
 /// - `remotes` is the list of remotes to remove.
 #[cfg(feature = "network")]
-fn remote_remove(env: &mut Environment, remotes: &[String]) -> Result<(), Box<dyn Error>> {
+fn remote_remove(env: &mut Environment, remotes: &[String]) -> io::Result<()> {
 	let mut list = Remote::load_list(env)?;
 	list.sort();
 
@@ -132,7 +132,7 @@ fn remote_remove(env: &mut Environment, remotes: &[String]) -> Result<(), Box<dy
 	Ok(())
 }
 
-async fn main_(sysroot: PathBuf, local_repos: &[PathBuf]) -> Result<bool, Box<dyn Error>> {
+async fn main_(sysroot: PathBuf, local_repos: &[PathBuf]) -> Result<bool> {
 	let args: Vec<String> = env::args().collect();
 	// Name of the current binary file
 	let bin = args.first().map(|s| s.as_str()).unwrap_or("blimp");

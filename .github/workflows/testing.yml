@@ -1,10 +1,33 @@
-name: Testing
+name: Check
 on: push
 jobs:
-    test:
-        runs-on: [linux]
-        steps:
-            - uses: actions/checkout@v2
-            - run: cargo check
-            - run: cargo clippy
-            - run: cargo test
+  format:
+    runs-on: [linux]
+    steps:
+      - uses: actions/checkout@v3
+      - run: cargo fmt --check
+  offline:
+    runs-on: [linux]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Check debug compilation
+        run: cargo build
+      - name: Check release compilation
+        run: cargo build --release
+      - name: Clippy
+        run: cargo clippy
+      - name: Unit tests
+      - run: cargo test
+  online:
+    runs-on: [linux]
+    needs: offline
+    steps:
+      - uses: actions/checkout@v3
+      - name: Check debug compilation
+        run: cargo build --features network
+      - name: Check release compilation
+        run: cargo build --release --features network
+      - name: Clippy
+        run: cargo clippy --features network
+      - name: Unit tests
+      - run: cargo test --features network

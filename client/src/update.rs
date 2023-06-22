@@ -1,13 +1,14 @@
 //! This module handles packages list updating.
 
+use anyhow::anyhow;
+use anyhow::Result;
 use common::repository::remote::Remote;
 use common::Environment;
-use std::error::Error;
 
 /// Updates the packages list.
-pub async fn update(env: &mut Environment) -> Result<(), Box<dyn Error>> {
+pub async fn update(env: &mut Environment) -> Result<()> {
 	let remotes =
-		Remote::load_list(env).map_err(|e| format!("Could not update packages list: {}", e))?;
+		Remote::load_list(env).map_err(|e| anyhow!("Could not update packages list: {}", e))?;
 
 	println!("Updating from remotes...");
 
@@ -38,7 +39,7 @@ pub async fn update(env: &mut Environment) -> Result<(), Box<dyn Error>> {
 	}
 
 	if err {
-		Err("update failed".into())
+		Err(anyhow!("update failed"))
 	} else {
 		Ok(())
 	}

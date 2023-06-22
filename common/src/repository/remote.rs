@@ -57,8 +57,8 @@ impl Remote {
 			.open(path)?;
 		let mut writer = BufWriter::new(file);
 		for r in remotes {
-			writer.write(r.get_host().as_bytes())?;
-			writer.write(b"\n")?;
+			writer.write_all(r.get_host().as_bytes())?;
+			writer.write_all(b"\n")?;
 		}
 
 		Ok(())

@@ -12,6 +12,7 @@ pub mod version;
 #[cfg(feature = "network")]
 pub mod download;
 
+use anyhow::Result;
 use package::InstalledPackage;
 use package::Package;
 use repository::Repository;
@@ -169,7 +170,7 @@ impl Environment {
 	/// Arguments:
 	/// - `pkg` is the package to be updated.
 	/// - `archive_path` is the path to the archive of the new version of the package.
-	pub fn update(&self, pkg: &Package, archive_path: &Path) -> Result<(), Box<dyn Error>> {
+	pub fn update(&self, pkg: &Package, archive_path: &Path) -> Result<()> {
 		// Read archive
 		let _archive = util::read_package_archive(archive_path)?;
 
@@ -202,7 +203,7 @@ impl Environment {
 	///
 	/// This function does not check dependency breakage. It is the caller's responsibility to
 	/// ensure no other package depend on the package to be removed.
-	pub fn remove(&self, pkg: &InstalledPackage) -> Result<(), Box<dyn Error>> {
+	pub fn remove(&self, pkg: &InstalledPackage) -> Result<()> {
 		// TODO Get hooks (pre-remove-hook and post-remove-hook. Copy at installation?)
 
 		// TODO Execute pre-remove-hook

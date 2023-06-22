@@ -4,9 +4,9 @@ pub mod build_desc;
 
 use crate::build::build_desc::BuildDescriptor;
 use crate::util;
+use anyhow::Result;
 use flate2::write::GzEncoder;
 use flate2::Compression;
-use std::error::Error;
 use std::fs;
 use std::fs::File;
 use std::io;
@@ -81,7 +81,7 @@ impl BuildProcess {
 	}
 
 	/// Fetches resources required to build the package.
-	pub fn fetch_sources(&self) -> Result<(), Box<dyn Error>> {
+	pub fn fetch_sources(&self) -> Result<()> {
 		let (
 			Some(build_dir),
 			Some(build_desc)

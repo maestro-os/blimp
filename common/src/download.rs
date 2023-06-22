@@ -73,7 +73,7 @@ impl DownloadTask {
 		if let Some(chunk) = self.stream.next().await {
 			let chunk = chunk?;
 			self.curr_size += chunk.len() as u64;
-			self.file.write(&chunk)?;
+			self.file.write_all(&chunk)?;
 		} else {
 			running = false;
 		};
