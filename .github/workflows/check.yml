@@ -17,7 +17,7 @@ jobs:
       - name: Clippy
         run: cargo clippy
       - name: Unit tests
-      - run: cargo test
+        run: cargo test
   online:
     runs-on: [linux]
     needs: offline
@@ -30,4 +30,4 @@ jobs:
       - name: Clippy
         run: cargo clippy --features network
       - name: Unit tests
-      - run: cargo test --features network
+        run: cargo test --features network
