@@ -110,15 +110,18 @@ impl Repository {
 			.collect()
 	}
 
-	/// Returns the package with name `name` fitting the given constraints `version_constraints`.
+	/// Returns the package with the given name.
 	///
-	/// Specifying no constraint returns the latest package.
+	/// Arguments:
+	/// - `name` is the name of the package.
+	/// - `version_constraint` is the version constraint to match. If no constraint is specified,
+	/// the latest version is selected.
 	///
-	/// If the package doesn't exist, the function returns None.
-	pub fn get_package_with_constraints(
+	/// If the package doesn't exist, the function returns `None`.
+	pub fn get_package_with_constraint(
 		&self,
 		name: &str,
-		version_constraints: &[VersionConstraint],
+		version_constraint: Option<&VersionConstraint>,
 	) -> io::Result<Option<Package>> {
 		let version = fs::read_dir(self.path.join(name))?
 			.filter_map(|ent| {
@@ -131,7 +134,13 @@ impl Repository {
 					None
 				}
 			})
-			// TODO .filter(|version| version_constraints.iter().all(|c| c.is_valid(version)))
+			.filter(|version| {
+				if let Some(ref c) = version_constraint {
+					c.is_valid(version)
+				} else {
+					true
+				}
+			})
 			.max();
 
 		match version {
@@ -163,21 +172,23 @@ pub fn get_package<'a>(
 }
 
 // TODO Handle error reporting
-/// Returns the package with name `name` fitting the given constraints `version_constraints` with
-/// the associated reprository.
+/// Returns the package with the given name along with its associated repository.
 ///
-/// Specifying no constraint returns the latest package.
+/// Arguments:
+/// - `name` is the name of the package.
+/// - `version_constraint` is the version constraint to match. If no constraint is specified,
+/// the latest version is selected.
 ///
-/// If the package doesn't exist, the function returns None.
-pub fn get_package_with_constraints<'a>(
+/// If the package doesn't exist, the function returns `None`.
+pub fn get_package_with_constraint<'a>(
 	repos: &'a [Repository],
 	name: &str,
-	version_constraints: &[VersionConstraint],
+	version_constraint: Option<&VersionConstraint>,
 ) -> io::Result<Option<(&'a Repository, Package)>> {
 	Ok(repos
 		.iter()
 		.filter_map(
-			|repo| match repo.get_package_with_constraints(name, version_constraints) {
+			|repo| match repo.get_package_with_constraint(name, version_constraint) {
 				Ok(Some(pack)) => Some((repo, pack)),
 				_ => None,
 			},

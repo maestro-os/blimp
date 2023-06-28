@@ -27,18 +27,18 @@ pub enum ResolveError {
 		/// The name of the dependency.
 		name: String,
 		/// The version constraints on the dependency.
-		version_constraints: Vec<VersionConstraint>,
+		version_constraint: VersionConstraint,
 	},
 
 	/// The dependency version conflicts another package or dependency.
 	VersionConflict {
-		/// The name of the package.
+		/// The name of the dependency.
 		name: String,
 
 		/// Version of the required dependency.
-		v0: Version,
+		required_version: VersionConstraint,
 		/// Version of the other element.
-		v1: Version,
+		other_version: Version,
 	},
 }
 
@@ -47,25 +47,23 @@ impl fmt::Display for ResolveError {
 		match self {
 			Self::NotFound {
 				name,
-				version_constraints,
+				version_constraint,
 			} => {
-				writeln!(fmt, "Unresolved dependency `{}` for constraints:", name)?;
-
-				for c in version_constraints {
-					writeln!(fmt, "- `{}`", c)?;
-				}
+				writeln!(
+					fmt,
+					"Unresolved dependency `{name}` for constraint `{version_constraint}`"
+				)?;
 			}
 
 			Self::VersionConflict {
 				name,
 
-				v0,
-				v1,
+				required_version,
+				other_version,
 			} => {
 				write!(
 					fmt,
-					"Conflicting version `{}` and `{}` on `{}`!",
-					v0, v1, name
+					"Conflicting version `{other_version}` and `{required_version}` on dependency `{name}`!",
 				)?;
 			}
 		}
@@ -83,7 +81,7 @@ pub struct Dependency {
 	/// The dependency's version constraints.
 	///
 	/// The version of the package must match the intersection of all the constraints.
-	version: Vec<VersionConstraint>,
+	version_constraint: VersionConstraint,
 }
 
 impl Dependency {
@@ -93,29 +91,14 @@ impl Dependency {
 	}
 
 	/// Returns the version of the package.
-	pub fn get_version_constraints(&self) -> &[VersionConstraint] {
-		&self.version
-	}
-
-	/// Tells whether the given version matches every containts.
-	pub fn is_valid(&self, version: &Version) -> bool {
-		self.version.iter().all(|c| c.is_valid(version))
+	pub fn get_version_constraint(&self) -> &VersionConstraint {
+		&self.version_constraint
 	}
 }
 
 impl Display for Dependency {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		write!(f, "{}: ", self.name)?;
-
-		for (i, c) in self.version.iter().enumerate() {
-			write!(f, "{}", c)?;
-
-			if i + 1 < self.version.len() {
-				write!(f, ", ")?;
-			}
-		}
-
-		Ok(())
+		write!(f, "{}: {}", self.name, self.version_constraint)
 	}
 }
 
@@ -189,7 +172,7 @@ impl Package {
 		f: &mut F,
 	) -> io::Result<Result<(), Vec<ResolveError>>>
 	where
-		F: FnMut(&str, &[VersionConstraint]) -> Option<(Self, &'r Repository)>,
+		F: FnMut(&str, &VersionConstraint) -> Option<(Self, &'r Repository)>,
 	{
 		let mut errors = vec![];
 
@@ -203,21 +186,20 @@ impl Package {
 				.find(|p| p.get_name() == d.get_name());
 			// Check for conflict
 			if let Some(pkg) = pkg {
-				if !d.is_valid(pkg.get_version()) {
-					/*errors.push(ResolveError::VersionConflict {
-						v0: d.get_version().clone(),
-						v1: d.get_version().clone(),
-
+				if !d.get_version_constraint().is_valid(pkg.get_version()) {
+					errors.push(ResolveError::VersionConflict {
 						name: d.get_name().clone(),
-					});*/
-					todo!();
+
+						required_version: d.get_version_constraint().clone(),
+						other_version: pkg.get_version().clone(),
+					});
 				}
 
 				continue;
 			}
 
 			// Resolve package, then resolve its dependencies
-			if let Some((p, repo)) = f(d.get_name(), d.get_version_constraints()) {
+			if let Some((p, repo)) = f(d.get_name(), d.get_version_constraint()) {
 				// TODO Check for dependency cycles
 				// FIXME Possible stack overflow
 				let res = p.resolve_dependencies(packages, f)?;
@@ -229,7 +211,7 @@ impl Package {
 			} else {
 				errors.push(ResolveError::NotFound {
 					name: d.get_name().clone(),
-					version_constraints: d.get_version_constraints().to_vec(),
+					version_constraint: d.get_version_constraint().clone(),
 				});
 			}
 		}
@@ -264,13 +246,12 @@ pub fn list_unmatched_dependencies(
 				.filter(|dep| {
 					let matching = pkgs
 						.get(dep.get_name())
-						.map(|p| dep.is_valid(p.desc.get_version()))
+						.map(|p| dep.get_version_constraint().is_valid(p.desc.get_version()))
 						.unwrap_or(false);
 
 					!matching
 				})
-				.map(|dep| (pkg, dep))
-				.collect::<Vec<_>>()
+				.map(move |dep| (pkg, dep))
 		})
 		.collect()
 }

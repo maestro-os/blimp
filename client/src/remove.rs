@@ -1,7 +1,7 @@
 //! TODO doc
 
-use anyhow::bail;
 use anyhow::anyhow;
+use anyhow::bail;
 use anyhow::Result;
 use common::package;
 use common::Environment;

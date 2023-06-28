@@ -1,9 +1,9 @@
 //! This module implements the build descriptor structure.
 
-use anyhow::bail;
 use crate::package::Package;
 use crate::util;
 use anyhow::anyhow;
+use anyhow::bail;
 use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;

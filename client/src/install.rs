@@ -1,7 +1,7 @@
 //! This module handles package installation.
 
-use anyhow::bail;
 use crate::confirm;
+use anyhow::bail;
 use anyhow::Result;
 use common::package::Package;
 use common::repository;
@@ -36,7 +36,7 @@ pub async fn install(
 	let mut packages = HashMap::<Package, &Repository>::new();
 
 	for name in names {
-		let pkg = repository::get_package_with_constraints(&repos, name, &[])?;
+		let pkg = repository::get_package_with_constraint(&repos, name, None)?;
 		let Some((repo, pkg)) = pkg else {
             eprintln!("Package `{}` not found!", name);
             failed = true;
@@ -66,8 +66,9 @@ pub async fn install(
 	for (package, _) in packages {
 		let res = package.resolve_dependencies(
 			&mut total_packages,
-			&mut |name, version_constraints| {
-				let res = repository::get_package_with_constraints(&repos, name, version_constraints);
+			&mut |name, version_constraint| {
+				let res =
+					repository::get_package_with_constraint(&repos, name, Some(version_constraint));
 				let pkg = match res {
 					Ok(p) => p,
 					Err(e) => {
@@ -85,7 +86,7 @@ pub async fn install(
 						todo!();
 					}
 				}
-			}
+			},
 		)?;
 		if let Err(errs) = res {
 			for e in errs {
