@@ -1,8 +1,8 @@
 //! This module handles package installation.
 
+use crate::confirm;
 use anyhow::anyhow;
 use anyhow::Result;
-use crate::confirm;
 use common::package::Package;
 use common::repository;
 use common::repository::Repository;
@@ -36,18 +36,19 @@ pub async fn install(
 	let mut packages = HashMap::<Package, &Repository>::new();
 
 	for name in names {
-        let pkg = repository::get_package_with_constraints(&repos, name, &[])?;
-        let Some((repo, pkg)) = pkg else {
+		let pkg = repository::get_package_with_constraints(&repos, name, &[])?;
+		let Some((repo, pkg)) = pkg else {
             eprintln!("Package `{}` not found!", name);
             failed = true;
             continue;
         };
-        packages.insert(pkg, repo);
+		packages.insert(pkg, repo);
 
 		if let Some(installed) = installed.get(name) {
 			println!(
 				"Package `{}` version `{}` is already installed. Reinstalling",
-				name, installed.desc.get_version()
+				name,
+				installed.desc.get_version()
 			);
 		}
 	}
@@ -96,51 +97,51 @@ pub async fn install(
 
 	println!("Packages to be installed:");
 
-    // List packages to be installed
-    #[cfg(feature = "network")]
-    {
-        let mut total_size = 0;
-        for (pkg, repo) in &total_packages {
-            let name = pkg.get_name();
-            let version = pkg.get_version();
+	// List packages to be installed
+	#[cfg(feature = "network")]
+	{
+		let mut total_size = 0;
+		for (pkg, repo) in &total_packages {
+			let name = pkg.get_name();
+			let version = pkg.get_version();
 
-            match repo.get_package(name, version)? {
-                Some(_) => println!("\t- {} ({}) - cached", name, version),
+			match repo.get_package(name, version)? {
+				Some(_) => println!("\t- {} ({}) - cached", name, version),
 
-                None => {
-                    let remote = repo.get_remote().unwrap();
+				None => {
+					let remote = repo.get_remote().unwrap();
 
-                    // Get package size from remote
-                    let size = remote.get_size(pkg).await?;
-                    total_size += size;
+					// Get package size from remote
+					let size = remote.get_size(pkg).await?;
+					total_size += size;
 
-                    println!("\t- {} ({}) - download size: {}", name, version, size);
-                }
-            }
-        }
+					println!("\t- {} ({}) - download size: {}", name, version, size);
+				}
+			}
+		}
 
-        print!("Total download size: ");
-        util::print_size(total_size);
-        println!();
-    }
-    #[cfg(not(feature = "network"))]
-    {
-        for pkg in total_packages.keys() {
-            println!("\t- {} ({}) - cached", pkg.get_name(), pkg.get_version());
-        }
-    }
+		print!("Total download size: ");
+		util::print_size(total_size);
+		println!();
+	}
+	#[cfg(not(feature = "network"))]
+	{
+		for pkg in total_packages.keys() {
+			println!("\t- {} ({}) - cached", pkg.get_name(), pkg.get_version());
+		}
+	}
 
-    if !confirm::prompt() {
-        println!("Aborting.");
-        return Ok(());
-    }
+	if !confirm::prompt() {
+		println!("Aborting.");
+		return Ok(());
+	}
 
 	#[cfg(feature = "network")]
 	{
 		println!("Downloading packages...");
 		let mut futures = Vec::new();
 
-        // TODO download biggest packets first (sort_unstable by decreasing size)
+		// TODO download biggest packets first (sort_unstable by decreasing size)
 		for (pkg, repo) in &total_packages {
 			if repo.is_in_cache(pkg.get_name(), pkg.get_version()) {
 				println!("`{}` is in cache.", pkg.get_name());
@@ -148,19 +149,19 @@ pub async fn install(
 			}
 
 			if let Some(remote) = repo.get_remote() {
-                // TODO limit the number of packages downloaded concurrently
+				// TODO limit the number of packages downloaded concurrently
 				futures.push((
 					pkg.get_name(),
 					pkg.get_version(),
-                    // TODO spawn task
+					// TODO spawn task
 					async {
-                        let mut task = Remote::fetch_archive(remote, repo, pkg).await?;
-                        while task.next().await? {
-                            // TODO update progress bar
-                        }
+						let mut task = Remote::fetch_archive(remote, repo, pkg).await?;
+						while task.next().await? {
+							// TODO update progress bar
+						}
 
-                        Ok::<(), anyhow::Error>(())
-                    }
+						Ok::<(), anyhow::Error>(())
+					},
 				));
 			}
 		}
@@ -187,7 +188,7 @@ pub async fn install(
 		let archive_path = repo.get_archive_path(pkg.get_name(), pkg.get_version());
 		if let Err(e) = env.install(&pkg, &archive_path) {
 			eprintln!("Failed to install `{}`: {}", pkg.get_name(), e);
-            // TODO fail function if at least one package could not be installed
+			// TODO fail function if at least one package could not be installed
 		}
 	}
 

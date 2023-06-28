@@ -1,9 +1,9 @@
 //! This module implements the build descriptor structure.
 
-use anyhow::anyhow;
-use anyhow::Result;
 use crate::package::Package;
 use crate::util;
+use anyhow::anyhow;
+use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;
 use std::ffi::OsString;
@@ -15,7 +15,7 @@ use std::process::Command;
 use crate::download::DownloadTask;
 
 /// Structure representing the location of sources and where to unpack them.
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum Source {
 	/// Downloading a tarball from an URL.
@@ -114,7 +114,7 @@ this feature enabled"
 					.status()?;
 
 				if !status.success() {
-					return Err(anyhow!("Cloning `{}` failed", git_url));
+					bail!("Cloning `{}` failed", git_url);
 				}
 			}
 

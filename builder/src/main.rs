@@ -1,18 +1,25 @@
 //! The Blimp builder is a tool allowing to build a package.
 
+use anyhow::anyhow;
+use anyhow::Result;
 use common::build::BuildProcess;
 use common::repository::Repository;
 use common::util;
 use std::env;
 use std::fs;
+use std::io;
 use std::path::PathBuf;
 use std::process::exit;
 use std::str;
 use std::thread;
+use tokio::runtime::Runtime;
 
 /// Prints command line usage.
 fn print_usage(bin: &str) {
-	eprintln!("blimp package builder version {}", env!("CARGO_PKG_VERSION"));
+	eprintln!(
+		"blimp package builder version {}",
+		env!("CARGO_PKG_VERSION")
+	);
 	eprintln!();
 	eprintln!("USAGE:");
 	eprintln!("\t{} <FROM> <TO>", bin);
@@ -26,8 +33,8 @@ package into the repository at the given path."
 	);
 	eprintln!();
 	eprintln!(
-		"When creating a package, the building process can be debugged using the BLIMP_DEBUG \
-environment variable, allowing to keep the files after building to investigate problems"
+		"The building process can be debugged using the BLIMP_DEBUG environment variable, \
+allowing to keep build files to troubleshoot problems"
 	);
 	eprintln!();
 	eprintln!("ENVIRONMENT VARIABLES:");
@@ -51,57 +58,50 @@ fn get_jobs_count() -> u32 {
 }
 
 /// Returns the triplet of the host on which the package is to be built.
-fn get_host_triplet() -> String {
-	env::var("HOST").unwrap_or_else(|_| {
-		common::build::get_host_triplet().unwrap_or_else(|| {
-			let default = "x86_64-linux-gnu".to_owned();
-			eprintln!(
-				"Failed to retrieve host triplet. Defaulting to {}.",
-				default
-			);
+fn get_host_triplet() -> io::Result<String> {
+	if let Ok(triplet) = env::var("HOST") {
+		return Ok(triplet);
+	}
 
-			default
-		})
-	})
+	if let Some(triplet) = common::build::get_host_triplet()? {
+		return Ok(triplet);
+	}
+
+	let default = "x86_64-linux-gnu".to_owned();
+	eprintln!(
+		"Failed to retrieve host triplet. Defaulting to {}.",
+		default
+	);
+	Ok(default)
 }
 
 /// Builds the package.
 ///
 /// `from` and `to` correspond to the command line arguments.
-fn build(from: PathBuf, to: PathBuf) {
+fn build(from: PathBuf, to: PathBuf) -> Result<()> {
 	let debug = env::var("BLIMP_DEBUG")
 		.map(|s| s == "true")
 		.unwrap_or(false);
 
 	let jobs = get_jobs_count();
-	let host = get_host_triplet();
+	let host = get_host_triplet()?;
 	let target = env::var("TARGET").unwrap_or_else(|_| host.clone());
 	println!("[INFO] Jobs: {}; Host: {}; Target: {}", jobs, host, target);
 
-	let mut build_process = BuildProcess::new(from);
-	build_process.set_clean_on_drop(!debug);
-
-	build_process.prepare().unwrap_or_else(|e| {
-		eprintln!("Cannot prepare building process: {}", e);
-		exit(1);
-	});
+	let build_process = BuildProcess::new(from)?;
 
 	println!("[INFO] Fetching sources...");
 	// TODO Progress bars
 
-	build_process.fetch_sources().unwrap_or_else(|e| {
-		eprintln!("Cannot fetch sources: {}", e);
-		exit(1);
-	});
+	let rt = Runtime::new()?;
+	rt.block_on(build_process.fetch_sources())
+		.map_err(|e| anyhow!("Cannot fetch sources: {e}"))?;
 
 	println!("[INFO] Compilation...");
 
 	let success = build_process
 		.build(jobs, &host, &target)
-		.unwrap_or_else(|e| {
-			eprintln!("Cannot build package: {}", e);
-			exit(1);
-		});
+		.map_err(|e| anyhow!("Cannot build package: {e}"))?;
 	if !success {
 		eprintln!("Package build failed!");
 		exit(1);
@@ -111,17 +111,17 @@ fn build(from: PathBuf, to: PathBuf) {
 
 	// TODO Move to separate function
 	let archive_path = {
-		let build_desc = build_process.get_build_desc().unwrap(); // TODO Handle error
+		let build_desc = build_process.get_build_desc();
 		let name = build_desc.package.get_name();
 		let version = build_desc.package.get_version();
 
 		let package_path = to.join(name).join(version.to_string());
-		fs::create_dir_all(&package_path).unwrap(); // TODO Handle error
+		fs::create_dir_all(&package_path)?;
 
 		let desc_path = package_path.join("desc");
-		util::write_json(&desc_path, &build_desc.package).unwrap(); // TODO Handle error
+		util::write_json(&desc_path, &build_desc.package)?;
 
-		let repo = Repository::load(to).unwrap(); // TODO Handle error
+		let repo = Repository::load(to)?;
 		repo.get_archive_path(name, version)
 	};
 
@@ -137,10 +137,15 @@ fn build(from: PathBuf, to: PathBuf) {
 	if debug {
 		eprintln!(
 			"[DEBUG] Build directory path: {}; Fake sysroot path: {}",
-			build_process.get_build_dir().unwrap().display(),
-			build_process.get_sysroot().unwrap().display()
+			build_process.get_build_dir().display(),
+			build_process.get_sysroot().display()
 		);
+	} else {
+		println!("[INFO] Cleaning up...");
+		build_process.cleanup()?;
 	}
+
+	Ok(())
 }
 
 fn main() {
@@ -157,5 +162,8 @@ fn main() {
 	let from = PathBuf::from(&args[1]);
 	let to = PathBuf::from(&args[2]);
 
-	build(from, to);
+	if let Err(e) = build(from, to) {
+		eprintln!("{bin}: error: {e}");
+		exit(1);
+	}
 }

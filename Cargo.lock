@@ -313,6 +313,7 @@ dependencies = [
 name = "blimp-builder"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "common",
  "flate2",
  "tar",

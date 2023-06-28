@@ -1,4 +1,5 @@
-//! TODO doc
+//! The module implements the package building procedure, which is used to build packages for the
+//! package manager.
 
 pub mod build_desc;
 
@@ -14,93 +15,77 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::str;
-use tokio::runtime::Runtime;
+use std::sync::Arc;
 
 /// A build process referes to the operation of converting source code into an installable package.
 ///
-/// To build a package, the following files are needed:
+/// To build a package, the following files are required:
 /// - `package.json`: The file describing the package
 /// - `build-hook`: The script to build the package
+///
+/// The package is build and then installed to a fake system root, which is then compressed.
 pub struct BuildProcess {
 	/// The path to the directory containing informations to build the package.
 	input_path: PathBuf,
 
 	/// The build descriptor.
-	build_desc: Option<BuildDescriptor>,
+	build_desc: BuildDescriptor,
 
 	/// The path to the build directory.
-	build_dir: Option<PathBuf>,
-	/// The path to the fake sysroot at which the package is "installed".
-	sysroot: Option<PathBuf>,
-
-	/// Whether temporary files must be cleaned up on drop.
-	clean_on_drop: bool,
+	build_dir: PathBuf,
+	/// The path to the fake system root at which the package is "installed".
+	sysroot: PathBuf,
 }
 
 impl BuildProcess {
 	/// Creates a new instance.
 	///
 	/// `input_path` is the path to the directory containing informations to build the package.
-	pub fn new(input_path: PathBuf) -> Self {
-		Self {
+	pub fn new(input_path: PathBuf) -> io::Result<Self> {
+		let build_desc_path = input_path.join("package.json");
+		let build_desc = util::read_json::<BuildDescriptor>(&build_desc_path)?;
+
+		Ok(Self {
 			input_path,
 
-			build_desc: None,
+			build_desc,
 
-			build_dir: None,
-			sysroot: None,
-
-			clean_on_drop: true,
-		}
+			build_dir: util::create_tmp_dir()?,
+			sysroot: util::create_tmp_dir()?,
+		})
 	}
 
-	/// TODO doc
-	pub fn get_build_desc(&self) -> Option<&BuildDescriptor> {
-		self.build_desc.as_ref()
+	/// Returns the build descriptor of the package to be built.
+	pub fn get_build_desc(&self) -> &BuildDescriptor {
+		&self.build_desc
 	}
 
-	/// TODO doc
-	pub fn get_build_dir(&self) -> Option<&PathBuf> {
-		self.build_dir.as_ref()
+	/// Returns the path to the build directory.
+	pub fn get_build_dir(&self) -> &Path {
+		&self.build_dir
 	}
 
-	/// TODO doc
-	pub fn get_sysroot(&self) -> Option<&PathBuf> {
-		self.sysroot.as_ref()
-	}
-
-	/// Prepares for building.
-	pub fn prepare(&mut self) -> io::Result<()> {
-		let build_desc_path = self.input_path.join("package.json");
-		self.build_desc = Some(util::read_json::<BuildDescriptor>(&build_desc_path)?);
-
-		self.build_dir = Some(util::create_tmp_dir()?);
-		self.sysroot = Some(util::create_tmp_dir()?);
-
-		Ok(())
+	/// Returns the path to the fake system root at which the package is "installed".
+	pub fn get_sysroot(&self) -> &Path {
+		&self.sysroot
 	}
 
 	/// Fetches resources required to build the package.
-	pub fn fetch_sources(&self) -> Result<()> {
-		let (
-			Some(build_dir),
-			Some(build_desc)
-		) = (
-			&self.build_dir,
-			&self.build_desc
-		) else {
-			return Ok(());
-		};
-
-		let runtime = Runtime::new()?;
-		let futures = build_desc
+	pub async fn fetch_sources(&self) -> Result<()> {
+		let build_dir = Arc::new(self.build_dir.clone());
+		let futures = self
+			.build_desc
 			.sources
 			.iter()
-			.map(|s| s.fetch(build_dir))
+			.cloned()
+			.map(move |s| {
+				let build_dir = build_dir.clone();
+				tokio::spawn(async move { s.fetch(&build_dir).await })
+			})
 			.collect::<Vec<_>>();
 
 		for f in futures {
-			runtime.block_on(f)?;
+			f.await??;
 		}
 
 		Ok(())
@@ -115,16 +100,6 @@ impl BuildProcess {
 	///
 	/// On success, the function returns `true`.
 	pub fn build(&self, jobs: u32, host: &str, target: &str) -> io::Result<bool> {
-		let (
-			Some(build_dir),
-			Some(sysroot),
-		) = (
-			&self.build_dir,
-			&self.sysroot,
-		) else {
-			return Ok(false);
-		};
-
 		let absolute_input = fs::canonicalize(&self.input_path)?;
 		let hook_path = absolute_input.join("build-hook");
 
@@ -132,9 +107,9 @@ impl BuildProcess {
 			.env("DESC_PATH", absolute_input)
 			.env("HOST", host)
 			.env("TARGET", target)
-			.env("SYSROOT", sysroot)
-			.env("JOBS", format!("{}", jobs))
-			.current_dir(build_dir)
+			.env("SYSROOT", &self.sysroot)
+			.env("JOBS", jobs.to_string())
+			.current_dir(&self.build_dir)
 			.status()
 			.map(|status| status.success())
 	}
@@ -145,53 +120,35 @@ impl BuildProcess {
 	pub fn create_archive(&self, output_path: &Path) -> io::Result<()> {
 		let build_desc_path = self.input_path.join("package.json");
 
-		let Some(ref sysroot) = self.sysroot else {
-			// TODO
-			todo!();
-		};
-
 		let tar_gz = File::create(output_path)?;
 		let enc = GzEncoder::new(tar_gz, Compression::default());
 		let mut tar = tar::Builder::new(enc);
 		tar.follow_symlinks(false);
 		tar.append_path_with_name(build_desc_path, "package.json")?;
-		tar.append_dir_all("data", sysroot)?;
+		tar.append_dir_all("data", &self.sysroot)?;
 		// TODO add install/update/remove hooks
 
 		tar.finish()
 	}
 
-	/// Set whether temporary files must be cleaned up on drop.
-	pub fn set_clean_on_drop(&mut self, clean: bool) {
-		self.clean_on_drop = clean;
-	}
-}
+	/// Cleans files created by the build process.
+	pub fn cleanup(self) -> io::Result<()> {
+		fs::remove_dir_all(&self.build_dir)?;
+		fs::remove_dir_all(&self.sysroot)?;
 
-impl Drop for BuildProcess {
-	fn drop(&mut self) {
-		if self.clean_on_drop {
-			if let Some(ref path) = self.build_dir {
-				let _ = fs::remove_dir_all(path);
-			}
-
-			if let Some(ref path) = self.sysroot {
-				let _ = fs::remove_dir_all(path);
-			}
-		}
+		Ok(())
 	}
 }
 
 /// Returns the triplet of the host on which the package is to be built.
 ///
-/// If the triplet cannot be retrieved, the function returns None.
-pub fn get_host_triplet() -> Option<String> {
-	let output = Command::new("cc").arg("-dumpmachine").output();
+/// If the triplet cannot be retrieved, the function returns `None`.
+pub fn get_host_triplet() -> io::Result<Option<String>> {
+	let output = Command::new("cc").arg("-dumpmachine").output()?;
 
-	if let Ok(out) = output {
-		if let Ok(triplet) = str::from_utf8(&out.stdout) {
-			return Some(triplet.trim().to_owned());
-		}
-	}
+	let Ok(triplet) = str::from_utf8(&output.stdout) else {
+		return Ok(None);
+	};
 
-	None
+	Ok(Some(triplet.trim().to_owned()))
 }

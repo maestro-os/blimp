@@ -65,20 +65,13 @@ impl Environment {
 
 	/// Loads and returns the list of all repositories.
 	///
-	/// Arguments:
-	/// - `local_repos` is the list of paths of local repositories.
+	/// `local_repos` is the list of paths to local repositories.
 	pub fn list_repositories(&self, local_repos: &[PathBuf]) -> io::Result<Vec<Repository>> {
-		let mut repos = vec![];
-
-		// TODO List from blimp directory using sysroot
-
-		let mut local_repos = local_repos
+		// TODO Add blimp's inner repositories (local representations of remotes)
+		local_repos
 			.iter()
 			.map(|path| Repository::load(path.clone()))
-			.collect::<Result<Vec<_>, _>>()?;
-		repos.append(&mut local_repos);
-
-		Ok(repos)
+			.collect::<Result<Vec<_>, _>>()
 	}
 
 	/// Returns the list of installed packages.
@@ -242,9 +235,6 @@ impl Environment {
 
 		Ok(())
 	}
-
-	/// Unlocks the environment.
-	pub fn unlock(self) {}
 }
 
 impl Drop for Environment {

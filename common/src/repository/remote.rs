@@ -1,11 +1,11 @@
 //! A remote is a remote host from which packages can be downloaded.
 
-use anyhow::anyhow;
-use anyhow::Result;
 use crate::download::DownloadTask;
 use crate::package::Package;
 use crate::repository::Repository;
 use crate::Environment;
+use anyhow::anyhow;
+use anyhow::Result;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io;
@@ -93,7 +93,10 @@ impl Remote {
 		match status {
 			reqwest::StatusCode::OK => Ok(serde_json::from_str(&content)?),
 
-			_ => Err(anyhow!("Failed to retrieve packages list from remote: {}", status)),
+			_ => Err(anyhow!(
+				"Failed to retrieve packages list from remote: {}",
+				status
+			)),
 		}
 	}
 
@@ -106,10 +109,7 @@ impl Remote {
 			package.get_version()
 		);
 		let client = reqwest::Client::new();
-		let response = client
-			.head(url)
-			.send()
-			.await?;
+		let response = client.head(url).send().await?;
 		let len = response
 			.content_length()
 			.ok_or_else(|| anyhow!("Content-Length field not present in response"))?;

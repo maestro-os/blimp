@@ -7,22 +7,25 @@ mod remove;
 #[cfg(feature = "network")]
 mod update;
 
-use tokio::runtime::Runtime;
-use anyhow::Result;
 use anyhow::anyhow;
+use anyhow::Result;
 use common::Environment;
 use install::install;
 use remove::remove;
 use std::env;
 use std::path::PathBuf;
 use std::process::exit;
+use tokio::runtime::Runtime;
 
 #[cfg(feature = "network")]
 use common::repository::remote::Remote;
 
 /// Prints command line usage.
 fn print_usage(bin: &str) {
-	eprintln!("blimp package manager version {}", env!("CARGO_PKG_VERSION"));
+	eprintln!(
+		"blimp package manager version {}",
+		env!("CARGO_PKG_VERSION")
+	);
 	eprintln!();
 	eprintln!("USAGE:");
 	eprintln!("\t{} <COMMAND> [OPTIONS]", bin);
@@ -159,7 +162,7 @@ fn main_(sysroot: PathBuf, local_repos: &[PathBuf]) -> Result<bool> {
 		#[cfg(feature = "network")]
 		"update" => {
 			let mut env = get_env(sysroot)?;
-			let rt = Runtime::new().unwrap();
+			let rt = Runtime::new()?;
 			rt.block_on(update::update(&mut env))?;
 
 			Ok(true)
@@ -173,7 +176,7 @@ fn main_(sysroot: PathBuf, local_repos: &[PathBuf]) -> Result<bool> {
 			}
 
 			let mut env = get_env(sysroot)?;
-			let rt = Runtime::new().unwrap();
+			let rt = Runtime::new()?;
 			rt.block_on(install(names, &mut env, local_repos))?;
 
 			Ok(true)
