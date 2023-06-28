@@ -135,7 +135,7 @@ impl Repository {
 				}
 			})
 			.filter(|version| {
-				if let Some(ref c) = version_constraint {
+				if let Some(c) = version_constraint {
 					c.is_valid(version)
 				} else {
 					true
