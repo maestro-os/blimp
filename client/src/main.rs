@@ -7,7 +7,7 @@ mod remove;
 #[cfg(feature = "network")]
 mod update;
 
-use std::io;
+use tokio::runtime::Runtime;
 use anyhow::Result;
 use anyhow::anyhow;
 use common::Environment;
@@ -71,7 +71,7 @@ fn get_env(sysroot: PathBuf) -> Result<Environment> {
 
 /// Lists remotes.
 #[cfg(feature = "network")]
-fn remote_list(env: &Environment) -> io::Result<()> {
+fn remote_list(env: &Environment) -> std::io::Result<()> {
 	let remotes = Remote::load_list(env)?;
 
 	println!("Remotes list:");
@@ -94,7 +94,7 @@ fn remote_list(env: &Environment) -> io::Result<()> {
 /// - `env` is the environment.
 /// - `remotes` is the list of remotes to add.
 #[cfg(feature = "network")]
-fn remote_add(env: &mut Environment, remotes: &[String]) -> io::Result<()> {
+fn remote_add(env: &mut Environment, remotes: &[String]) -> std::io::Result<()> {
 	let mut list = Remote::load_list(env)?;
 	list.sort();
 
@@ -115,7 +115,7 @@ fn remote_add(env: &mut Environment, remotes: &[String]) -> io::Result<()> {
 /// - `env` is the environment.
 /// - `remotes` is the list of remotes to remove.
 #[cfg(feature = "network")]
-fn remote_remove(env: &mut Environment, remotes: &[String]) -> io::Result<()> {
+fn remote_remove(env: &mut Environment, remotes: &[String]) -> std::io::Result<()> {
 	let mut list = Remote::load_list(env)?;
 	list.sort();
 
@@ -132,7 +132,7 @@ fn remote_remove(env: &mut Environment, remotes: &[String]) -> io::Result<()> {
 	Ok(())
 }
 
-async fn main_(sysroot: PathBuf, local_repos: &[PathBuf]) -> Result<bool> {
+fn main_(sysroot: PathBuf, local_repos: &[PathBuf]) -> Result<bool> {
 	let args: Vec<String> = env::args().collect();
 	// Name of the current binary file
 	let bin = args.first().map(|s| s.as_str()).unwrap_or("blimp");
@@ -159,7 +159,8 @@ async fn main_(sysroot: PathBuf, local_repos: &[PathBuf]) -> Result<bool> {
 		#[cfg(feature = "network")]
 		"update" => {
 			let mut env = get_env(sysroot)?;
-			update::update(&mut env).await?;
+			let rt = Runtime::new().unwrap();
+			rt.block_on(update::update(&mut env))?;
 
 			Ok(true)
 		}
@@ -172,7 +173,8 @@ async fn main_(sysroot: PathBuf, local_repos: &[PathBuf]) -> Result<bool> {
 			}
 
 			let mut env = get_env(sysroot)?;
-			install(names, &mut env, local_repos).await?;
+			let rt = Runtime::new().unwrap();
+			rt.block_on(install(names, &mut env, local_repos))?;
 
 			Ok(true)
 		}
@@ -260,8 +262,7 @@ async fn main_(sysroot: PathBuf, local_repos: &[PathBuf]) -> Result<bool> {
 	}
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
 	// Getting the sysroot
 	let sysroot = env::var("SYSROOT")
 		.map(PathBuf::from)
@@ -270,7 +271,7 @@ async fn main() {
 		.map(|s| s.split(':').map(PathBuf::from).collect())
 		.unwrap_or(vec![]);
 
-	match main_(sysroot, &local_repos).await {
+	match main_(sysroot, &local_repos) {
 		Ok(false) => exit(1),
 
 		Err(e) => {
