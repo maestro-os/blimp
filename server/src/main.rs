@@ -1,3 +1,5 @@
+//! The blimp server serves packages to be installed by the package manager.
+
 mod config;
 mod global_data;
 mod package;
