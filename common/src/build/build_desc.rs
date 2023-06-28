@@ -1,5 +1,6 @@
 //! This module implements the build descriptor structure.
 
+use anyhow::bail;
 use crate::package::Package;
 use crate::util;
 use anyhow::anyhow;

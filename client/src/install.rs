@@ -26,7 +26,7 @@ pub async fn install(
 	env: &mut Environment,
 	local_repos: &[PathBuf],
 ) -> Result<()> {
-	let installed = env.get_installed_list()?;
+	let installed = env.load_installed_list()?;
 
 	let mut failed = false;
 

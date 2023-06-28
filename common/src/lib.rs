@@ -74,10 +74,10 @@ impl Environment {
 			.collect::<Result<Vec<_>, _>>()
 	}
 
-	/// Returns the list of installed packages.
+	/// Loads the list of installed packages.
 	///
 	/// The key is the name of the package and the value is the installed package.
-	pub fn get_installed_list(&self) -> io::Result<HashMap<String, InstalledPackage>> {
+	pub fn load_installed_list(&self) -> io::Result<HashMap<String, InstalledPackage>> {
 		let path = util::concat_paths(&self.sysroot, Path::new(INSTALLED_FILE));
 
 		match util::read_json::<HashMap<String, InstalledPackage>>(&path) {
@@ -145,7 +145,7 @@ impl Environment {
 		// TODO Execute post-install-hook
 
 		// Update installed list
-		let mut installed = self.get_installed_list()?;
+		let mut installed = self.load_installed_list()?;
 		installed.insert(
 			pkg.get_name().to_owned(),
 			InstalledPackage {
@@ -179,7 +179,7 @@ impl Environment {
 		// TODO Execute post-update-hook
 
 		// Update installed list
-		let mut installed = self.get_installed_list()?;
+		let mut installed = self.load_installed_list()?;
 		installed.insert(
 			pkg.get_name().to_owned(),
 			InstalledPackage {
@@ -229,7 +229,7 @@ impl Environment {
 		// TODO Execute post-remove-hook
 
 		// Update installed list
-		let mut installed = self.get_installed_list()?;
+		let mut installed = self.load_installed_list()?;
 		installed.remove(pkg.desc.get_name());
 		self.update_installed_list(&installed)?;
 

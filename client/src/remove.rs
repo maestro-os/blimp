@@ -1,5 +1,6 @@
 //! TODO doc
 
+use anyhow::bail;
 use anyhow::anyhow;
 use anyhow::Result;
 use common::package;
@@ -13,9 +14,11 @@ use common::Environment;
 /// - `names` is the list of packages to remove.
 /// - `env` is the blimp environment.
 pub fn remove(names: &[String], env: &mut Environment) -> Result<()> {
+	let installed = env.load_installed_list()?;
+
 	// The list of remaining packages after the remove operation
 	let remaining = {
-		let mut installed = env.get_installed_list()?;
+		let mut installed = installed.clone();
 		installed.retain(|name, _| !names.contains(name));
 
 		installed
@@ -35,13 +38,10 @@ pub fn remove(names: &[String], env: &mut Environment) -> Result<()> {
 			);
 		}
 
-		return Err(anyhow!("dependencies would break"));
+		bail!("dependencies would break");
 	}
 
 	let mut failed = false;
-
-	let installed = env.get_installed_list()?;
-
 	// Remove packages
 	for name in names {
 		if let Some(installed) = installed.get(name) {
@@ -57,7 +57,7 @@ pub fn remove(names: &[String], env: &mut Environment) -> Result<()> {
 		}
 	}
 	if failed {
-		return Err(anyhow!("cannot remove packages"));
+		bail!("cannot remove packages");
 	}
 
 	Ok(())
