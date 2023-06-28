@@ -1,7 +1,7 @@
 //! This module handles package installation.
 
+use anyhow::bail;
 use crate::confirm;
-use anyhow::anyhow;
 use anyhow::Result;
 use common::package::Package;
 use common::repository;
@@ -53,7 +53,7 @@ pub async fn install(
 		}
 	}
 	if failed {
-		return Err(anyhow!("installation failed"));
+		bail!("installation failed");
 	}
 
 	println!("Resolving dependencies...");
@@ -61,38 +61,42 @@ pub async fn install(
 	// The list of all packages, dependencies included
 	let mut total_packages = packages.clone();
 
+	// TODO check dependencies for all packages at once to avoid duplicate errors
 	// Resolving dependencies
 	for (package, _) in packages {
 		let res = package.resolve_dependencies(
 			&mut total_packages,
 			&mut |name, version_constraints| {
-				let res =
-					repository::get_package_with_constraints(&repos, name, version_constraints)
-						.map_err(|e| {
-							eprintln!("error: {}", e);
-						})
-						.ok()?;
+				let res = repository::get_package_with_constraints(&repos, name, version_constraints);
+				let pkg = match res {
+					Ok(p) => p,
+					Err(e) => {
+						eprintln!("error: {e}");
+						return None;
+					}
+				};
 
-				// If not present, check on remote
-				if res.is_none() {
-					// TODO
-					todo!();
+				match pkg {
+					Some((repo, pkg)) => Some((pkg, repo)),
+
+					// If not present, check on remote
+					None => {
+						// TODO
+						todo!();
+					}
 				}
-
-				let (repo, pkg) = res?;
-				Some((pkg, repo))
-			},
+			}
 		)?;
 		if let Err(errs) = res {
 			for e in errs {
-				eprintln!("{}", e);
+				eprintln!("{e}");
 			}
 
 			failed = true;
 		}
 	}
 	if failed {
-		return Err(anyhow!("installation failed"));
+		bail!("installation failed");
 	}
 
 	println!("Packages to be installed:");
@@ -174,7 +178,7 @@ pub async fn install(
 			}
 		}
 		if failed {
-			return Err(anyhow!("installation failed"));
+			bail!("installation failed");
 		}
 	}
 
@@ -187,9 +191,12 @@ pub async fn install(
 
 		let archive_path = repo.get_archive_path(pkg.get_name(), pkg.get_version());
 		if let Err(e) = env.install(&pkg, &archive_path) {
-			eprintln!("Failed to install `{}`: {}", pkg.get_name(), e);
-			// TODO fail function if at least one package could not be installed
+			eprintln!("Failed to install `{}`: {e}", pkg.get_name());
+			failed = true;
 		}
+	}
+	if failed {
+		bail!("installation failed");
 	}
 
 	Ok(())

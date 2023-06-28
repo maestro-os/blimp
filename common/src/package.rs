@@ -173,13 +173,13 @@ impl Package {
 		&self.run_deps
 	}
 
-	/// Resolves the dependencies of the package and inserts them into the given HashMap
-	/// `packages`.
+	/// Resolves the dependencies of the package and inserts them into the given `HashMap`.
 	///
 	/// Arguments:
+	/// - `packages` is the `HashMap` which associates packages with their respective repository.
 	/// - `f` is a function used to get a package from its name and version.
 	///
-	/// The function makes use of packages that are already in the HashMap and those which are
+	/// The function makes use of packages that are already in the `HashMap` and those which are
 	/// already installed to determine if there is a dependency error.
 	///
 	/// If one or more packages cannot be resolved, the function returns the list of errors.
@@ -195,6 +195,7 @@ impl Package {
 
 		// TODO Add support for build dependencies
 		for d in &self.run_deps {
+			// TODO check already installed packages
 			// Get package in the installation list
 			let pkg = packages
 				.iter()
