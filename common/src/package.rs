@@ -81,6 +81,7 @@ pub struct Dependency {
 	/// The dependency's version constraints.
 	///
 	/// The version of the package must match the intersection of all the constraints.
+	#[serde(rename = "version")]
 	version_constraint: VersionConstraint,
 }
 

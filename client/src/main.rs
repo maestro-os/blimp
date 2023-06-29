@@ -278,7 +278,6 @@ fn main() {
 		Ok(false) => exit(1),
 
 		Err(e) => {
-			eprintln!();
 			eprintln!("error: {}", e);
 			exit(1);
 		}
