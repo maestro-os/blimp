@@ -2,7 +2,6 @@
 
 use crate::package::Package;
 use crate::util;
-use anyhow::anyhow;
 use anyhow::bail;
 use anyhow::Result;
 use serde::Deserialize;

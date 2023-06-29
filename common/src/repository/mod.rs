@@ -89,7 +89,7 @@ impl Repository {
 
 				let iter = fs::read_dir(&ent_path)
 					.ok()?
-					.filter_map(|ent| {
+					.filter_map(move |ent| {
 						let ent = ent.ok()?;
 						if !ent.file_type().ok()?.is_dir() {
 							return None;
@@ -100,10 +100,7 @@ impl Repository {
 
 						let ent_path = ent_path.join(version.to_string());
 						Package::load(ent_path).transpose()
-					})
-					.collect::<Vec<_>>()
-					.into_iter();
-
+					});
 				Some(iter)
 			})
 			.flatten()
