@@ -108,9 +108,12 @@ impl BuildProcess {
 			.env("HOST", host)
 			.env("TARGET", target)
 			.env("SYSROOT", &self.sysroot)
-			.env("PKG_NAME", &self.build_desc.package.get_name())
-			.env("PKG_VERSION", self.build_desc.package.get_version().to_string())
-			.env("PKG_DESC", &self.build_desc.package.get_description())
+			.env("PKG_NAME", self.build_desc.package.get_name())
+			.env(
+				"PKG_VERSION",
+				self.build_desc.package.get_version().to_string(),
+			)
+			.env("PKG_DESC", self.build_desc.package.get_description())
 			.env("JOBS", jobs.to_string())
 			.current_dir(&self.build_dir)
 			.status()
