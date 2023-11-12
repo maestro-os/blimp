@@ -31,9 +31,9 @@ fn print_usage(bin: &str) {
 	eprintln!("\t{} <COMMAND> [OPTIONS]", bin);
 	eprintln!();
 	eprintln!("COMMAND:");
-	eprintln!("\tinfo <package...>: Prints informations about the given package(s)");
+	eprintln!("\tinfo <package...>: Prints information about the given package(s)");
 	eprintln!("\tinstall <package...>: Installs the given package(s)");
-	eprintln!("\tupdate: Synchronizes packets informations from remote");
+	eprintln!("\tupdate: Synchronizes packets information from remote");
 	eprintln!(
 		"\tupgrade [package...]: Upgrades the given package(s). If no package is specified, \
 the package manager updates every packages that are not up to date"

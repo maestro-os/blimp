@@ -146,7 +146,7 @@ pub async fn install(
 		println!("Downloading packages...");
 		let mut futures = Vec::new();
 
-		// TODO download biggest packets first (sort_unstable by decreasing size)
+		// TODO download biggest packages first (sort_unstable by decreasing size)
 		for (pkg, repo) in &total_packages {
 			if repo.is_in_cache(pkg.get_name(), pkg.get_version()) {
 				println!("`{}` is in cache.", pkg.get_name());
