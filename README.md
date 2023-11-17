@@ -76,7 +76,7 @@ blimp
 
 
 
-## Blimp-builder
+## Package builder
 
 The general usage of the command is:
 
@@ -86,7 +86,7 @@ blimp-builder <package descriptor> <output repository>
 
 The command builds the package according to the descriptor, then writes the result in the given output repository.
 
-TODO: description of the structure of package descriptors and output packages
+> **Note**: the structure of package descriptors and output packages is not yet documented as they are subject to changes
 
 
 
@@ -94,16 +94,20 @@ TODO: description of the structure of package descriptors and output packages
 
 Cross compilation is required when building package for a system with a different target triplet than the current system.
 
-To cross compile, you first need to build a [toolchain](TODO).
+To cross compile, you first need to build a [toolchain](https://github.com/llenotre/gcc_maestro).
+
+The target triplet can be specified with the `TARGET` environment variable. Example:
+
+```sh
+export TARGET="i686-unknown-linux-musl"
+```
+
+If not specified, the target default to `i686-unknown-linux-musl`.
+
+To cross compile for Maestro, **Linux** targets with **musl** should be used, since Maestro is Linux-compatible.
 
 Then, run the following command to set environment variables for your current shell:
 
 ```sh
 TOOLCHAIN=<path to the toolchain> source cross_compile_env.sh
 ```
-
-
-
-# Blimp-server
-
-TODO
