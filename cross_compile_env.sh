@@ -6,10 +6,10 @@ if [ -z $TARGET ]; then
   export TARGET=i686-unknown-linux-musl
 fi
 
-export CC="clang"
-export CFLAGS="-target $TARGET --sysroot $TOOLCHAIN -I$TOOLCHAIN/usr/include -I$TOOLCHAIN/include"
+export CC="$TOOLCHAIN/bin/clang"
+export LD="$TOOLCHAIN/bin/ld.lld"
 
-export LD=ld.lld
-export LDFLAGS="-target $TARGET --sysroot $TOOLCHAIN -L$TOOLCHAIN/usr/lib -L$TOOLCHAIN/lib -fuse-ld=lld --rtlib=compiler-rt"
+export CFLAGS="-target $TARGET --sysroot $TOOLCHAIN -I$TOOLCHAIN/usr/include -I$TOOLCHAIN/include -fuse-ld=$LD --rtlib=compiler-rt"
+export LDFLAGS="-target $TARGET --sysroot $TOOLCHAIN -L$TOOLCHAIN/usr/lib -L$TOOLCHAIN/lib -fuse-ld=$LD --rtlib=compiler-rt"
 
-export RUSTFLAGS="-L$TOOLCHAIN/usr/lib -L$TOOLCHAIN/lib -Clink-arg=-fuse-ld=lld -Clinker=clang -Clink-arg=--rtlib=compiler-rt"
+export RUSTFLAGS="-L$TOOLCHAIN/usr/lib -L$TOOLCHAIN/lib -Clinker=$LD -Clink-arg=-fuse-ld=$LD -Clink-arg=--rtlib=compiler-rt"
