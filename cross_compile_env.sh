@@ -9,7 +9,7 @@ fi
 export CC="$TOOLCHAIN/bin/clang"
 export LD="$TOOLCHAIN/bin/ld.lld"
 
-export CFLAGS="-target $TARGET --sysroot $TOOLCHAIN -I$TOOLCHAIN/usr/include -I$TOOLCHAIN/include -fuse-ld=$LD --rtlib=compiler-rt -static"
-export LDFLAGS="-target $TARGET --sysroot $TOOLCHAIN -L$TOOLCHAIN/usr/lib -L$TOOLCHAIN/lib -fuse-ld=$LD --rtlib=compiler-rt -static"
+export CFLAGS="-target $TARGET --sysroot $TOOLCHAIN -I$TOOLCHAIN/usr/include -I$TOOLCHAIN/include -fuse-ld=$LD --rtlib=compiler-rt -Wno-unused-command-line-argument -static"
+export LDFLAGS="-target $TARGET --sysroot $TOOLCHAIN -L$TOOLCHAIN/usr/lib -L$TOOLCHAIN/lib -fuse-ld=$LD --rtlib=compiler-rt -Wno-unused-command-line-argument -static "
 
 export RUSTFLAGS="-L$TOOLCHAIN/usr/lib -L$TOOLCHAIN/lib -Clinker=$LD"
