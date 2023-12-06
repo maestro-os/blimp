@@ -6,7 +6,6 @@ use anyhow::bail;
 use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;
-use std::ffi::OsString;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -108,8 +107,8 @@ this feature enabled"
 			} => {
 				let dest_path = util::concat_paths(build_dir, location);
 
-				let mut cmd = Command::new("git")
-					.arg("clone")
+				let mut cmd = Command::new("git");
+				cmd.arg("clone")
 					// Only keep the last commit
 					.arg("--depth")
 					.arg("1")
