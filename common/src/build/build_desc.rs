@@ -37,6 +37,8 @@ pub enum Source {
 
 		/// The URL to the Git repository.
 		git_url: String,
+		/// The branch to clone from. If not specified, the default branch is used.
+		branch: Option<String>,
 	},
 
 	/// Copying from a local path.
@@ -102,19 +104,23 @@ this feature enabled"
 				location,
 
 				git_url,
+				branch,
 			} => {
 				let dest_path = util::concat_paths(build_dir, location);
 
-				let status = Command::new("git")
-					.args([
-						OsString::from("clone"),
-						OsString::from(git_url),
-						dest_path.into(),
-					])
-					.status()?;
-
+				let mut cmd = Command::new("git")
+					.arg("clone")
+					// Only keep the last commit
+					.arg("--depth")
+					.arg("1")
+					.arg("--single-branch");
+				if let Some(branch) = branch {
+					cmd.arg("-b");
+					cmd.arg(branch);
+				}
+				let status = cmd.arg(git_url).arg(dest_path).status()?;
 				if !status.success() {
-					bail!("Cloning `{}` failed", git_url);
+					bail!("Cloning `{git_url}` failed");
 				}
 			}
 

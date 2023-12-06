@@ -38,16 +38,15 @@ pub async fn install(
 	for name in names {
 		let pkg = repository::get_package_with_constraint(&repos, name, None)?;
 		let Some((repo, pkg)) = pkg else {
-            eprintln!("Package `{}` not found!", name);
-            failed = true;
-            continue;
-        };
+			eprintln!("Package `{name}` not found!");
+			failed = true;
+			continue;
+		};
 		packages.insert(pkg, repo);
 
 		if let Some(installed) = installed.get(name) {
 			println!(
-				"Package `{}` version `{}` is already installed. Reinstalling",
-				name,
+				"Package `{name}` version `{}` is already installed. Reinstalling",
 				installed.desc.get_version()
 			);
 		}
@@ -111,7 +110,7 @@ pub async fn install(
 			let version = pkg.get_version();
 
 			match repo.get_package(name, version)? {
-				Some(_) => println!("\t- {} ({}) - cached", name, version),
+				Some(_) => println!("\t- {name} ({version}) - cached"),
 
 				None => {
 					let remote = repo.get_remote().unwrap();
@@ -120,7 +119,7 @@ pub async fn install(
 					let size = remote.get_size(pkg).await?;
 					total_size += size;
 
-					println!("\t- {} ({}) - download size: {}", name, version, size);
+					println!("\t- {name} ({version}) - download size: {size}");
 				}
 			}
 		}
@@ -175,7 +174,7 @@ pub async fn install(
 		for (name, version, f) in futures {
 			match f.await {
 				Ok(()) => continue,
-				Err(e) => eprintln!("Failed to download `{}` version `{}`: {}", name, version, e),
+				Err(e) => eprintln!("Failed to download `{name}` version `{version}`: {e}"),
 			}
 		}
 		if failed {

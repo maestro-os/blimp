@@ -87,20 +87,18 @@ impl Repository {
 				let name = ent.file_name().to_str()?.to_owned();
 				let ent_path = self.path.join(name);
 
-				let iter = fs::read_dir(&ent_path)
-					.ok()?
-					.filter_map(move |ent| {
-						let ent = ent.ok()?;
-						if !ent.file_type().ok()?.is_dir() {
-							return None;
-						}
+				let iter = fs::read_dir(&ent_path).ok()?.filter_map(move |ent| {
+					let ent = ent.ok()?;
+					if !ent.file_type().ok()?.is_dir() {
+						return None;
+					}
 
-						let ent_name = ent.file_name().to_str()?.to_owned();
-						let version = Version::try_from(ent_name.as_ref()).ok()?;
+					let ent_name = ent.file_name().to_str()?.to_owned();
+					let version = Version::try_from(ent_name.as_ref()).ok()?;
 
-						let ent_path = ent_path.join(version.to_string());
-						Package::load(ent_path).transpose()
-					});
+					let ent_path = ent_path.join(version.to_string());
+					Package::load(ent_path).transpose()
+				});
 				Some(iter)
 			})
 			.flatten()
