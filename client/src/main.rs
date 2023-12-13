@@ -266,19 +266,18 @@ fn main_(sysroot: PathBuf, local_repos: &[PathBuf]) -> Result<bool> {
 }
 
 fn main() {
-	// Getting the sysroot
-	let sysroot = env::var("SYSROOT")
+	let sysroot = env::var_os("SYSROOT")
 		.map(PathBuf::from)
 		.unwrap_or(PathBuf::from("/"));
-	let local_repos = env::var("LOCAL_REPO")
+	let local_repos: Vec<PathBuf> = env::var("LOCAL_REPO") // TODO var_os
 		.map(|s| s.split(':').map(PathBuf::from).collect())
-		.unwrap_or(vec![]);
+		.unwrap_or_default();
 
 	match main_(sysroot, &local_repos) {
 		Ok(false) => exit(1),
 
 		Err(e) => {
-			eprintln!("error: {}", e);
+			eprintln!("error: {e}");
 			exit(1);
 		}
 

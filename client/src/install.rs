@@ -6,7 +6,6 @@ use anyhow::Result;
 use common::package::Package;
 use common::repository;
 use common::repository::Repository;
-use common::util;
 use common::Environment;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -125,7 +124,7 @@ pub async fn install(
 		}
 
 		print!("Total download size: ");
-		util::print_size(total_size);
+		common::util::print_size(total_size);
 		println!();
 	}
 	#[cfg(not(feature = "network"))]

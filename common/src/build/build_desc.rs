@@ -75,11 +75,11 @@ impl Source {
 			} => {
 				let metadata = fs::metadata(path)?;
 				if metadata.is_dir() {
-					util::recursive_copy(&path, &dest_path)?;
+					util::recursive_copy(path, &dest_path)?;
 				} else {
 					// TODO uncompress only if it is an actual archive
 					// Uncompress tarball
-					util::uncompress(&path, &dest_path, self.unwrap)?;
+					util::uncompress(path, &dest_path, self.unwrap)?;
 				}
 			}
 
