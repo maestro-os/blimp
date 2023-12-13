@@ -83,11 +83,9 @@ impl BuildProcess {
 				tokio::spawn(async move { s.fetch(&build_dir).await })
 			})
 			.collect::<Vec<_>>();
-
 		for f in futures {
 			f.await??;
 		}
-
 		Ok(())
 	}
 

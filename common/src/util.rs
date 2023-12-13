@@ -20,12 +20,13 @@ use tar::Archive;
 use xz2::read::XzDecoder;
 
 // TODO Add a maximum try count
+// FIXME: infinite loop if the permission is denied, for example
 /// Creates a temporary directory. The function returns the path to the directory.
 pub fn create_tmp_dir() -> io::Result<PathBuf> {
 	let mut i = 0;
 
 	loop {
-		let path = PathBuf::from(format!("/tmp/blimp-{}", i));
+		let path = PathBuf::from(format!("/tmp/blimp-{i}"));
 
 		if fs::create_dir(&path).is_ok() {
 			return Ok(path);
@@ -36,12 +37,13 @@ pub fn create_tmp_dir() -> io::Result<PathBuf> {
 }
 
 // TODO Add a maximum try count
+// FIXME: infinite loop if the permission is denied, for example
 /// Creates a temporary file. The function returns the path to the file and the file itself.
 pub fn create_tmp_file() -> io::Result<(PathBuf, File)> {
 	let mut i = 0;
 
 	loop {
-		let path = PathBuf::from(format!("/tmp/blimp-{}", i));
+		let path = PathBuf::from(format!("/tmp/blimp-{i}"));
 
 		let result = OpenOptions::new()
 			.read(true)
@@ -61,6 +63,7 @@ pub fn create_tmp_file() -> io::Result<(PathBuf, File)> {
 ///
 /// `unwrap` tells whether the tarball shall be unwrapped.
 fn uncompress_<R: Read>(mut archive: Archive<R>, dest: &Path, unwrap: bool) -> io::Result<()> {
+	// TODO undo on fail?
 	if unwrap {
 		for entry in archive.entries()? {
 			let mut entry = entry?;
@@ -89,7 +92,7 @@ fn uncompress_<R: Read>(mut archive: Archive<R>, dest: &Path, unwrap: bool) -> i
 /// If the tarball contains directories at the root, the unwrap operation unwraps their content
 /// instead of the directories themselves.
 pub fn uncompress(src: &Path, dest: &Path, unwrap: bool) -> io::Result<()> {
-	// Trying to uncompress .tar.gz
+	// Try to uncompress .tar.gz
 	{
 		let file = File::open(src)?;
 		let tar = GzDecoder::new(file);
@@ -100,7 +103,7 @@ pub fn uncompress(src: &Path, dest: &Path, unwrap: bool) -> io::Result<()> {
 		}
 	}
 
-	// Trying to uncompress .tar.xz
+	// Try to uncompress .tar.xz
 	{
 		let file = File::open(src)?;
 		let tar = XzDecoder::new(file);
@@ -111,7 +114,7 @@ pub fn uncompress(src: &Path, dest: &Path, unwrap: bool) -> io::Result<()> {
 		}
 	}
 
-	// Trying to uncompress .tar.bz2
+	// Try to uncompress .tar.bz2
 	{
 		let file = File::open(src)?;
 		let tar = BzDecoder::new(file);
@@ -131,7 +134,7 @@ pub fn uncompress_wrap<T, F: FnOnce(&Path) -> T>(archive: &Path, f: F) -> io::Re
 
 	let v = f(&tmp_dir);
 
-	// Removing temporary directory
+	// Remove temporary directory
 	fs::remove_dir_all(&tmp_dir)?;
 
 	Ok(v)
@@ -170,6 +173,7 @@ pub fn recursive_copy(src: &Path, dst: &Path) -> io::Result<()> {
 		let to = dst.join(entry.file_name());
 
 		if file_type.is_dir() {
+			// TODO Set timestamps, permissions and owner
 			fs::create_dir_all(&to)?;
 			recursive_copy(&entry.path(), &to)?;
 		} else if file_type.is_symlink() {
@@ -182,11 +186,10 @@ pub fn recursive_copy(src: &Path, dst: &Path) -> io::Result<()> {
 			fs::copy(entry.path(), &to)?;
 		}
 	}
-
 	Ok(())
 }
 
-// TODO cleanup (reuse the version in maestro-utils?)
+// TODO delete (reuse the version in maestro-utils)
 /// Prints the given size in bytes into a human-readable form.
 pub fn print_size(mut size: u64) {
 	let mut level = 0;
@@ -210,13 +213,14 @@ pub fn print_size(mut size: u64) {
 	print!("{size} {suffix}");
 }
 
+// TODO: rework to allow deserialize from structs with lifetimes (currently unefficient)
 /// Reads a JSON file.
 pub fn read_json<T: for<'a> Deserialize<'a>>(file: &Path) -> io::Result<T> {
 	let file = File::open(file)?;
 	let reader = BufReader::new(file);
 
 	serde_json::from_reader(reader).map_err(|e| {
-		let msg = format!("JSON deserializing failed: {}", e);
+		let msg = format!("JSON deserializing failed: {e}");
 		io::Error::new(io::ErrorKind::Other, msg)
 	})
 }
@@ -227,20 +231,17 @@ pub fn write_json<T: Serialize>(file: &Path, data: &T) -> io::Result<()> {
 	let writer = BufWriter::new(file);
 
 	serde_json::to_writer_pretty(writer, &data).map_err(|e| {
-		let msg = format!("JSON serializing failed: {}", e);
+		let msg = format!("JSON serializing failed: {e}");
 		io::Error::new(io::ErrorKind::Other, msg)
 	})
 }
 
 /// Concatenates the given paths.
 ///
-/// If the second path begins at the root of the filesystem, this doesn't ignore the first path,
-/// as opposed to the `join` function available in `Path`.
+/// This function is different from the [`Path::join`] in the way that it does not suppress the
+/// first path if the second is absolute.
+///
+/// TODO: example
 pub fn concat_paths(path0: &Path, path1: &Path) -> PathBuf {
-	let path1 = match path1.to_str() {
-		Some(path1_str) if path1_str.starts_with('/') => Path::new(&path1_str[1..]),
-		_ => path1,
-	};
-
-	path0.join(path1)
+	path0.join(path1.strip_prefix("/").unwrap_or(path1))
 }
