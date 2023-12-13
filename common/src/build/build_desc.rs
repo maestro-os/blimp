@@ -1,11 +1,13 @@
 //! A build descriptor defines how to build a package.
 //!
-//! A build descriptor contains general informations about the package, but also sources for files used for building the package.
+//! A build descriptor contains general informations about the package, but also sources for files
+//! used for building the package.
 //!
 //! Source files may come from different sources. See [`SourceInner`].
 //!
 //! A tarball is a compressed file containing sources for a package.
-//! Tarballs may contain a single directory in which all files are present. "Unwrapping" is the action of moving all the files out of this directory while decompressing the archive.
+//! Tarballs may contain a single directory in which all files are present. "Unwrapping" is the
+//! action of moving all the files out of this directory while decompressing the archive.
 
 use crate::package::Package;
 use crate::util;

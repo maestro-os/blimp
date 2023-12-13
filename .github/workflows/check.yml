@@ -2,32 +2,37 @@ name: Check
 on: push
 jobs:
   format:
-    runs-on: [linux]
+    runs-on: [self-hosted, linux]
     steps:
       - uses: actions/checkout@v3
-      - run: cargo fmt --check
+      - run: cargo +nightly fmt --check
+  doc:
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v3
+      - run: cargo +nightly doc
   offline:
-    runs-on: [linux]
+    runs-on: [self-hosted, linux]
     steps:
       - uses: actions/checkout@v3
       - name: Check debug compilation
-        run: cargo build
+        run: cargo +nightly build
       - name: Check release compilation
-        run: cargo build --release
+        run: cargo +nightly build --release
       - name: Clippy
-        run: cargo clippy
+        run: cargo +nightly clippy
       - name: Unit tests
-        run: cargo test
+        run: cargo +nightly test
   online:
-    runs-on: [linux]
+    runs-on: [self-hosted, linux]
     needs: offline
     steps:
       - uses: actions/checkout@v3
       - name: Check debug compilation
-        run: cargo build --features network
+        run: cargo +nightly build --features network
       - name: Check release compilation
-        run: cargo build --release --features network
+        run: cargo +nightly build --release --features network
       - name: Clippy
-        run: cargo clippy --features network
+        run: cargo +nightly clippy --features network
       - name: Unit tests
-        run: cargo test --features network
+        run: cargo +nightly test --features network
