@@ -59,10 +59,10 @@ pub fn create_tmp_file() -> io::Result<(PathBuf, File)> {
 	}
 }
 
-/// TODO doc
-///
-/// `unwrap` tells whether the tarball shall be unwrapped.
 fn uncompress_<R: Read>(mut archive: Archive<R>, dest: &Path, unwrap: bool) -> io::Result<()> {
+	archive.set_overwrite(true);
+	archive.set_preserve_permissions(true);
+
 	// TODO undo on fail?
 	if unwrap {
 		for entry in archive.entries()? {
@@ -142,7 +142,10 @@ pub fn uncompress_wrap<T, F: FnOnce(&Path) -> T>(archive: &Path, f: F) -> io::Re
 
 /// Reads the package archive at the given path and returns an instance for it.
 pub fn read_package_archive(path: &Path) -> io::Result<Archive<GzDecoder<File>>> {
-	Ok(Archive::new(GzDecoder::new(File::open(path)?)))
+	let mut archive = Archive::new(GzDecoder::new(File::open(path)?));
+	archive.set_overwrite(true);
+	archive.set_preserve_permissions(true);
+	Ok(archive)
 }
 
 /// Run the hook at the given path.
