@@ -4,17 +4,17 @@ jobs:
   format:
     runs-on: [self-hosted, linux]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: cargo +nightly fmt --check
   doc:
     runs-on: [self-hosted, linux]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: cargo +nightly doc
   offline:
     runs-on: [self-hosted, linux]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Check debug compilation
         run: cargo +nightly build
       - name: Check release compilation
@@ -27,7 +27,6 @@ jobs:
     runs-on: [self-hosted, linux]
     needs: offline
     steps:
-      - uses: actions/checkout@v3
       - name: Check debug compilation
         run: cargo +nightly build --features network
       - name: Check release compilation
