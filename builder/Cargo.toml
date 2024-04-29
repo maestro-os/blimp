@@ -4,11 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.71"
+anyhow = "1.0.82"
 common = { path = "../common" }
-flate2 = "1.0.22"
-tar = "0.4.38"
-tokio = "1.28.2"
+flate2 = "1.0.30"
+tar = "0.4.40"
+tokio = "1.37.0"
 
 [features]
 default = []
