@@ -23,10 +23,8 @@ use std::sync::Arc;
 pub struct BuildProcess {
 	/// The path to the directory containing information to build the package.
 	input_path: PathBuf,
-
 	/// The build descriptor.
 	build_desc: BuildDescriptor,
-
 	/// The path to the build directory.
 	build_dir: PathBuf,
 	/// The path to the fake system root at which the package is "installed".
@@ -40,12 +38,9 @@ impl BuildProcess {
 	pub fn new(input_path: PathBuf) -> io::Result<Self> {
 		let build_desc_path = input_path.join("package.json");
 		let build_desc = common::util::read_json::<BuildDescriptor>(&build_desc_path)?;
-
 		Ok(Self {
 			input_path,
-
 			build_desc,
-
 			build_dir: common::util::create_tmp_dir()?,
 			sysroot: common::util::create_tmp_dir()?,
 		})
@@ -93,11 +88,12 @@ impl BuildProcess {
 	/// - `target` is the triplet of the target machine.
 	///
 	/// On success, the function returns `true`.
-	pub fn build(&self, jobs: usize, host: &str, target: &str) -> io::Result<bool> {
+	pub fn build(&self, jobs: usize, build: &str, host: &str, target: &str) -> io::Result<bool> {
 		let absolute_input = fs::canonicalize(&self.input_path)?;
 		let hook_path = absolute_input.join("build-hook");
 		Command::new(hook_path)
 			.env("DESC_PATH", absolute_input)
+			.env("BUILD", build)
 			.env("HOST", host)
 			.env("TARGET", target)
 			.env("SYSROOT", &self.sysroot)

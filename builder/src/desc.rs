@@ -95,6 +95,7 @@ impl Source {
 				// Download
 				let (path, _) = common::util::create_tmp_file()?;
 				let mut download_task = DownloadTask::new(url, &path).await?;
+				// TODO progress bar
 				while download_task.next().await? {}
 
 				// TODO check integrity with hash if specified

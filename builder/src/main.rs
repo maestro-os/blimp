@@ -5,8 +5,8 @@ mod desc;
 mod util;
 
 use crate::build::BuildProcess;
-use crate::util::{get_host_triplet, get_jobs_count};
-use anyhow::anyhow;
+use crate::util::{get_build_triplet, get_jobs_count};
+use anyhow::{anyhow, bail};
 use anyhow::Result;
 use common::repository::Repository;
 use std::env;
@@ -24,32 +24,37 @@ fn print_usage(bin: &str) {
 	);
 	eprintln!();
 	eprintln!("USAGE:");
-	eprintln!("\t{bin} (--toolchain|<FROM>) <TO>");
+	eprintln!("\t{bin} <FROM> <TO>");
 	eprintln!();
 	eprintln!("FROM is the path to the package's build files");
 	eprintln!("TO is the repository in which the output package will be placed");
 	eprintln!();
 	eprintln!("Builds packages according to their descriptor, then writes them into the repository at the given path.");
 	eprintln!();
-	eprintln!("The building process can be debugged using the BLIMP_DEBUG environment variable, allowing to keep build files for troubleshooting");
-	eprintln!();
 	eprintln!("ENVIRONMENT VARIABLES:");
 	eprintln!("\tJOBS: Specifies the recommended number of jobs to build the package");
-	eprintln!("\tTARGET: The target for which the package is built");
-	eprintln!("\tBLIMP_DEBUG: If set to `true`, the builder is set to debug mode");
+	eprintln!("\tBUILD: Target triplet of the machine on which the package is built");
+	eprintln!("\tHOST: Target triplet for which the package is built");
+	eprintln!("\tTARGET: Target triplet for which the package builds (this is useful when cross-compiling compilers)");
+	eprintln!("\tBLIMP_DEBUG: If set to `true`, build files are kept for troubleshooting purpose");
+	eprintln!();
+	eprintln!("All environment variable are optional");
 }
 
 /// Builds the package.
 ///
 /// `from` and `to` correspond to the command line arguments.
 fn build(from: PathBuf, to: PathBuf) -> Result<()> {
+	// Read environment
+	let jobs = get_jobs_count()?;
+	let build = get_build_triplet()?;
+	let host = env::var("HOST");
+	let host = host.as_deref().unwrap_or(build.as_str());
+	let target = env::var("TARGET");
+	let target = target.as_deref().unwrap_or(host);
 	let debug = env::var("BLIMP_DEBUG")
 		.map(|s| s == "true")
 		.unwrap_or(false);
-	let jobs = get_jobs_count()?;
-	let host = get_host_triplet()?;
-	let target = env::var("TARGET");
-	let target = target.as_deref().unwrap_or(host.as_str());
 	println!("[INFO] Jobs: {jobs}; Host: {host}; Target: {target}");
 	let build_process = BuildProcess::new(from)?;
 	println!("[INFO] Fetch sources...");
@@ -59,11 +64,10 @@ fn build(from: PathBuf, to: PathBuf) -> Result<()> {
 		.map_err(|e| anyhow!("Cannot fetch sources: {e}"))?;
 	println!("[INFO] Compilation...");
 	let success = build_process
-		.build(jobs, &host, &target)
+		.build(jobs, &build, host, target)
 		.map_err(|e| anyhow!("Cannot build package: {e}"))?;
 	if !success {
-		eprintln!("Package build failed!");
-		exit(1);
+		bail!("Package build failed!");
 	}
 	println!("[INFO] Prepare repository at `{}`...", to.display());
 	// TODO Move to separate function
