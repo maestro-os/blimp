@@ -61,7 +61,7 @@ pub struct Source {
 }
 
 impl Source {
-	/// Fetches files from the source and uncompresses them if necessary.
+	/// Fetches files from the source and decompress them if necessary.
 	///
 	/// Files are placed into the build directory `build_dir` according to the specified location.
 	pub async fn fetch(&self, build_dir: &Path) -> Result<()> {
@@ -75,9 +75,8 @@ impl Source {
 				if metadata.is_dir() {
 					common::util::recursive_copy(path, &dest_path)?;
 				} else {
-					// TODO uncompress only if it is an actual archive
-					// Uncompress tarball
-					common::util::uncompress(path, &dest_path, self.unwrap)?;
+					// TODO decompress only if it is an actual archive
+					common::util::decompress(path, &dest_path, self.unwrap)?;
 				}
 			}
 
@@ -97,12 +96,8 @@ impl Source {
 				let mut download_task = DownloadTask::new(url, &path).await?;
 				// TODO progress bar
 				while download_task.next().await? {}
-
 				// TODO check integrity with hash if specified
-
-				// Uncompress the archive
-				common::util::uncompress(&path, &dest_path, self.unwrap)?;
-
+				common::util::decompress(&path, &dest_path, self.unwrap)?;
 				// TODO remove archive?
 			}
 

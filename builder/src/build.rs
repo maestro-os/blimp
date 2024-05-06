@@ -114,7 +114,6 @@ impl BuildProcess {
 	/// `output_path` is the path at which the package's archive will be created.
 	pub fn create_archive(&self, output_path: &Path) -> io::Result<()> {
 		let build_desc_path = self.input_path.join("package.json");
-
 		let tar_gz = File::create(output_path)?;
 		let enc = GzEncoder::new(tar_gz, Compression::default());
 		let mut tar = tar::Builder::new(enc);
@@ -122,7 +121,6 @@ impl BuildProcess {
 		tar.append_path_with_name(build_desc_path, "package.json")?;
 		tar.append_dir_all("data", &self.sysroot)?;
 		// TODO add install/update/remove hooks
-
 		tar.finish()
 	}
 

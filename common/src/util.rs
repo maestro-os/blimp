@@ -12,9 +12,8 @@ use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Read;
 use std::os::unix;
-use std::path::Component::Normal;
-use std::path::Path;
 use std::path::PathBuf;
+use std::path::{Component, Path};
 use std::process::Command;
 use tar::Archive;
 use xz2::read::XzDecoder;
@@ -59,84 +58,57 @@ pub fn create_tmp_file() -> io::Result<(PathBuf, File)> {
 	}
 }
 
-fn uncompress_<R: Read>(mut archive: Archive<R>, dest: &Path, unwrap: bool) -> io::Result<()> {
+fn decompress_impl<R: Read>(stream: R, dest: &Path, unwrap: bool) -> io::Result<()> {
+	let mut archive = Archive::new(stream);
 	archive.set_overwrite(true);
 	archive.set_preserve_permissions(true);
-
 	// TODO undo on fail?
 	if unwrap {
 		for entry in archive.entries()? {
 			let mut entry = entry?;
-
 			let path: PathBuf = entry
 				.path()?
 				.components()
 				.skip(1)
-				.filter(|c| matches!(c, Normal(_)))
+				.filter(|c| matches!(c, Component::Normal(_)))
 				.collect();
 			let path = dest.join(path);
-
 			entry.unpack(path)?;
 		}
 	} else {
 		archive.unpack(dest)?;
 	}
-
 	Ok(())
 }
 
-/// Uncompresses the given archive file `src` to the given location `dest`.
+/// Decompresses the given archive file `src` to the given location `dest`.
 ///
 /// `unwrap` tells whether the tarball shall be unwrapped.
 ///
 /// If the tarball contains directories at the root, the unwrap operation unwraps their content
 /// instead of the directories themselves.
-pub fn uncompress(src: &Path, dest: &Path, unwrap: bool) -> io::Result<()> {
-	// Try to uncompress .tar.gz
-	{
-		let file = File::open(src)?;
-		let tar = GzDecoder::new(file);
-		let archive = Archive::new(tar);
-
-		if uncompress_(archive, dest, unwrap).is_ok() {
-			return Ok(());
-		}
-	}
-
-	// Try to uncompress .tar.xz
-	{
-		let file = File::open(src)?;
-		let tar = XzDecoder::new(file);
-		let archive = Archive::new(tar);
-
-		if uncompress_(archive, dest, unwrap).is_ok() {
-			return Ok(());
-		}
-	}
-
-	// Try to uncompress .tar.bz2
-	{
-		let file = File::open(src)?;
-		let tar = BzDecoder::new(file);
-		let archive = Archive::new(tar);
-
-		uncompress_(archive, dest, unwrap)
+pub fn decompress(src: &Path, dest: &Path, unwrap: bool) -> io::Result<()> {
+	let file_type = infer::get_from_path(src)?.map(|t| t.mime_type());
+	let file = File::open(src)?;
+	match file_type {
+		Some("application/gzip") => decompress_impl(GzDecoder::new(file), dest, unwrap),
+		Some("application/x-xz") => decompress_impl(XzDecoder::new(file), dest, unwrap),
+		Some("application/x-bzip2") => decompress_impl(BzDecoder::new(file), dest, unwrap),
+		_ => Err(io::Error::new(
+			io::ErrorKind::Other,
+			"Invalid or unsupported archive format",
+		)),
 	}
 }
 
-/// Uncompresses the given .tar.gz file `archive` into a temporary directory, executes the given
+/// Decompresses the given .tar.gz file `archive` into a temporary directory, executes the given
 /// function `f` with the path to the temporary directory as argument, then removes the directory
 /// and returns the result of the call to `f`.
-pub fn uncompress_wrap<T, F: FnOnce(&Path) -> T>(archive: &Path, f: F) -> io::Result<T> {
-	// Uncompressing
+pub fn decompress_wrap<T, F: FnOnce(&Path) -> T>(archive: &Path, f: F) -> io::Result<T> {
 	let tmp_dir = create_tmp_dir()?;
-	uncompress(archive, &tmp_dir, false)?;
-
+	decompress(archive, &tmp_dir, false)?;
 	let v = f(&tmp_dir);
-
-	// Remove temporary directory
 	fs::remove_dir_all(&tmp_dir)?;
-
 	Ok(v)
 }
 
@@ -160,11 +132,9 @@ pub fn run_hook(hook_path: &Path, sysroot: &Path) -> io::Result<bool> {
 	if !Path::new(hook_path).exists() {
 		return Ok(true);
 	}
-
 	let status = Command::new(hook_path)
 		.env("SYSROOT", sysroot.as_os_str())
 		.status()?;
-
 	Ok(status.success())
 }
 
@@ -221,22 +191,14 @@ pub fn print_size(mut size: u64) {
 pub fn read_json<T: for<'a> Deserialize<'a>>(file: &Path) -> io::Result<T> {
 	let file = File::open(file)?;
 	let reader = BufReader::new(file);
-
-	serde_json::from_reader(reader).map_err(|e| {
-		let msg = format!("JSON deserializing failed: {e}");
-		io::Error::new(io::ErrorKind::Other, msg)
-	})
+	Ok(serde_json::from_reader(reader)?)
 }
 
 /// Writes a JSON file.
 pub fn write_json<T: Serialize>(file: &Path, data: &T) -> io::Result<()> {
 	let file = File::create(file)?;
 	let writer = BufWriter::new(file);
-
-	serde_json::to_writer_pretty(writer, &data).map_err(|e| {
-		let msg = format!("JSON serializing failed: {e}");
-		io::Error::new(io::ErrorKind::Other, msg)
-	})
+	Ok(serde_json::to_writer_pretty(writer, &data)?)
 }
 
 /// Concatenates the given paths.

@@ -6,8 +6,8 @@ mod util;
 
 use crate::build::BuildProcess;
 use crate::util::{get_build_triplet, get_jobs_count};
-use anyhow::{anyhow, bail};
 use anyhow::Result;
+use anyhow::{anyhow, bail};
 use common::repository::Repository;
 use std::env;
 use std::fs;
