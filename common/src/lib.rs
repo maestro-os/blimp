@@ -2,7 +2,6 @@
 
 #![feature(io_error_more)]
 
-pub mod build;
 pub mod lockfile;
 pub mod package;
 pub mod repository;

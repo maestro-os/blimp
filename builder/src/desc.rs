@@ -1,6 +1,6 @@
 //! A build descriptor defines how to build a package.
 //!
-//! A build descriptor contains general informations about the package, but also sources for files
+//! A build descriptor contains general information about the package, but also sources for files
 //! used for building the package.
 //!
 //! Source files may come from different sources. See [`SourceInner`].
@@ -9,9 +9,8 @@
 //! Tarballs may contain a single directory in which all files are present. "Unwrapping" is the
 //! action of moving all the files out of this directory while decompressing the archive.
 
-use crate::package::Package;
-use crate::util;
 use anyhow::Result;
+use common::package::Package;
 use serde::Deserialize;
 use serde::Serialize;
 use std::fs;
@@ -19,7 +18,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 #[cfg(feature = "network")]
-use crate::download::DownloadTask;
+use common::download::DownloadTask;
 
 // TODO add an option to allow fetching a tarball without unwrapping it?
 
@@ -27,7 +26,7 @@ use crate::download::DownloadTask;
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum SourceInner {
-	/// Download a tarball from an URL.
+	/// Download a tarball from a URL.
 	Url {
 		/// The URL of the sources.
 		url: String,
@@ -54,10 +53,9 @@ pub struct Source {
 	/// Source-type specific fields.
 	#[serde(flatten)]
 	inner: SourceInner,
-
 	/// The location relative to the build directory where the source files will be placed.
 	location: PathBuf,
-	/// Tells whether the files must unwrapped.
+	/// Tells whether the files must be unwrapped.
 	#[serde(default)]
 	unwrap: bool,
 }
@@ -67,7 +65,7 @@ impl Source {
 	///
 	/// Files are placed into the build directory `build_dir` according to the specified location.
 	pub async fn fetch(&self, build_dir: &Path) -> Result<()> {
-		let dest_path = util::concat_paths(build_dir, &self.location);
+		let dest_path = common::util::concat_paths(build_dir, &self.location);
 
 		match &self.inner {
 			SourceInner::Local {
@@ -75,11 +73,11 @@ impl Source {
 			} => {
 				let metadata = fs::metadata(path)?;
 				if metadata.is_dir() {
-					util::recursive_copy(path, &dest_path)?;
+					common::util::recursive_copy(path, &dest_path)?;
 				} else {
 					// TODO uncompress only if it is an actual archive
 					// Uncompress tarball
-					util::uncompress(path, &dest_path, self.unwrap)?;
+					common::util::uncompress(path, &dest_path, self.unwrap)?;
 				}
 			}
 
@@ -95,14 +93,14 @@ impl Source {
 				url,
 			} => {
 				// Download
-				let (path, _) = util::create_tmp_file()?;
+				let (path, _) = common::util::create_tmp_file()?;
 				let mut download_task = DownloadTask::new(url, &path).await?;
 				while download_task.next().await? {}
 
 				// TODO check integrity with hash if specified
 
 				// Uncompress the archive
-				util::uncompress(&path, &dest_path, self.unwrap)?;
+				common::util::uncompress(&path, &dest_path, self.unwrap)?;
 
 				// TODO remove archive?
 			}
