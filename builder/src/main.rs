@@ -55,7 +55,7 @@ fn build(from: PathBuf, to: PathBuf) -> Result<()> {
 	let debug = env::var("BLIMP_DEBUG")
 		.map(|s| s == "true")
 		.unwrap_or(false);
-	println!("[INFO] Jobs: {jobs}; Host: {host}; Target: {target}");
+	println!("[INFO] Jobs: {jobs}; Build: {build}; Host: {host}; Target: {target}");
 	let build_process = BuildProcess::new(from)?;
 	println!("[INFO] Fetch sources...");
 	// TODO Progress bars

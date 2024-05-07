@@ -45,16 +45,12 @@ impl Environment {
 	///
 	/// The function tries to lock the environment so that no other instance can access it at the
 	/// same time. If already locked, the function returns `None`.
-	pub fn with_root(sysroot: PathBuf) -> Option<Self> {
+	pub fn with_root(sysroot: PathBuf) -> io::Result<Option<Self>> {
 		let path = util::concat_paths(&sysroot, Path::new(LOCKFILE_PATH));
-
-		if lockfile::lock(&path) {
-			Some(Self {
-				sysroot,
-			})
-		} else {
-			None
-		}
+		let acquired = lockfile::lock(&path)?;
+		Ok(acquired.then_some(Self {
+			sysroot,
+		}))
 	}
 
 	/// Returns the sysroot of the current environement.

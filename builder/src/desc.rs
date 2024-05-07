@@ -20,7 +20,7 @@ use std::path::PathBuf;
 #[cfg(feature = "network")]
 use common::download::DownloadTask;
 
-// TODO add an option to allow fetching a tarball without unwrapping it?
+// TODO add an option to allow fetching a tarball without decompressing it?
 
 /// Source-type specific fields.
 #[derive(Clone, Deserialize, Serialize)]
@@ -40,14 +40,11 @@ pub enum SourceInner {
 		/// The branch to clone from. If not specified, the default branch is used.
 		branch: Option<String>,
 	},
-	/// Copy from a local path.
-	Local {
-		/// The path to the local tarball or directory.
-		path: PathBuf,
-	},
+	/// Copy from a local path to a tarball or directory.
+	Local(PathBuf),
 }
 
-/// Description of sources files, where to find them and where to places them for building.
+/// Description of sources files, where to find them and where to place them for building.
 #[derive(Clone, Deserialize, Serialize)]
 pub struct Source {
 	/// Source-type specific fields.
@@ -55,9 +52,6 @@ pub struct Source {
 	inner: SourceInner,
 	/// The location relative to the build directory where the source files will be placed.
 	location: PathBuf,
-	/// Tells whether the files must be unwrapped.
-	#[serde(default)]
-	unwrap: bool,
 }
 
 impl Source {
@@ -66,26 +60,21 @@ impl Source {
 	/// Files are placed into the build directory `build_dir` according to the specified location.
 	pub async fn fetch(&self, build_dir: &Path) -> Result<()> {
 		let dest_path = common::util::concat_paths(build_dir, &self.location);
-
 		match &self.inner {
-			SourceInner::Local {
-				path,
-			} => {
+			SourceInner::Local(path) => {
 				let metadata = fs::metadata(path)?;
 				if metadata.is_dir() {
 					common::util::recursive_copy(path, &dest_path)?;
 				} else {
 					// TODO decompress only if it is an actual archive
-					common::util::decompress(path, &dest_path, self.unwrap)?;
+					common::util::decompress(path, &dest_path)?;
 				}
 			}
-
 			#[cfg(not(feature = "network"))]
 			_ => panic!("Feature `network` is not enabled! Please recompile blimp common with this feature enabled"),
 			#[cfg(feature = "network")]
 			_ => {}
 		}
-
 		#[cfg(feature = "network")]
 		match &self.inner {
 			SourceInner::Url {
@@ -97,17 +86,15 @@ impl Source {
 				// TODO progress bar
 				while download_task.next().await? {}
 				// TODO check integrity with hash if specified
-				common::util::decompress(&path, &dest_path, self.unwrap)?;
+				common::util::decompress(&path, &dest_path)?;
 				// TODO remove archive?
 			}
-
 			SourceInner::Git {
 				git_url,
 				branch,
 			} => {
 				use anyhow::bail;
 				use std::process::Command;
-
 				let mut cmd = Command::new("git");
 				cmd.arg("clone")
 					// Only keep the last commit
@@ -123,10 +110,8 @@ impl Source {
 					bail!("Cloning from `{git_url}` failed");
 				}
 			}
-
 			_ => {}
 		}
-
 		Ok(())
 	}
 }

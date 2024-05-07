@@ -13,7 +13,7 @@ use std::io::BufWriter;
 use std::io::Read;
 use std::os::unix;
 use std::path::PathBuf;
-use std::path::{Component, Path};
+use std::path::{Path};
 use std::process::Command;
 use tar::Archive;
 use xz2::read::XzDecoder;
@@ -58,42 +58,22 @@ pub fn create_tmp_file() -> io::Result<(PathBuf, File)> {
 	}
 }
 
-fn decompress_impl<R: Read>(stream: R, dest: &Path, unwrap: bool) -> io::Result<()> {
+fn decompress_impl<R: Read>(stream: R, dest: &Path) -> io::Result<()> {
 	let mut archive = Archive::new(stream);
 	archive.set_overwrite(true);
 	archive.set_preserve_permissions(true);
-	// TODO undo on fail?
-	if unwrap {
-		for entry in archive.entries()? {
-			let mut entry = entry?;
-			let path: PathBuf = entry
-				.path()?
-				.components()
-				.skip(1)
-				.filter(|c| matches!(c, Component::Normal(_)))
-				.collect();
-			let path = dest.join(path);
-			entry.unpack(path)?;
-		}
-	} else {
-		archive.unpack(dest)?;
-	}
+	archive.unpack(dest)?;
 	Ok(())
 }
 
 /// Decompresses the given archive file `src` to the given location `dest`.
-///
-/// `unwrap` tells whether the tarball shall be unwrapped.
-///
-/// If the tarball contains directories at the root, the unwrap operation unwraps their content
-/// instead of the directories themselves.
-pub fn decompress(src: &Path, dest: &Path, unwrap: bool) -> io::Result<()> {
+pub fn decompress(src: &Path, dest: &Path) -> io::Result<()> {
 	let file_type = infer::get_from_path(src)?.map(|t| t.mime_type());
 	let file = File::open(src)?;
 	match file_type {
-		Some("application/gzip") => decompress_impl(GzDecoder::new(file), dest, unwrap),
-		Some("application/x-xz") => decompress_impl(XzDecoder::new(file), dest, unwrap),
-		Some("application/x-bzip2") => decompress_impl(BzDecoder::new(file), dest, unwrap),
+		Some("application/gzip") => decompress_impl(GzDecoder::new(file), dest),
+		Some("application/x-xz") => decompress_impl(XzDecoder::new(file), dest),
+		Some("application/x-bzip2") => decompress_impl(BzDecoder::new(file), dest),
 		_ => Err(io::Error::new(
 			io::ErrorKind::Other,
 			"Invalid or unsupported archive format",
@@ -106,7 +86,7 @@ pub fn decompress(src: &Path, dest: &Path, unwrap: bool) -> io::Result<()> {
 /// and returns the result of the call to `f`.
 pub fn decompress_wrap<T, F: FnOnce(&Path) -> T>(archive: &Path, f: F) -> io::Result<T> {
 	let tmp_dir = create_tmp_dir()?;
-	decompress(archive, &tmp_dir, false)?;
+	decompress(archive, &tmp_dir)?;
 	let v = f(&tmp_dir);
 	fs::remove_dir_all(&tmp_dir)?;
 	Ok(v)
