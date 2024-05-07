@@ -1,10 +1,9 @@
-# This file contains an environment to cross-compile packages to the i686 architecture
-# The script requires the TOOLCHAIN variable to be set to the toolchain's path
+# Usage: `source env.sh`
+# `TARGET` is the target triplet for the compiler
 
-# If the target is not specified, set to default
-if [ -z $TARGET ]; then
-  export TARGET=i686-unknown-linux-musl
-fi
+TOOLCHAIN="$(pwd)/toolchain"
+
+export PATH="$TOOLCHAIN/usr/bin:$TOOLCHAIN/toolchain/bin:$PATH"
 
 export CC="clang"
 export LD="ld.lld"

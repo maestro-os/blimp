@@ -1,0 +1,17 @@
+#!/bin/bash
+
+set -e
+cd *
+
+# Compile
+./configure \
+	--build="$BUILD" \
+	--host="$HOST" \
+	--target="$TARGET" \
+	--prefix="/usr" \
+	--enable-optimize \
+	--enable-shared
+make -j${JOBS}
+
+# Install
+make DESTDIR=$SYSROOT install
