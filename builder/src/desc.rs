@@ -41,7 +41,10 @@ pub enum SourceInner {
 		branch: Option<String>,
 	},
 	/// Copy from a local path to a tarball or directory.
-	Local(PathBuf),
+	Local {
+		/// The local path.
+		path: PathBuf,
+	},
 }
 
 /// Description of sources files, where to find them and where to place them for building.
@@ -61,7 +64,7 @@ impl Source {
 	pub async fn fetch(&self, build_dir: &Path) -> Result<()> {
 		let dest_path = common::util::concat_paths(build_dir, &self.location);
 		match &self.inner {
-			SourceInner::Local(path) => {
+			SourceInner::Local { path } => {
 				let metadata = fs::metadata(path)?;
 				if metadata.is_dir() {
 					common::util::recursive_copy(path, &dest_path)?;

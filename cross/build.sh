@@ -10,8 +10,8 @@ fi
 # Prepare
 mkdir -p toolchain/repo
 PATH="$(pwd)/../target/release:$PATH"
-export SYSROOT="$(pwd)/toolchain/"
-export LOCAL_REPO="$(pwd)/toolchain/repo/"
+export SYSROOT="toolchain/"
+export LOCAL_REPO="toolchain/repo/"
 
 # binutils
 blimp-builder desc/binutils toolchain/repo/
@@ -23,4 +23,6 @@ HOST="$TARGET" blimp-builder desc/musl toolchain/repo/
 unset CC LD CFLAGS LDFLAGS RUSTFLAGS
 yes | blimp install musl
 
-# TODO clang
+# clang
+blimp-builder desc/clang toolchain/repo/
+yes | blimp install clang
