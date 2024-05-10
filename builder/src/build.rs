@@ -1,6 +1,7 @@
 //! Implementation of the package building procedure.
 
 use crate::desc::BuildDescriptor;
+use crate::WORK_DIR;
 use anyhow::Result;
 use flate2::write::GzEncoder;
 use flate2::Compression;
@@ -41,8 +42,8 @@ impl BuildProcess {
 		Ok(Self {
 			input_path,
 			build_desc,
-			build_dir: common::util::create_tmp_dir()?,
-			sysroot: common::util::create_tmp_dir()?,
+			build_dir: common::util::create_tmp_dir(Path::new(WORK_DIR))?,
+			sysroot: common::util::create_tmp_dir(Path::new(WORK_DIR))?,
 		})
 	}
 

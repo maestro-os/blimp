@@ -16,6 +16,9 @@ use std::process::exit;
 use std::str;
 use tokio::runtime::Runtime;
 
+/// The path to the work directory.
+const WORK_DIR: &str = "work/";
+
 /// Prints command line usage.
 fn print_usage(bin: &str) {
 	eprintln!(

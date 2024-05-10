@@ -2,6 +2,8 @@
 
 use bzip2::read::BzDecoder;
 use flate2::read::GzDecoder;
+use rand::distributions::Alphanumeric;
+use rand::{thread_rng, Rng};
 use serde::Deserialize;
 use serde::Serialize;
 use std::fs;
@@ -14,48 +16,45 @@ use std::io::Read;
 use std::os::unix;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
 use tar::Archive;
 use xz2::read::XzDecoder;
 
-// TODO Add a maximum try count
-// FIXME: infinite loop if the permission is denied, for example
-/// Creates a temporary directory. The function returns the path to the directory.
-pub fn create_tmp_dir() -> io::Result<PathBuf> {
-	let mut i = 0;
-
-	loop {
-		let path = PathBuf::from(format!("/tmp/blimp-{i}"));
-
-		if fs::create_dir(&path).is_ok() {
-			return Ok(path);
+fn create_tmp<T, F: Fn(&Path) -> io::Result<T>>(parent: &Path, f: F) -> io::Result<(PathBuf, T)> {
+	fs::create_dir_all(parent)?;
+	for _ in 0..100 {
+		let name: String = thread_rng()
+			.sample_iter(&Alphanumeric)
+			.take(16)
+			.map(char::from)
+			.collect();
+		let path = parent.join(name);
+		match f(&path) {
+			Ok(res) => return Ok((path, res)),
+			Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {}
+			Err(e) => return Err(e),
 		}
-
-		i += 1;
 	}
+	Err(io::Error::new(io::ErrorKind::Other, "too many tries"))
 }
 
-// TODO Add a maximum try count
-// FIXME: infinite loop if the permission is denied, for example
+/// Creates a temporary directory. The function returns the path to the directory.
+///
+/// `parent` is the path to the parent of the temporary file.
+pub fn create_tmp_dir(parent: &Path) -> io::Result<PathBuf> {
+	Ok(create_tmp(parent, |p| fs::create_dir(p))?.0)
+}
+
 /// Creates a temporary file. The function returns the path to the file and the file itself.
-pub fn create_tmp_file() -> io::Result<(PathBuf, File)> {
-	let mut i = 0;
-
-	loop {
-		let path = PathBuf::from(format!("/tmp/blimp-{i}"));
-
-		let result = OpenOptions::new()
+///
+/// `parent` is the path to the parent of the temporary file.
+pub fn create_tmp_file(parent: &Path) -> io::Result<(PathBuf, File)> {
+	create_tmp(parent, |path| {
+		OpenOptions::new()
 			.read(true)
 			.write(true)
 			.create_new(true)
-			.open(path.clone());
-
-		if let Ok(file) = result {
-			return Ok((path, file));
-		}
-
-		i += 1;
-	}
+			.open(path)
+	})
 }
 
 fn decompress_impl<R: Read>(stream: R, dest: &Path) -> io::Result<()> {
@@ -81,41 +80,12 @@ pub fn decompress(src: &Path, dest: &Path) -> io::Result<()> {
 	}
 }
 
-/// Decompresses the given .tar.gz file `archive` into a temporary directory, executes the given
-/// function `f` with the path to the temporary directory as argument, then removes the directory
-/// and returns the result of the call to `f`.
-pub fn decompress_wrap<T, F: FnOnce(&Path) -> T>(archive: &Path, f: F) -> io::Result<T> {
-	let tmp_dir = create_tmp_dir()?;
-	decompress(archive, &tmp_dir)?;
-	let v = f(&tmp_dir);
-	fs::remove_dir_all(&tmp_dir)?;
-	Ok(v)
-}
-
 /// Reads the package archive at the given path and returns an instance for it.
 pub fn read_package_archive(path: &Path) -> io::Result<Archive<GzDecoder<File>>> {
 	let mut archive = Archive::new(GzDecoder::new(File::open(path)?));
 	archive.set_overwrite(true);
 	archive.set_preserve_permissions(true);
 	Ok(archive)
-}
-
-/// Run the hook at the given path.
-///
-/// Arguments:
-/// - `hook_path` is the path to the hook to be executed.
-/// - `sysroot` is the sysroot.
-///
-/// If the hook succeeded, the function returns `true`. If it didn't, it returns `false`.
-/// If the hook doesn't exist, the function does nothing and returns successfully.
-pub fn run_hook(hook_path: &Path, sysroot: &Path) -> io::Result<bool> {
-	if !Path::new(hook_path).exists() {
-		return Ok(true);
-	}
-	let status = Command::new(hook_path)
-		.env("SYSROOT", sysroot.as_os_str())
-		.status()?;
-	Ok(status.success())
 }
 
 /// Copies the content of the directory `src` to the directory `dst` recursively.
