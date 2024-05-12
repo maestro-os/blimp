@@ -21,9 +21,9 @@ ninja -j$JOBS install
 cd ..
 
 # Build libstdc++
-cd ../libc++-build
-cmake
-  ../llvm
+cd libc++-build
+cmake \
+  ../llvm \
   -G Ninja \
   -S runtimes \
   -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind" \
