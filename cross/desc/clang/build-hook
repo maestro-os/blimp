@@ -21,11 +21,11 @@ ninja -j$JOBS install
 cd ..
 
 # Build libstdc++
-cd libc++-build
+cd llvm
 cmake \
-  ../llvm \
   -G Ninja \
   -S runtimes \
+  -B ../libc++-build \
   -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind" \
   -DLIBCXX_USE_COMPILER_RT=OFF \
   -DCMAKE_C_COMPILER="$SYSROOT/bin/clang" \
@@ -34,7 +34,8 @@ cmake \
   -DCMAKE_C_COMPILER_TARGET="$TARGET" \
   -DCMAKE_CXX_COMPILER_TARGET="$TARGET" \
   -DCMAKE_CXX_FLAGS="-nostdlib++" \
-  -DCMAKE_INSTALL_PREFIX=$SYSROOT
+  -DCMAKE_INSTALL_PREFIX="$SYSROOT"
+cd ../libc++-build
 ninja -j$JOBS cxx cxxabi unwind
 ninja install-cxx install-cxxabi install-unwind
 cd ..
@@ -61,13 +62,13 @@ cmake \
   -DCOMPILER_RT_BUILD_ORC=ON \
   -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON \
   -DCOMPILER_RT_BUILTINS_ENABLE_PIC=OFF \
-  -DCMAKE_INSTALL_PREFIX=$SYSROOT/lib/clang/13.0.1/
+  -DCMAKE_INSTALL_PREFIX="$SYSROOT/lib/clang/13.0.1/"
 ninja -j$JOBS
 ninja -j$JOBS install
 cd ..
 
 # Patch
-ln -fsv ../../lib/clang/13.0.1/lib/linux/clang_rt.crtbegin-i386.o $SYSROOT/usr/lib/crtbegin.o
-ln -fsv crtbegin.o $SYSROOT/usr/lib/crtbeginS.o
-ln -fsv crtbegin.o $SYSROOT/usr/lib/crtbeginT.o
-ln -fsv ../../lib/clang/13.0.1/lib/linux/clang_rt.crtend-i386.o $SYSROOT/usr/lib/crtend.o
+ln -fsv ../../lib/clang/13.0.1/lib/linux/clang_rt.crtbegin-i386.o "$SYSROOT/usr/lib/crtbegin.o"
+ln -fsv crtbegin.o "$SYSROOT/usr/lib/crtbeginS.o"
+ln -fsv crtbegin.o "$SYSROOT/usr/lib/crtbeginT.o"
+ln -fsv ../../lib/clang/13.0.1/lib/linux/clang_rt.crtend-i386.o "$SYSROOT/usr/lib/crtend.o"

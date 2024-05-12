@@ -21,6 +21,7 @@ use xz2::read::XzDecoder;
 
 fn create_tmp<T, F: Fn(&Path) -> io::Result<T>>(parent: &Path, f: F) -> io::Result<(PathBuf, T)> {
 	fs::create_dir_all(parent)?;
+	let parent = parent.canonicalize()?;
 	for _ in 0..100 {
 		let name: String = thread_rng()
 			.sample_iter(&Alphanumeric)
