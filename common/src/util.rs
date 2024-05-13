@@ -154,10 +154,10 @@ pub fn write_json<T: Serialize>(file: &Path, data: &T) -> io::Result<()> {
 
 /// Concatenates the given paths.
 ///
-/// This function is different from the [`Path::join`] in the way that it does not suppress the
+/// This function is different from the [`Path::join`] in that it does not suppress the
 /// first path if the second is absolute.
-///
-/// TODO: example
-pub fn concat_paths(path0: &Path, path1: &Path) -> PathBuf {
-	path0.join(path1.strip_prefix("/").unwrap_or(path1))
+pub fn concat_paths<P0: AsRef<Path>, P1: AsRef<Path>>(base: P0, other: P1) -> PathBuf {
+	let other = other.as_ref();
+	let other = other.strip_prefix("/").unwrap_or(other);
+	base.as_ref().join(other)
 }

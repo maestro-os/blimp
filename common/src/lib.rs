@@ -17,7 +17,6 @@ use package::Package;
 use repository::Repository;
 use std::collections::HashMap;
 use std::error::Error;
-use std::ffi::OsStr;
 use std::fs;
 use std::io;
 use std::io::ErrorKind;
@@ -45,15 +44,16 @@ impl Environment {
 	///
 	/// The function tries to lock the environment so that no other instance can access it at the
 	/// same time. If already locked, the function returns `None`.
-	pub fn with_root(sysroot: PathBuf) -> io::Result<Option<Self>> {
-		let path = util::concat_paths(&sysroot, Path::new(LOCKFILE_PATH));
+	pub fn with_root(sysroot: &Path) -> io::Result<Option<Self>> {
+		let sysroot = sysroot.canonicalize()?;
+		let path = util::concat_paths(&sysroot, LOCKFILE_PATH);
 		let acquired = lockfile::lock(&path)?;
 		Ok(acquired.then_some(Self {
 			sysroot,
 		}))
 	}
 
-	/// Returns the sysroot of the current environement.
+	/// Returns the sysroot of the current environment.
 	pub fn get_sysroot(&self) -> &Path {
 		&self.sysroot
 	}
@@ -102,43 +102,28 @@ impl Environment {
 	pub fn install(&self, pkg: &Package, archive_path: &Path) -> Result<(), Box<dyn Error>> {
 		// Read archive
 		let mut archive = util::read_package_archive(archive_path)?;
-
 		// TODO Get hooks (pre-install-hook and post-install-hook)
-
 		// TODO Execute pre-install-hook
-
 		// The list of installed files
 		let mut files = vec![];
-
 		// Copy files
 		for e in archive.entries()? {
 			let mut e = e?;
 			let path = e.path()?;
-			let mut path_iter = path.iter();
-
-			// Exclude files that are not in the `data` directory
-			if path_iter.next() != Some(OsStr::new("data")) {
+			// Exclude files outside the `data` directory
+			let Ok(path) = path.strip_prefix("data/") else {
 				continue;
-			}
-
-			let sys_path = path_iter.filter(|c| !c.is_empty()).collect::<PathBuf>();
-			if sys_path.components().count() == 0 {
-				continue;
-			}
-
-			let dst = self.sysroot.join(&sys_path);
-
+			};
+			let dst = self.sysroot.join(&path);
 			// Create parent directories
 			if let Some(parent) = dst.parent() {
 				fs::create_dir_all(parent)?;
 			}
-
+			let path = path.to_path_buf();
 			e.unpack(dst)?;
-			files.push(sys_path);
+			files.push(path);
 		}
-
 		// TODO Execute post-install-hook
-
 		// Update installed list
 		let mut installed = self.load_installed_list()?;
 		installed.insert(
@@ -149,11 +134,10 @@ impl Environment {
 			},
 		);
 		self.update_installed_list(&installed)?;
-
 		Ok(())
 	}
 
-	/// Installs a new verion of the package, removing the previous.
+	/// Installs a new version of the package, removing the previous.
 	///
 	/// Arguments:
 	/// - `pkg` is the package to be updated.
@@ -161,18 +145,12 @@ impl Environment {
 	pub fn update(&self, pkg: &Package, archive_path: &Path) -> Result<()> {
 		// Read archive
 		let _archive = util::read_package_archive(archive_path)?;
-
 		// TODO Get hooks (pre-update-hook and post-update-hook)
-
 		// TODO Execute pre-update-hook
-
 		// The list of installed files
 		let files = vec![];
-
 		// TODO Patch files corresponding to the ones in inner data archive
-
 		// TODO Execute post-update-hook
-
 		// Update installed list
 		let mut installed = self.load_installed_list()?;
 		installed.insert(
@@ -183,7 +161,6 @@ impl Environment {
 			},
 		);
 		self.update_installed_list(&installed)?;
-
 		Ok(())
 	}
 
@@ -193,16 +170,13 @@ impl Environment {
 	/// ensure no other package depend on the package to be removed.
 	pub fn remove(&self, pkg: &InstalledPackage) -> Result<()> {
 		// TODO Get hooks (pre-remove-hook and post-remove-hook. Copy at installation?)
-
 		// TODO Execute pre-remove-hook
-
 		// Remove the package's files
 		// Removing is made in reverse order to ensure inner files are removed first
 		let mut files = pkg.files.clone();
 		files.sort_unstable_by(|a, b| a.cmp(b).reverse());
 		for sys_path in &files {
 			let path = util::concat_paths(&self.sysroot, sys_path);
-
 			let dir = fs::metadata(&path)
 				.map(|m| m.file_type().is_dir())
 				.unwrap_or(false);
@@ -211,30 +185,25 @@ impl Environment {
 			} else {
 				fs::remove_file(&path)
 			};
-
 			match result {
 				Ok(_) => {}
 				Err(e)
 					if matches!(e.kind(), ErrorKind::DirectoryNotEmpty | ErrorKind::NotFound) => {}
-
 				Err(e) => return Err(e.into()),
 			}
 		}
-
 		// TODO Execute post-remove-hook
-
 		// Update installed list
 		let mut installed = self.load_installed_list()?;
 		installed.remove(pkg.desc.get_name());
 		self.update_installed_list(&installed)?;
-
 		Ok(())
 	}
 }
 
 impl Drop for Environment {
 	fn drop(&mut self) {
-		let path = util::concat_paths(&self.sysroot, Path::new(LOCKFILE_PATH));
-		let _ = lockfile::unlock(&path);
+		let path = util::concat_paths(&self.sysroot, LOCKFILE_PATH);
+		lockfile::unlock(&path).unwrap_or_else(|e| eprintln!("blimp: could remove lockfile: {e}"));
 	}
 }
