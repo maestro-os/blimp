@@ -73,8 +73,7 @@ impl Environment {
 	///
 	/// The key is the name of the package and the value is the installed package.
 	pub fn load_installed_list(&self) -> io::Result<HashMap<String, InstalledPackage>> {
-		let path = util::concat_paths(&self.sysroot, Path::new(INSTALLED_FILE));
-
+		let path = util::concat_paths(&self.sysroot, INSTALLED_FILE);
 		match util::read_json::<HashMap<String, InstalledPackage>>(&path) {
 			Ok(pkgs) => Ok(pkgs),
 			Err(e) if e.kind() == ErrorKind::NotFound => Ok(HashMap::new()),
@@ -87,7 +86,7 @@ impl Environment {
 		&self,
 		list: &HashMap<String, InstalledPackage>,
 	) -> io::Result<()> {
-		let path = util::concat_paths(&self.sysroot, Path::new(INSTALLED_FILE));
+		let path = util::concat_paths(&self.sysroot, INSTALLED_FILE);
 		util::write_json(&path, list)
 	}
 

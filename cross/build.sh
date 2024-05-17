@@ -10,7 +10,7 @@ fi
 # Prepare
 mkdir -p toolchain/repo
 PATH="$(pwd)/../target/release:$PATH"
-export SYSROOT="$(pwd)/toolchain/"
+export SYSROOT="toolchain/"
 export LOCAL_REPO="toolchain/repo/"
 
 # binutils
