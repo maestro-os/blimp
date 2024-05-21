@@ -42,8 +42,8 @@ impl BuildProcess {
 		Ok(Self {
 			input_path,
 			build_desc,
-			build_dir: common::util::create_tmp_dir(Path::new(WORK_DIR))?,
-			sysroot: common::util::create_tmp_dir(Path::new(WORK_DIR))?,
+			build_dir: common::util::create_tmp_dir(WORK_DIR)?,
+			sysroot: common::util::create_tmp_dir(WORK_DIR)?,
 		})
 	}
 

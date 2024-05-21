@@ -84,7 +84,7 @@ impl Source {
 				use common::download::DownloadTask;
 
 				// Download
-				let (path, _) = common::util::create_tmp_file(Path::new(WORK_DIR))?;
+				let (path, _) = common::util::create_tmp_file(WORK_DIR)?;
 				let mut download_task = DownloadTask::new(url, &path).await?;
 				// TODO progress bar
 				while download_task.next().await? {}
