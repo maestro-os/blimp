@@ -69,7 +69,7 @@ fn network_not_enabled() {
 ///
 /// If the environment's lockfile cannot be acquired, the function returns an error.
 fn get_env(sysroot: PathBuf) -> Result<Environment> {
-	Environment::with_root(sysroot)?.ok_or(anyhow!("failed to acquire lockfile"))
+	Environment::with_root(&sysroot)?.ok_or(anyhow!("failed to acquire lockfile"))
 }
 
 /// Lists remotes.

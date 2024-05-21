@@ -113,7 +113,7 @@ impl Environment {
 			let Ok(path) = path.strip_prefix("data/") else {
 				continue;
 			};
-			let dst = self.sysroot.join(&path);
+			let dst = self.sysroot.join(path);
 			// Create parent directories
 			if let Some(parent) = dst.parent() {
 				fs::create_dir_all(parent)?;
