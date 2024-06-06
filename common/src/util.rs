@@ -42,14 +42,14 @@ fn create_tmp<T, F: Fn(&Path) -> io::Result<T>>(parent: &Path, f: F) -> io::Resu
 ///
 /// `parent` is the path to the parent of the temporary file.
 pub fn create_tmp_dir<P: AsRef<Path>>(parent: P) -> io::Result<PathBuf> {
-	Ok(create_tmp(parent, |p| fs::create_dir(p))?.0)
+	Ok(create_tmp(parent.as_ref(), |p| fs::create_dir(p))?.0)
 }
 
 /// Creates a temporary file. The function returns the path to the file and the file itself.
 ///
 /// `parent` is the path to the parent of the temporary file.
 pub fn create_tmp_file<P: AsRef<Path>>(parent: P) -> io::Result<(PathBuf, File)> {
-	create_tmp(parent, |path| {
+	create_tmp(parent.as_ref(), |path| {
 		OpenOptions::new()
 			.read(true)
 			.write(true)

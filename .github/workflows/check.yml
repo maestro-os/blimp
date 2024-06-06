@@ -5,33 +5,33 @@ jobs:
     runs-on: [self-hosted, linux]
     steps:
       - uses: actions/checkout@v4
-      - run: cargo +nightly fmt --check
+      - run: cargo fmt --check
   doc:
     runs-on: [self-hosted, linux]
     steps:
       - uses: actions/checkout@v4
-      - run: cargo +nightly doc
+      - run: cargo doc
   offline:
     runs-on: [self-hosted, linux]
     steps:
       - uses: actions/checkout@v4
       - name: Check debug compilation
-        run: cargo +nightly build
+        run: cargo build
       - name: Check release compilation
-        run: cargo +nightly build --release
+        run: cargo build --release
       - name: Clippy
-        run: cargo +nightly clippy
+        run: cargo clippy
       - name: Unit tests
-        run: cargo +nightly test
+        run: cargo test
   online:
     runs-on: [self-hosted, linux]
     needs: offline
     steps:
       - name: Check debug compilation
-        run: cargo +nightly build --features network
+        run: cargo build --features network
       - name: Check release compilation
-        run: cargo +nightly build --release --features network
+        run: cargo build --release --features network
       - name: Clippy
-        run: cargo +nightly clippy --features network
+        run: cargo clippy --features network
       - name: Unit tests
-        run: cargo +nightly test --features network
+        run: cargo test --features network
