@@ -231,7 +231,7 @@ impl Package {
 pub struct InstalledPackage {
 	/// The package's description.
 	pub desc: Package,
-	/// The list of absolute pathes to installed files.
+	/// The list of absolute paths to installed files.
 	pub files: Vec<PathBuf>,
 }
 

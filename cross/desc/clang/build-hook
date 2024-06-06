@@ -1,0 +1,75 @@
+#!/bin/sh
+
+set -e
+
+mv llvm-* llvm
+mkdir {clang,libc++,compiler-rt}-build
+
+# Build clang
+cd clang-build
+cmake \
+  ../llvm/llvm \
+  -G Ninja \
+  -DLLVM_ENABLE_PROJECTS="lld;clang" \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DLLVM_PARALLEL_COMPILE_JOBS=$JOBS \
+  -DLLVM_PARALLEL_LINK_JOBS=1 \
+  -DLLVM_TARGETS_TO_BUILD=X86 \
+  -DCMAKE_INSTALL_PREFIX="$SYSROOT"
+ninja -j$JOBS
+ninja -j$JOBS install
+cd ..
+
+# Build libstdc++
+cd llvm
+cmake \
+  -G Ninja \
+  -S runtimes \
+  -B ../libc++-build \
+  -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind" \
+  -DLIBCXX_USE_COMPILER_RT=OFF \
+  -DCMAKE_C_COMPILER="$SYSROOT/bin/clang" \
+  -DCMAKE_CXX_COMPILER="$SYSROOT/bin/clang++" \
+  -DCMAKE_ASM_COMPILER_TARGET="$TARGET" \
+  -DCMAKE_C_COMPILER_TARGET="$TARGET" \
+  -DCMAKE_CXX_COMPILER_TARGET="$TARGET" \
+  -DCMAKE_CXX_FLAGS="-nostdlib++" \
+  -DCMAKE_INSTALL_PREFIX="$SYSROOT"
+cd ../libc++-build
+ninja -j$JOBS cxx cxxabi unwind
+ninja install-cxx install-cxxabi install-unwind
+cd ..
+
+# Build compiler-rt
+cd compiler-rt-build
+LDFLAGS="-nostdlib" cmake \
+  ../llvm/compiler-rt \
+  -G Ninja \
+  -DCMAKE_C_COMPILER="$SYSROOT/bin/clang" \
+  -DCMAKE_CXX_COMPILER="$SYSROOT/bin/clang++" \
+  -DLLVM_CONFIG_PATH="$SYSROOT/bin/llvm-config" \
+  -DCMAKE_ASM_COMPILER_TARGET="$TARGET" \
+  -DCMAKE_C_COMPILER_TARGET="$TARGET" \
+  -DCMAKE_CXX_COMPILER_TARGET="$TARGET" \
+  -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
+  -DCOMPILER_RT_BAREMETAL_BUILD=ON \
+  -DCOMPILER_RT_BUILD_BUILTINS=ON \
+  -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
+  -DCOMPILER_RT_BUILD_MEMPROF=OFF \
+  -DCOMPILER_RT_BUILD_PROFILE=OFF \
+  -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
+  -DCOMPILER_RT_BUILD_XRAY=OFF \
+  -DCOMPILER_RT_BUILD_ORC=ON \
+  -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON \
+  -DCOMPILER_RT_BUILTINS_ENABLE_PIC=OFF \
+  -DCMAKE_INSTALL_PREFIX="$SYSROOT/lib/clang/$PKG_VERSION/"
+ninja -j$JOBS
+ninja -j$JOBS install
+cd ..
+
+# Patch
+mkdir -p "$SYSROOT/usr/lib"
+ln -fsv "../../lib/clang/$PKG_VERSION/lib/linux/clang_rt.crtbegin-i386.o" "$SYSROOT/usr/lib/crtbegin.o"
+ln -fsv crtbegin.o "$SYSROOT/usr/lib/crtbeginS.o"
+ln -fsv crtbegin.o "$SYSROOT/usr/lib/crtbeginT.o"
+ln -fsv "../../lib/clang/$PKG_VERSION/lib/linux/clang_rt.crtend-i386.o" "$SYSROOT/usr/lib/crtend.o"

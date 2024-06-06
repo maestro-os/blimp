@@ -2,6 +2,8 @@
 
 use bzip2::read::BzDecoder;
 use flate2::read::GzDecoder;
+use rand::distributions::Alphanumeric;
+use rand::{thread_rng, Rng};
 use serde::Deserialize;
 use serde::Serialize;
 use std::fs;
@@ -12,132 +14,71 @@ use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Read;
 use std::os::unix;
-use std::path::Component::Normal;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
 use tar::Archive;
 use xz2::read::XzDecoder;
 
-// TODO Add a maximum try count
-// FIXME: infinite loop if the permission is denied, for example
-/// Creates a temporary directory. The function returns the path to the directory.
-pub fn create_tmp_dir() -> io::Result<PathBuf> {
-	let mut i = 0;
-
-	loop {
-		let path = PathBuf::from(format!("/tmp/blimp-{i}"));
-
-		if fs::create_dir(&path).is_ok() {
-			return Ok(path);
+fn create_tmp<T, F: Fn(&Path) -> io::Result<T>>(parent: &Path, f: F) -> io::Result<(PathBuf, T)> {
+	fs::create_dir_all(parent)?;
+	let parent = parent.canonicalize()?;
+	for _ in 0..100 {
+		let name: String = thread_rng()
+			.sample_iter(&Alphanumeric)
+			.take(16)
+			.map(char::from)
+			.collect();
+		let path = parent.join(name);
+		match f(&path) {
+			Ok(res) => return Ok((path, res)),
+			Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {}
+			Err(e) => return Err(e),
 		}
-
-		i += 1;
 	}
+	Err(io::Error::new(io::ErrorKind::Other, "too many tries"))
 }
 
-// TODO Add a maximum try count
-// FIXME: infinite loop if the permission is denied, for example
+/// Creates a temporary directory. The function returns the path to the directory.
+///
+/// `parent` is the path to the parent of the temporary file.
+pub fn create_tmp_dir<P: AsRef<Path>>(parent: P) -> io::Result<PathBuf> {
+	Ok(create_tmp(parent.as_ref(), |p| fs::create_dir(p))?.0)
+}
+
 /// Creates a temporary file. The function returns the path to the file and the file itself.
-pub fn create_tmp_file() -> io::Result<(PathBuf, File)> {
-	let mut i = 0;
-
-	loop {
-		let path = PathBuf::from(format!("/tmp/blimp-{i}"));
-
-		let result = OpenOptions::new()
+///
+/// `parent` is the path to the parent of the temporary file.
+pub fn create_tmp_file<P: AsRef<Path>>(parent: P) -> io::Result<(PathBuf, File)> {
+	create_tmp(parent.as_ref(), |path| {
+		OpenOptions::new()
 			.read(true)
 			.write(true)
 			.create_new(true)
-			.open(path.clone());
-
-		if let Ok(file) = result {
-			return Ok((path, file));
-		}
-
-		i += 1;
-	}
+			.open(path)
+	})
 }
 
-fn uncompress_<R: Read>(mut archive: Archive<R>, dest: &Path, unwrap: bool) -> io::Result<()> {
+fn decompress_impl<R: Read>(stream: R, dest: &Path) -> io::Result<()> {
+	let mut archive = Archive::new(stream);
 	archive.set_overwrite(true);
 	archive.set_preserve_permissions(true);
-
-	// TODO undo on fail?
-	if unwrap {
-		for entry in archive.entries()? {
-			let mut entry = entry?;
-
-			let path: PathBuf = entry
-				.path()?
-				.components()
-				.skip(1)
-				.filter(|c| matches!(c, Normal(_)))
-				.collect();
-			let path = dest.join(path);
-
-			entry.unpack(path)?;
-		}
-	} else {
-		archive.unpack(dest)?;
-	}
-
+	archive.unpack(dest)?;
 	Ok(())
 }
 
-/// Uncompresses the given archive file `src` to the given location `dest`.
-///
-/// `unwrap` tells whether the tarball shall be unwrapped.
-///
-/// If the tarball contains directories at the root, the unwrap operation unwraps their content
-/// instead of the directories themselves.
-pub fn uncompress(src: &Path, dest: &Path, unwrap: bool) -> io::Result<()> {
-	// Try to uncompress .tar.gz
-	{
-		let file = File::open(src)?;
-		let tar = GzDecoder::new(file);
-		let archive = Archive::new(tar);
-
-		if uncompress_(archive, dest, unwrap).is_ok() {
-			return Ok(());
-		}
+/// Decompresses the given archive file `src` to the given location `dest`.
+pub fn decompress(src: &Path, dest: &Path) -> io::Result<()> {
+	let file_type = infer::get_from_path(src)?.map(|t| t.mime_type());
+	let file = File::open(src)?;
+	match file_type {
+		Some("application/gzip") => decompress_impl(GzDecoder::new(file), dest),
+		Some("application/x-xz") => decompress_impl(XzDecoder::new(file), dest),
+		Some("application/x-bzip2") => decompress_impl(BzDecoder::new(file), dest),
+		_ => Err(io::Error::new(
+			io::ErrorKind::Other,
+			"Invalid or unsupported archive format",
+		)),
 	}
-
-	// Try to uncompress .tar.xz
-	{
-		let file = File::open(src)?;
-		let tar = XzDecoder::new(file);
-		let archive = Archive::new(tar);
-
-		if uncompress_(archive, dest, unwrap).is_ok() {
-			return Ok(());
-		}
-	}
-
-	// Try to uncompress .tar.bz2
-	{
-		let file = File::open(src)?;
-		let tar = BzDecoder::new(file);
-		let archive = Archive::new(tar);
-
-		uncompress_(archive, dest, unwrap)
-	}
-}
-
-/// Uncompresses the given .tar.gz file `archive` into a temporary directory, executes the given
-/// function `f` with the path to the temporary directory as argument, then removes the directory
-/// and returns the result of the call to `f`.
-pub fn uncompress_wrap<T, F: FnOnce(&Path) -> T>(archive: &Path, f: F) -> io::Result<T> {
-	// Uncompressing
-	let tmp_dir = create_tmp_dir()?;
-	uncompress(archive, &tmp_dir, false)?;
-
-	let v = f(&tmp_dir);
-
-	// Remove temporary directory
-	fs::remove_dir_all(&tmp_dir)?;
-
-	Ok(v)
 }
 
 /// Reads the package archive at the given path and returns an instance for it.
@@ -146,26 +87,6 @@ pub fn read_package_archive(path: &Path) -> io::Result<Archive<GzDecoder<File>>>
 	archive.set_overwrite(true);
 	archive.set_preserve_permissions(true);
 	Ok(archive)
-}
-
-/// Run the hook at the given path.
-///
-/// Arguments:
-/// - `hook_path` is the path to the hook to be executed.
-/// - `sysroot` is the sysroot.
-///
-/// If the hook succeeded, the function returns `true`. If it didn't, it returns `false`.
-/// If the hook doesn't exist, the function does nothing and returns successfully.
-pub fn run_hook(hook_path: &Path, sysroot: &Path) -> io::Result<bool> {
-	if !Path::new(hook_path).exists() {
-		return Ok(true);
-	}
-
-	let status = Command::new(hook_path)
-		.env("SYSROOT", sysroot.as_os_str())
-		.status()?;
-
-	Ok(status.success())
 }
 
 /// Copies the content of the directory `src` to the directory `dst` recursively.
@@ -221,30 +142,22 @@ pub fn print_size(mut size: u64) {
 pub fn read_json<T: for<'a> Deserialize<'a>>(file: &Path) -> io::Result<T> {
 	let file = File::open(file)?;
 	let reader = BufReader::new(file);
-
-	serde_json::from_reader(reader).map_err(|e| {
-		let msg = format!("JSON deserializing failed: {e}");
-		io::Error::new(io::ErrorKind::Other, msg)
-	})
+	Ok(serde_json::from_reader(reader)?)
 }
 
 /// Writes a JSON file.
 pub fn write_json<T: Serialize>(file: &Path, data: &T) -> io::Result<()> {
 	let file = File::create(file)?;
 	let writer = BufWriter::new(file);
-
-	serde_json::to_writer_pretty(writer, &data).map_err(|e| {
-		let msg = format!("JSON serializing failed: {e}");
-		io::Error::new(io::ErrorKind::Other, msg)
-	})
+	Ok(serde_json::to_writer_pretty(writer, &data)?)
 }
 
 /// Concatenates the given paths.
 ///
-/// This function is different from the [`Path::join`] in the way that it does not suppress the
+/// This function is different from the [`Path::join`] in that it does not suppress the
 /// first path if the second is absolute.
-///
-/// TODO: example
-pub fn concat_paths(path0: &Path, path1: &Path) -> PathBuf {
-	path0.join(path1.strip_prefix("/").unwrap_or(path1))
+pub fn concat_paths<P0: AsRef<Path>, P1: AsRef<Path>>(base: P0, other: P1) -> PathBuf {
+	let other = other.as_ref();
+	let other = other.strip_prefix("/").unwrap_or(other);
+	base.as_ref().join(other)
 }
