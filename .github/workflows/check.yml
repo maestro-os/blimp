@@ -10,7 +10,7 @@ jobs:
     runs-on: [self-hosted, linux]
     steps:
       - uses: actions/checkout@v4
-      - run: cargo doc
+      - run: cargo doc --all-features
   offline:
     runs-on: [self-hosted, linux]
     steps:
@@ -20,7 +20,7 @@ jobs:
       - name: Check release compilation
         run: cargo build --release
       - name: Clippy
-        run: cargo clippy
+        run: cargo clippy --all-targets
       - name: Unit tests
         run: cargo test
   online:
@@ -32,6 +32,6 @@ jobs:
       - name: Check release compilation
         run: cargo build --release --features network
       - name: Clippy
-        run: cargo clippy --features network
+        run: cargo clippy --features network --all-targets
       - name: Unit tests
-        run: cargo test --features network
+        run: cargo test --features network --all-targets

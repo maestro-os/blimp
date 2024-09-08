@@ -13,7 +13,7 @@ use common::Environment;
 use install::install;
 use remove::remove;
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::exit;
 use tokio::runtime::Runtime;
 
@@ -68,8 +68,8 @@ fn network_not_enabled() {
 /// Returns an environment for the given sysroot.
 ///
 /// If the environment's lockfile cannot be acquired, the function returns an error.
-fn get_env(sysroot: PathBuf) -> Result<Environment> {
-	Environment::with_root(&sysroot)?.ok_or(anyhow!("failed to acquire lockfile"))
+fn get_env(sysroot: &Path) -> Result<Environment> {
+	Environment::with_root(sysroot)?.ok_or(anyhow!("failed to acquire lockfile"))
 }
 
 /// Lists remotes.
@@ -135,7 +135,7 @@ fn remote_remove(env: &mut Environment, remotes: &[String]) -> std::io::Result<(
 	Ok(())
 }
 
-fn main_(sysroot: PathBuf, local_repos: &[PathBuf]) -> Result<bool> {
+fn main_(sysroot: &Path, local_repos: &[PathBuf]) -> Result<bool> {
 	let args: Vec<String> = env::args().collect();
 	// Name of the current binary file
 	let bin = args.first().map(|s| s.as_str()).unwrap_or("blimp");
@@ -273,7 +273,7 @@ fn main() {
 		.map(|s| s.split(':').map(PathBuf::from).collect())
 		.unwrap_or_default();
 
-	match main_(sysroot, &local_repos) {
+	match main_(&sysroot, &local_repos) {
 		Ok(false) => exit(1),
 
 		Err(e) => {
