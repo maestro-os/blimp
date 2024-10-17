@@ -3,7 +3,7 @@
 
 TOOLCHAIN="$(pwd)/toolchain"
 
-export PATH="$TOOLCHAIN/usr/bin:$TOOLCHAIN/toolchain/bin:$PATH"
+export PATH="$TOOLCHAIN/usr/bin:$TOOLCHAIN/bin:$PATH"
 
 export CC="clang"
 export LD="ld.lld"
