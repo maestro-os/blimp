@@ -1,7 +1,10 @@
 //! This module handles packages list updating.
 
-use anyhow::{anyhow, Result};
-use common::{repository::remote::Remote, Environment};
+use common::{
+	anyhow::{anyhow, Result},
+	repository::remote::Remote,
+	Environment,
+};
 
 /// Updates the packages list.
 pub async fn update(env: &mut Environment) -> Result<()> {

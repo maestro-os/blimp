@@ -108,7 +108,7 @@ impl Repository {
 	/// Arguments:
 	/// - `name` is the name of the package.
 	/// - `version_constraint` is the version constraint to match. If no constraint is specified,
-	/// the latest version is selected.
+	///   the latest version is selected.
 	///
 	/// If the package doesn't exist, the function returns `None`.
 	pub fn get_package_with_constraint(
@@ -169,8 +169,8 @@ pub fn get_package<'a>(
 ///
 /// Arguments:
 /// - `name` is the name of the package.
-/// - `version_constraint` is the version constraint to match. If no constraint is specified,
-/// the latest version is selected.
+/// - `version_constraint` is the version constraint to match. If no constraint is specified, the
+///   latest version is selected.
 ///
 /// If the package doesn't exist, the function returns `None`.
 pub fn get_package_with_constraint<'a>(
