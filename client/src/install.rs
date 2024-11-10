@@ -4,6 +4,7 @@ use crate::confirm;
 #[cfg(feature = "network")]
 use common::repository::remote::Remote;
 use common::{
+	anyhow,
 	anyhow::{bail, Result},
 	package::Package,
 	repository,
@@ -11,6 +12,7 @@ use common::{
 	Environment,
 };
 use std::{collections::HashMap, path::PathBuf};
+use utils::util::ByteSize;
 
 // TODO Clean
 /// Installs the given list of packages.

@@ -8,11 +8,10 @@ pub mod repository;
 pub mod util;
 pub mod version;
 
-pub use anyhow;
-
 #[cfg(feature = "network")]
 pub mod download;
 
+pub use anyhow;
 use anyhow::Result;
 use package::{InstalledPackage, Package};
 use repository::Repository;
@@ -29,7 +28,7 @@ const LOCKFILE_PATH: &str = "/usr/lib/blimp/.lock";
 /// The path to the file storing the list of installed packages.
 const INSTALLED_FILE: &str = "/usr/lib/blimp/installed";
 
-/// An instance of a Blimp environment.
+/// An environment is a system managed by the package manager.
 ///
 /// On creation, the environment creates a lockfile to ensure no other instance can access it at
 /// the same time.
