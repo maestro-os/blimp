@@ -1,8 +1,8 @@
 //! This module handles package installation.
 
 use crate::confirm;
-use anyhow::bail;
-use anyhow::Result;
+use common::anyhow::bail;
+use common::anyhow::Result;
 use common::package::Package;
 use common::repository;
 use common::repository::Repository;
@@ -123,9 +123,7 @@ pub async fn install(
 			}
 		}
 
-		print!("Total download size: ");
-		common::util::print_size(total_size);
-		println!();
+		println!("Total download size: {}", ByteSize(total_size));
 	}
 	#[cfg(not(feature = "network"))]
 	{
