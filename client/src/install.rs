@@ -4,7 +4,6 @@ use crate::confirm;
 #[cfg(feature = "network")]
 use common::repository::remote::Remote;
 use common::{
-	anyhow,
 	anyhow::{bail, Result},
 	package::Package,
 	repository,
@@ -12,7 +11,6 @@ use common::{
 	Environment,
 };
 use std::{collections::HashMap, path::PathBuf};
-use utils::util::ByteSize;
 
 // TODO Clean
 /// Installs the given list of packages.
@@ -130,12 +128,12 @@ pub async fn install(
 			}
 		}
 
-		println!("Total download size: {}", ByteSize(total_size));
+		println!("Total download size: {}", utils::util::ByteSize(total_size));
 	}
 	#[cfg(not(feature = "network"))]
 	{
 		for pkg in total_packages.keys() {
-			println!("\t- {} ({}) - cached", pkg.get_name(), pkg.get_version());
+			println!("\t- {} ({}) - cached", pkg.name, pkg.version);
 		}
 	}
 
@@ -167,8 +165,7 @@ pub async fn install(
 						while task.next().await? > 0 {
 							// TODO update progress bar
 						}
-
-						Ok::<(), anyhow::Error>(())
+						Ok::<(), common::anyhow::Error>(())
 					},
 				));
 			}
@@ -178,7 +175,9 @@ pub async fn install(
 		for (name, version, f) in futures {
 			match f.await {
 				Ok(()) => continue,
-				Err(e) => eprintln!("Failed to download `{name}` version `{version}`: {e}"),
+				Err(error) => {
+					eprintln!("Failed to download `{name}` version `{version}`: {error}")
+				}
 			}
 		}
 		if failed {

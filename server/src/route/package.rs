@@ -1,19 +1,16 @@
 //! Package endpoints.
 
-use std::sync::Arc;
 use crate::Context;
 use axum::{
+	body::Body,
 	extract::{Path, State},
-	http::StatusCode,
+	http::{header::CONTENT_TYPE, StatusCode},
 	response::{IntoResponse, Response},
 	Json,
 };
-use axum::body::Body;
-use axum::http::header::CONTENT_TYPE;
-use common::{package, version::Version};
+use common::{package, tokio::fs::File, tokio_util::io::ReaderStream, version::Version};
+use std::sync::Arc;
 use tracing::error;
-use common::tokio::fs::File;
-use common::tokio_util::io::ReaderStream;
 
 /// Endpoint to list packages.
 pub async fn list(State(ctx): State<Arc<Context>>) -> Response {
@@ -63,8 +60,10 @@ pub async fn archive(
 	// Check package exists
 	let res = ctx.repo.get_package(&name, &version);
 	match res {
-		Ok(Some(_)) => {},
-		Ok(None) => return (StatusCode::NOT_FOUND, "package or version not found").into_response(),
+		Ok(Some(_)) => {}
+		Ok(None) => {
+			return (StatusCode::NOT_FOUND, "package or version not found").into_response()
+		}
 		Err(error) => {
 			error!(%error, name, %version, "could read package");
 			return (StatusCode::INTERNAL_SERVER_ERROR, "internal server error").into_response();
