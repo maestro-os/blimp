@@ -3,7 +3,6 @@
 mod config;
 mod global_data;
 mod package;
-mod util;
 
 use actix_web::{get, middleware, web, App, HttpResponse, HttpServer, Responder};
 use common::repository::Repository;
