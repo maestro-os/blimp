@@ -14,6 +14,7 @@ pub mod download;
 pub use anyhow;
 use anyhow::Result;
 use package::{InstalledPackage, Package};
+pub use serde_json;
 use std::{
 	collections::HashMap,
 	error::Error,
@@ -21,6 +22,8 @@ use std::{
 	io::ErrorKind,
 	path::{Path, PathBuf},
 };
+pub use tokio;
+pub use tokio_util;
 
 /// The directory containing cached packages.
 const LOCKFILE_PATH: &str = "/usr/lib/blimp/.lock";
