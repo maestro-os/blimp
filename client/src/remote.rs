@@ -3,12 +3,12 @@
 use common::{repository::remote::Remote, Environment};
 
 /// Lists remotes.
-pub fn list(env: &Environment) -> std::io::Result<()> {
+pub async fn list(env: &Environment) -> std::io::Result<()> {
 	let remotes = Remote::load_list(env)?;
 	println!("Remotes list:");
 	for remote in remotes {
 		let host = &remote.host;
-		match remote.fetch_motd() {
+		match remote.fetch_motd().await {
 			Ok(motd) => println!("- {host} (status: UP): {motd}"),
 			Err(_) => println!("- {host} (status: DOWN)"),
 		}

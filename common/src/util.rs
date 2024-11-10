@@ -3,12 +3,11 @@
 use bzip2::read::BzDecoder;
 use flate2::read::GzDecoder;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
-use serde::{Deserialize, Serialize};
 use std::{
 	fs,
 	fs::{File, OpenOptions},
 	io,
-	io::{BufReader, BufWriter, Read},
+	io::Read,
 	os::unix,
 	path::{Path, PathBuf},
 };
@@ -108,21 +107,6 @@ pub fn recursive_copy(src: &Path, dst: &Path) -> io::Result<()> {
 		}
 	}
 	fs::set_permissions(dst, src_metadata.permissions())
-}
-
-// TODO: rework to allow deserialize from structs with lifetimes (currently unefficient)
-/// Reads a JSON file.
-pub fn read_json<T: for<'a> Deserialize<'a>>(file: &Path) -> io::Result<T> {
-	let file = File::open(file)?;
-	let reader = BufReader::new(file);
-	Ok(serde_json::from_reader(reader)?)
-}
-
-/// Writes a JSON file.
-pub fn write_json<T: Serialize>(file: &Path, data: &T) -> io::Result<()> {
-	let file = File::create(file)?;
-	let writer = BufWriter::new(file);
-	Ok(serde_json::to_writer_pretty(writer, &data)?)
 }
 
 /// Concatenates the given paths.

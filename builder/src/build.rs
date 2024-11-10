@@ -2,6 +2,7 @@
 
 use crate::{desc::BuildDescriptor, WORK_DIR};
 use anyhow::Result;
+use common::serde_json;
 use flate2::{write::GzEncoder, Compression};
 use std::{
 	fs,
@@ -37,7 +38,8 @@ impl BuildProcess {
 	/// `input_path` is the path to the directory containing information to build the package.
 	pub fn new(input_path: PathBuf) -> io::Result<Self> {
 		let build_desc_path = input_path.join("package.json");
-		let build_desc = common::util::read_json::<BuildDescriptor>(&build_desc_path)?;
+		let build_desc = fs::read_to_string(build_desc_path)?;
+		let build_desc = serde_json::from_str(&build_desc)?;
 		Ok(Self {
 			input_path,
 			build_desc,

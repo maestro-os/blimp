@@ -10,7 +10,7 @@ mod update;
 
 use common::{
 	anyhow::{anyhow, Result},
-	Environment,
+	tokio, Environment,
 };
 use install::install;
 use remove::remove;
@@ -19,7 +19,6 @@ use std::{
 	path::{Path, PathBuf},
 	process::exit,
 };
-use tokio::runtime::Runtime;
 
 /// Prints command line usage.
 fn print_usage() {
@@ -73,7 +72,7 @@ fn get_env(sysroot: &Path) -> Result<Environment> {
 	Environment::with_root(sysroot)?.ok_or(anyhow!("failed to acquire lockfile"))
 }
 
-fn main_impl(sysroot: &Path, local_repos: &[PathBuf]) -> Result<bool> {
+async fn main_impl(sysroot: &Path, local_repos: Vec<PathBuf>) -> Result<bool> {
 	// If no argument is specified, print usage
 	let args: Vec<String> = env::args().collect();
 	if args.len() <= 1 {
@@ -93,8 +92,7 @@ fn main_impl(sysroot: &Path, local_repos: &[PathBuf]) -> Result<bool> {
 		#[cfg(feature = "network")]
 		"update" => {
 			let mut env = get_env(sysroot)?;
-			let rt = Runtime::new()?;
-			rt.block_on(update::update(&mut env))?;
+			update::update(&mut env).await?;
 			Ok(true)
 		}
 		"install" => {
@@ -104,8 +102,7 @@ fn main_impl(sysroot: &Path, local_repos: &[PathBuf]) -> Result<bool> {
 				return Ok(false);
 			}
 			let mut env = get_env(sysroot)?;
-			let rt = Runtime::new()?;
-			rt.block_on(install(names, &mut env, local_repos))?;
+			install(names, &mut env, local_repos).await?;
 			Ok(true)
 		}
 		"upgrade" => {
@@ -134,7 +131,7 @@ fn main_impl(sysroot: &Path, local_repos: &[PathBuf]) -> Result<bool> {
 		#[cfg(feature = "network")]
 		"remote-list" => {
 			let env = get_env(sysroot)?;
-			remote::list(&env)?;
+			remote::list(&env).await?;
 			Ok(true)
 		}
 		#[cfg(feature = "network")]
@@ -180,10 +177,11 @@ async fn main() {
 	let sysroot = env::var_os("SYSROOT")
 		.map(PathBuf::from)
 		.unwrap_or(PathBuf::from("/"));
-	let local_repos: Vec<PathBuf> = env::var("LOCAL_REPO") // TODO var_os
+	let local_repos = env::var("LOCAL_REPO") // TODO var_os
 		.map(|s| s.split(':').map(PathBuf::from).collect())
 		.unwrap_or_default();
-	match main_impl(&sysroot, &local_repos) {
+	let res = main_impl(&sysroot, local_repos).await;
+	match res {
 		Ok(false) => exit(1),
 		Err(e) => {
 			eprintln!("error: {e}");

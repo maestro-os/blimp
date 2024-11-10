@@ -16,10 +16,10 @@ pub mod repository;
 pub mod util;
 pub mod version;
 
+use crate::version::Version;
 use anyhow::Result;
 use package::{InstalledPackage, Package};
 use std::{
-	collections::HashMap,
 	error::Error,
 	fs, io,
 	io::ErrorKind,
@@ -27,9 +27,9 @@ use std::{
 };
 
 /// The directory containing cached packages.
-const LOCKFILE_PATH: &str = "/usr/lib/blimp/.lock";
-/// The path to the file storing the list of installed packages.
-const INSTALLED_FILE: &str = "/usr/lib/blimp/installed";
+const LOCKFILE_PATH: &str = "var/lib/blimp/.lock";
+/// The path to directory storing information about installed packages.
+const INSTALLED_DB: &str = "var/lib/blimp/installed";
 
 /// An environment is a system managed by the package manager.
 ///
@@ -49,7 +49,7 @@ impl Environment {
 	/// same time. If already locked, the function returns `None`.
 	pub fn with_root(sysroot: &Path) -> io::Result<Option<Self>> {
 		let sysroot = sysroot.canonicalize()?;
-		let path = util::concat_paths(&sysroot, LOCKFILE_PATH);
+		let path = sysroot.join(LOCKFILE_PATH);
 		let acquired = lockfile::lock(&path)?;
 		Ok(acquired.then_some(Self {
 			sysroot,
@@ -57,29 +57,13 @@ impl Environment {
 	}
 
 	/// Returns the sysroot of the current environment.
-	pub fn get_sysroot(&self) -> &Path {
+	pub fn sysroot(&self) -> &Path {
 		&self.sysroot
 	}
 
-	/// Loads the list of installed packages.
-	///
-	/// The key is the name of the package and the value is the installed package.
-	pub fn load_installed_list(&self) -> io::Result<HashMap<String, InstalledPackage>> {
-		let path = util::concat_paths(&self.sysroot, INSTALLED_FILE);
-		match util::read_json::<HashMap<String, InstalledPackage>>(&path) {
-			Ok(pkgs) => Ok(pkgs),
-			Err(e) if e.kind() == ErrorKind::NotFound => Ok(HashMap::new()),
-			Err(e) => Err(e),
-		}
-	}
-
-	/// Updates the list of installed packages to the disk.
-	pub fn update_installed_list(
-		&self,
-		list: &HashMap<String, InstalledPackage>,
-	) -> io::Result<()> {
-		let path = util::concat_paths(&self.sysroot, INSTALLED_FILE);
-		util::write_json(&path, list)
+	/// Returns the installed version for the package with the given `name`.
+	pub fn get_installed_version(&self, _name: &str) -> Option<Version> {
+		todo!()
 	}
 
 	/// Installs the given package.
@@ -90,7 +74,7 @@ impl Environment {
 	///
 	/// The function does not resolve dependencies. It is the caller's responsibility to install
 	/// them beforehand.
-	pub fn install(&self, pkg: &Package, archive_path: &Path) -> Result<(), Box<dyn Error>> {
+	pub fn install(&self, _pkg: &Package, archive_path: &Path) -> Result<(), Box<dyn Error>> {
 		// Read archive
 		let mut archive = util::read_package_archive(archive_path)?;
 		// TODO Get hooks (pre-install-hook and post-install-hook)
@@ -115,16 +99,7 @@ impl Environment {
 			files.push(path);
 		}
 		// TODO Execute post-install-hook
-		// Update installed list
-		let mut installed = self.load_installed_list()?;
-		installed.insert(
-			pkg.name.to_owned(),
-			InstalledPackage {
-				desc: pkg.clone(),
-				files,
-			},
-		);
-		self.update_installed_list(&installed)?;
+		// TODO add package to installed db
 		Ok(())
 	}
 
@@ -133,25 +108,14 @@ impl Environment {
 	/// Arguments:
 	/// - `pkg` is the package to be updated.
 	/// - `archive_path` is the path to the archive of the new version of the package.
-	pub fn update(&self, pkg: &Package, archive_path: &Path) -> Result<()> {
+	pub fn update(&self, _pkg: &Package, archive_path: &Path) -> Result<()> {
 		// Read archive
 		let _archive = util::read_package_archive(archive_path)?;
 		// TODO Get hooks (pre-update-hook and post-update-hook)
 		// TODO Execute pre-update-hook
-		// The list of installed files
-		let files = vec![];
 		// TODO Patch files corresponding to the ones in inner data archive
 		// TODO Execute post-update-hook
-		// Update installed list
-		let mut installed = self.load_installed_list()?;
-		installed.insert(
-			pkg.name.to_owned(),
-			InstalledPackage {
-				desc: pkg.clone(),
-				files,
-			},
-		);
-		self.update_installed_list(&installed)?;
+		// TODO update package in installed db
 		Ok(())
 	}
 
@@ -184,18 +148,14 @@ impl Environment {
 			}
 		}
 		// TODO Execute post-remove-hook
-		// Update installed list
-		let mut installed = self.load_installed_list()?;
-		installed.remove(&pkg.desc.name);
-		self.update_installed_list(&installed)?;
+		// TODO remove package from installed db
 		Ok(())
 	}
 }
 
 impl Drop for Environment {
 	fn drop(&mut self) {
-		let path = util::concat_paths(&self.sysroot, LOCKFILE_PATH);
-		lockfile::unlock(&path)
-			.unwrap_or_else(|e| eprintln!("blimp: could not remove lockfile: {e}"));
+		let path = self.sysroot.join(LOCKFILE_PATH);
+		lockfile::unlock(&path).unwrap_or_else(|e| eprintln!("blimp: could not remove lockfile: {e}"));
 	}
 }
