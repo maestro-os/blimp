@@ -12,7 +12,7 @@ pub fn lock(path: &Path) -> io::Result<bool> {
 	if let Some(parent) = path.parent() {
 		fs::create_dir_all(parent)?;
 	}
-	// Trying to create the file and failing if it already exists, preventing TOCTOU race
+	// Try to create the file and failing if it already exists, preventing TOCTOU race
 	// conditions
 	let acquired = OpenOptions::new()
 		.write(true)

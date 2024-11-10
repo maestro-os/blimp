@@ -98,9 +98,7 @@ impl Remote {
 	pub async fn get_size(&self, package: &Package) -> Result<u64> {
 		let url = format!(
 			"http://{}/package/{}/version/{}/archive",
-			self.host,
-			package.get_name(),
-			package.get_version()
+			self.host, package.name, package.version
 		);
 		let client = reqwest::Client::new();
 		let response = client.head(url).send().await?;
@@ -119,12 +117,10 @@ impl Remote {
 	) -> Result<DownloadTask> {
 		let url = format!(
 			"http://{}/package/{}/version/{}/archive",
-			self.host,
-			package.get_name(),
-			package.get_version()
+			self.host, package.name, package.version
 		);
 
-		let path = repo.get_archive_path(package.get_name(), package.get_version());
+		let path = repo.get_archive_path(&package.name, &package.version);
 		DownloadTask::new(&url, &path).await.map_err(Into::into)
 	}
 }

@@ -186,5 +186,5 @@ pub fn get_package_with_constraint<'a>(
 				_ => None,
 			},
 		)
-		.max_by(|(_, p0), (_, p1)| p0.get_version().cmp(p1.get_version())))
+		.max_by(|(_, p0), (_, p1)| p0.version.cmp(&p1.version)))
 }
