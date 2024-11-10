@@ -4,16 +4,13 @@ mod build;
 mod desc;
 mod util;
 
-use crate::build::BuildProcess;
-use crate::util::{get_build_triplet, get_jobs_count};
-use anyhow::Result;
-use anyhow::{anyhow, bail};
+use crate::{
+	build::BuildProcess,
+	util::{get_build_triplet, get_jobs_count},
+};
+use anyhow::{anyhow, bail, Result};
 use common::repository::Repository;
-use std::env;
-use std::fs;
-use std::path::PathBuf;
-use std::process::exit;
-use std::str;
+use std::{env, fs, path::PathBuf, process::exit, str};
 use tokio::runtime::Runtime;
 
 /// The path to the work directory.

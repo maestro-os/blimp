@@ -2,10 +2,7 @@
 
 use anyhow::{anyhow, Result};
 use core::str;
-use std::ffi::OsStr;
-use std::num::NonZeroUsize;
-use std::process::Command;
-use std::{env, io, thread};
+use std::{env, ffi::OsStr, io, num::NonZeroUsize, process::Command, thread};
 
 /// Default build triplet in case it cannot be retrieved.
 const DEFAULT_BUILD_TRIPLET: &str = "x86_64-linux-gnu";

@@ -5,15 +5,13 @@
 #[cfg(feature = "network")]
 pub mod remote;
 
-use crate::package::Package;
-use crate::version::Version;
-use crate::version::VersionConstraint;
-use std::fs;
-use std::io;
-use std::path::PathBuf;
-
+use crate::{
+	package::Package,
+	version::{Version, VersionConstraint},
+};
 #[cfg(feature = "network")]
 use remote::Remote;
+use std::{fs, io, path::PathBuf};
 
 /// Structure representing a local repository.
 pub struct Repository {

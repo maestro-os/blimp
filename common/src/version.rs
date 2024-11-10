@@ -1,16 +1,12 @@
 //! The version structure represents the version of a package.
 
-use serde::de::Error;
-use serde::Deserialize;
-use serde::Deserializer;
-use serde::Serialize;
-use serde::Serializer;
-use std::cmp::min;
-use std::cmp::Ordering;
-use std::fmt;
-use std::fmt::Display;
-use std::fmt::Formatter;
-use std::num::ParseIntError;
+use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
+use std::{
+	cmp::{min, Ordering},
+	fmt,
+	fmt::{Display, Formatter},
+	num::ParseIntError,
+};
 
 /// Structure representing a version.
 #[derive(Clone, Eq, Hash, PartialEq)]

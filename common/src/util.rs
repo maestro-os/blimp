@@ -2,20 +2,16 @@
 
 use bzip2::read::BzDecoder;
 use flate2::read::GzDecoder;
-use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
-use serde::Deserialize;
-use serde::Serialize;
-use std::fs;
-use std::fs::File;
-use std::fs::OpenOptions;
-use std::io;
-use std::io::BufReader;
-use std::io::BufWriter;
-use std::io::Read;
-use std::os::unix;
-use std::path::Path;
-use std::path::PathBuf;
+use rand::{distributions::Alphanumeric, thread_rng, Rng};
+use serde::{Deserialize, Serialize};
+use std::{
+	fs,
+	fs::{File, OpenOptions},
+	io,
+	io::{BufReader, BufWriter, Read},
+	os::unix,
+	path::{Path, PathBuf},
+};
 use tar::Archive;
 use xz2::read::XzDecoder;
 

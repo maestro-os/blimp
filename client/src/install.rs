@@ -1,17 +1,16 @@
 //! This module handles package installation.
 
 use crate::confirm;
-use common::anyhow::bail;
-use common::anyhow::Result;
-use common::package::Package;
-use common::repository;
-use common::repository::Repository;
-use common::Environment;
-use std::collections::HashMap;
-use std::path::PathBuf;
-
 #[cfg(feature = "network")]
 use common::repository::remote::Remote;
+use common::{
+	anyhow::{bail, Result},
+	package::Package,
+	repository,
+	repository::Repository,
+	Environment,
+};
+use std::{collections::HashMap, path::PathBuf};
 
 // TODO Clean
 /// Installs the given list of packages.
@@ -65,8 +64,11 @@ pub async fn install(
 		let res = package.resolve_dependencies(
 			&mut total_packages,
 			&mut |name, version_constraint| {
-				let res =
-					repository::get_package_with_constraint(&repos, name, Some(version_constraint));
+				let res = repository::get_package_with_constraint(
+					&repos,
+					name,
+					Some(version_constraint),
+				);
 				let pkg = match res {
 					Ok(p) => p,
 					Err(e) => {

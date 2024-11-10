@@ -7,18 +7,20 @@ mod remove;
 #[cfg(feature = "network")]
 mod update;
 
-use common::anyhow::anyhow;
-use common::anyhow::Result;
-use common::Environment;
-use install::install;
-use remove::remove;
-use std::env;
-use std::path::{Path, PathBuf};
-use std::process::exit;
-use tokio::runtime::Runtime;
-
 #[cfg(feature = "network")]
 use common::repository::remote::Remote;
+use common::{
+	anyhow::{anyhow, Result},
+	Environment,
+};
+use install::install;
+use remove::remove;
+use std::{
+	env,
+	path::{Path, PathBuf},
+	process::exit,
+};
+use tokio::runtime::Runtime;
 
 /// Prints command line usage.
 fn print_usage(bin: &str) {

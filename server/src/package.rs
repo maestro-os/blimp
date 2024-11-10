@@ -1,8 +1,7 @@
 use crate::global_data::GlobalData;
 use actix_files::NamedFile;
 use actix_web::{error, get, web, HttpRequest, HttpResponse, Responder};
-use common::package;
-use common::version::Version;
+use common::{package, version::Version};
 
 #[get("/package")]
 async fn list(data: web::Data<GlobalData>) -> actix_web::Result<impl Responder> {

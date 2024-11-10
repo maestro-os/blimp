@@ -8,8 +8,7 @@ use actix_web::{get, middleware, web, App, HttpResponse, HttpServer, Responder};
 use common::repository::Repository;
 use config::Config;
 use global_data::GlobalData;
-use std::env;
-use std::io;
+use std::{env, io};
 
 #[get("/")]
 async fn root() -> impl Responder {

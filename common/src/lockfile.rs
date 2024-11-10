@@ -1,10 +1,7 @@
 //! The lock file allows to prevent several instances of the package manager from running at the
 //! same time.
 
-use std::fs;
-use std::fs::OpenOptions;
-use std::io;
-use std::path::Path;
+use std::{fs, fs::OpenOptions, io, path::Path};
 
 /// Creates the lock file if not present.
 ///
@@ -15,7 +12,8 @@ pub fn lock(path: &Path) -> io::Result<bool> {
 	if let Some(parent) = path.parent() {
 		fs::create_dir_all(parent)?;
 	}
-	// Trying to create the file and failing if it already exists, preventing TOCTOU race conditions
+	// Trying to create the file and failing if it already exists, preventing TOCTOU race
+	// conditions
 	let acquired = OpenOptions::new()
 		.write(true)
 		.create_new(true)
