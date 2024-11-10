@@ -15,7 +15,7 @@ pub async fn update(env: &mut Environment) -> Result<()> {
 
 	let mut futures = Vec::new();
 	for r in remotes {
-		let host = r.get_host().to_owned();
+		let host = r.host.to_owned();
 		// TODO limit the number of concurrent tasks running
 		futures.push((host, tokio::spawn(async move { r.fetch_list().await })));
 	}

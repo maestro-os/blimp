@@ -2,19 +2,22 @@
 
 #![feature(io_error_more)]
 
+pub use anyhow;
+pub use serde_json;
+pub use tokio;
+pub use tokio_util;
+pub use utils as maestro_utils;
+
+#[cfg(feature = "network")]
+pub mod download;
 pub mod lockfile;
 pub mod package;
 pub mod repository;
 pub mod util;
 pub mod version;
 
-#[cfg(feature = "network")]
-pub mod download;
-
-pub use anyhow;
 use anyhow::Result;
 use package::{InstalledPackage, Package};
-pub use serde_json;
 use std::{
 	collections::HashMap,
 	error::Error,
@@ -22,8 +25,6 @@ use std::{
 	io::ErrorKind,
 	path::{Path, PathBuf},
 };
-pub use tokio;
-pub use tokio_util;
 
 /// The directory containing cached packages.
 const LOCKFILE_PATH: &str = "/usr/lib/blimp/.lock";
