@@ -128,7 +128,10 @@ pub async fn install(
 			}
 		}
 
-		println!("Total download size: {}", utils::util::ByteSize(total_size));
+		println!(
+			"Total download size: {}",
+			common::maestro_utils::util::ByteSize(total_size)
+		);
 	}
 	#[cfg(not(feature = "network"))]
 	{

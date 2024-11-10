@@ -1,38 +1,20 @@
-//! This module implements a confirmation prompt.
+//! Confirmation prompt.
 
-use std::{
-	io,
-	io::{BufRead, Write},
-};
+use common::maestro_utils;
 
 /// Asks for confirmation. If yes, true is returned. Else, false is returned.
 pub fn prompt() -> bool {
-	let mut first = true;
-	let stdin = io::stdin();
-	let mut response;
-
 	loop {
-		if first {
-			print!("Confirm? [y/n] ");
-		} else {
-			print!("Please type `y` or `n`. ");
+		let Some(input) = maestro_utils::prompt::prompt(Some("Confirm? [Y/n] "), false) else {
+			// Input closed, abort
+			break false;
+		};
+		let input = input.trim().to_lowercase();
+		match input.as_str() {
+			"" | "y" | "ye" | "yes" => break true,
+			"n" | "no" => break false,
+			// Retry
+			_ => {}
 		}
-
-		let _ = io::stdout().flush();
-
-		// Waiting for an input line
-		let input = stdin.lock().lines().next().unwrap().unwrap();
-		response = input == "y";
-
-		// If the input is correct, stop asking
-		if input == "y" || input == "n" {
-			break;
-		}
-
-		first = false;
 	}
-
-	println!();
-
-	response
 }

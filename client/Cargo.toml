@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 common = { path = "../common" }
 tokio = { version = "1.41.1", features = ["macros", "rt", "rt-multi-thread"] }
-utils = { git = "https://github.com/maestro-os/maestro-utils" }
 
 [features]
 default = []
