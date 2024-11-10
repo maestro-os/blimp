@@ -20,6 +20,11 @@ pub const SERVER_PACKAGES_DESC_DIR: &str = "public_desc";
 /// The directory storing packages' archives on the serverside.
 pub const SERVER_PACKAGES_DIR: &str = "public_packages";
 
+/// Tells whether the given package name is valid.
+pub fn is_valid_name(name: &str) -> bool {
+	name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+}
+
 /// Enumeration of possible package dependencies resolution error.
 pub enum ResolveError {
 	/// The dependency cannot be found.

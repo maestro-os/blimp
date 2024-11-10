@@ -1,7 +1,7 @@
 use crate::global_data::GlobalData;
-use crate::util;
 use actix_files::NamedFile;
 use actix_web::{error, get, web, HttpRequest, HttpResponse, Responder};
+use common::package;
 use common::version::Version;
 
 #[get("/package")]
@@ -19,7 +19,7 @@ async fn info(
 ) -> actix_web::Result<impl Responder> {
 	let (name, version) = path.into_inner();
 
-	if !util::is_correct_name(&name) {
+	if !package::is_valid_name(&name) {
 		return Err(error::ErrorBadRequest("invalid package name `{name}`"));
 	}
 	let version =
@@ -43,7 +43,7 @@ async fn archive(
 ) -> actix_web::Result<impl Responder> {
 	let (name, version) = path.into_inner();
 
-	if !util::is_correct_name(&name) {
+	if !package::is_valid_name(&name) {
 		return Err(error::ErrorBadRequest("invalid package name `{name}`"));
 	}
 	let version =
