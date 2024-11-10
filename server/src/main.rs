@@ -4,9 +4,8 @@ mod route;
 
 use axum::{routing::get, Router};
 use common::{repository::Repository, tokio};
-use std::{io, sync::Arc};
-use std::path::PathBuf;
 use serde::Deserialize;
+use std::{io, path::PathBuf, sync::Arc};
 
 /// The server's configuration.
 #[derive(Deserialize)]
