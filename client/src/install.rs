@@ -31,7 +31,10 @@ pub async fn install(
 	let mut failed = false;
 
 	// The list of repositories
-	let repos = env.list_repositories(local_repos)?;
+	let repos = local_repos
+		.iter()
+		.map(|path| Repository::load(path.clone()))
+		.collect::<Result<Vec<_>, _>>()?;
 	// The list of packages to install with their respective repository
 	let mut packages = HashMap::<Package, &Repository>::new();
 
@@ -47,7 +50,7 @@ pub async fn install(
 		if let Some(installed) = installed.get(name) {
 			println!(
 				"Package `{name}` version `{}` is already installed. Reinstalling",
-				installed.desc.get_version()
+				installed.desc.version
 			);
 		}
 	}
@@ -109,8 +112,8 @@ pub async fn install(
 	{
 		let mut total_size = 0;
 		for (pkg, repo) in &total_packages {
-			let name = pkg.get_name();
-			let version = pkg.get_version();
+			let name = &pkg.name;
+			let version = &pkg.version;
 
 			match repo.get_package(name, version)? {
 				Some(_) => println!("\t- {name} ({version}) - cached"),
@@ -148,20 +151,20 @@ pub async fn install(
 
 		// TODO download biggest packages first (sort_unstable by decreasing size)
 		for (pkg, repo) in &total_packages {
-			if repo.is_in_cache(pkg.get_name(), pkg.get_version()) {
-				println!("`{}` is in cache.", pkg.get_name());
+			if repo.is_in_cache(&pkg.name, &pkg.version) {
+				println!("`{}` is in cache.", &pkg.name);
 				continue;
 			}
 
 			if let Some(remote) = repo.get_remote() {
 				// TODO limit the number of packages downloaded concurrently
 				futures.push((
-					pkg.get_name(),
-					pkg.get_version(),
+					&pkg.name,
+					&pkg.version,
 					// TODO spawn task
 					async {
 						let mut task = Remote::fetch_archive(remote, repo, pkg).await?;
-						while task.next().await? {
+						while task.next().await? > 0 {
 							// TODO update progress bar
 						}
 
@@ -188,11 +191,11 @@ pub async fn install(
 
 	// Installing all packages
 	for (pkg, repo) in total_packages {
-		println!("Installing `{}`...", pkg.get_name());
+		println!("Installing `{}`...", pkg.name);
 
-		let archive_path = repo.get_archive_path(pkg.get_name(), pkg.get_version());
+		let archive_path = repo.get_archive_path(&pkg.name, &pkg.version);
 		if let Err(e) = env.install(&pkg, &archive_path) {
-			eprintln!("Failed to install `{}`: {e}", pkg.get_name());
+			eprintln!("Failed to install `{}`: {e}", &pkg.name);
 			failed = true;
 		}
 	}

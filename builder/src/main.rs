@@ -73,8 +73,8 @@ fn build(from: PathBuf, to: PathBuf) -> Result<()> {
 	// TODO Move to separate function
 	let archive_path = {
 		let build_desc = build_process.get_build_desc();
-		let name = build_desc.package.get_name();
-		let version = build_desc.package.get_version();
+		let name = &build_desc.package.name;
+		let version = &build_desc.package.version;
 		let package_path = to.join(name).join(version.to_string());
 		fs::create_dir_all(&package_path)?;
 		let desc_path = package_path.join("desc");

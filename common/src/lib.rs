@@ -14,7 +14,6 @@ pub mod download;
 pub use anyhow;
 use anyhow::Result;
 use package::{InstalledPackage, Package};
-use repository::Repository;
 use std::{
 	collections::HashMap,
 	error::Error,
@@ -56,17 +55,6 @@ impl Environment {
 	/// Returns the sysroot of the current environment.
 	pub fn get_sysroot(&self) -> &Path {
 		&self.sysroot
-	}
-
-	/// Loads and returns the list of all repositories.
-	///
-	/// `local_repos` is the list of paths to local repositories.
-	pub fn list_repositories(&self, local_repos: &[PathBuf]) -> io::Result<Vec<Repository>> {
-		// TODO Add blimp's inner repositories (local representations of remotes)
-		local_repos
-			.iter()
-			.map(|path| Repository::load(path.clone()))
-			.collect::<Result<Vec<_>, _>>()
 	}
 
 	/// Loads the list of installed packages.
@@ -126,7 +114,7 @@ impl Environment {
 		// Update installed list
 		let mut installed = self.load_installed_list()?;
 		installed.insert(
-			pkg.get_name().to_owned(),
+			pkg.name.to_owned(),
 			InstalledPackage {
 				desc: pkg.clone(),
 				files,
@@ -153,7 +141,7 @@ impl Environment {
 		// Update installed list
 		let mut installed = self.load_installed_list()?;
 		installed.insert(
-			pkg.get_name().to_owned(),
+			pkg.name.to_owned(),
 			InstalledPackage {
 				desc: pkg.clone(),
 				files,
@@ -194,7 +182,7 @@ impl Environment {
 		// TODO Execute post-remove-hook
 		// Update installed list
 		let mut installed = self.load_installed_list()?;
-		installed.remove(pkg.desc.get_name());
+		installed.remove(&pkg.desc.name);
 		self.update_installed_list(&installed)?;
 		Ok(())
 	}

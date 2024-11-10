@@ -89,27 +89,25 @@ pub fn read_package_archive(path: &Path) -> io::Result<Archive<GzDecoder<File>>>
 }
 
 /// Copies the content of the directory `src` to the directory `dst` recursively.
+///
+/// **Note**: the parent directory of `dst` must exist.
 pub fn recursive_copy(src: &Path, dst: &Path) -> io::Result<()> {
+	let src_metadata = fs::metadata(src)?;
+	fs::create_dir(dst)?;
 	for entry in fs::read_dir(src)? {
-		let entry = entry?;
-		let file_type = entry.file_type()?;
-		let to = dst.join(entry.file_name());
-
+		let from = entry?;
+		let to = dst.join(from.file_name());
+		let file_type = from.file_type()?;
 		if file_type.is_dir() {
-			// TODO Set timestamps, permissions and owner
-			fs::create_dir_all(&to)?;
-			recursive_copy(&entry.path(), &to)?;
+			recursive_copy(&from.path(), &to)?;
 		} else if file_type.is_symlink() {
-			let _metadata = fs::symlink_metadata(entry.path())?;
-			let target = fs::read_link(entry.path())?;
-
-			// TODO Set timestamps and owner
+			let target = fs::read_link(from.path())?;
 			unix::fs::symlink(target, &to)?;
 		} else {
-			fs::copy(entry.path(), &to)?;
+			fs::copy(from.path(), &to)?;
 		}
 	}
-	Ok(())
+	fs::set_permissions(dst, src_metadata.permissions())
 }
 
 // TODO: rework to allow deserialize from structs with lifetimes (currently unefficient)

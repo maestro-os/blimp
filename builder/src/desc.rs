@@ -87,7 +87,7 @@ impl Source {
 				let (path, _) = common::util::create_tmp_file(WORK_DIR)?;
 				let mut download_task = DownloadTask::new(url, &path).await?;
 				// TODO progress bar
-				while download_task.next().await? {}
+				while download_task.next().await? > 0 {}
 				// TODO check integrity with hash if specified
 				common::util::decompress(&path, &dest_path)?;
 				// TODO remove archive?

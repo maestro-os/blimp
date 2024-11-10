@@ -31,9 +31,7 @@ pub fn remove(names: &[String], env: &mut Environment) -> Result<()> {
 		for (pkg, dep) in unmatched_deps {
 			eprintln!(
 				"- for package `{}` (version `{}`): {}",
-				pkg.desc.get_name(),
-				pkg.desc.get_version(),
-				dep
+				pkg.desc.name, pkg.desc.version, dep
 			);
 		}
 
@@ -44,12 +42,8 @@ pub fn remove(names: &[String], env: &mut Environment) -> Result<()> {
 	// Remove packages
 	for name in names {
 		if let Some(installed) = installed.get(name) {
-			env.remove(installed).map_err(|e| {
-				anyhow!(
-					"failed to remove package `{}`: {e}",
-					installed.desc.get_name()
-				)
-			})?;
+			env.remove(installed)
+				.map_err(|e| anyhow!("failed to remove package `{}`: {e}", installed.desc.name))?;
 		} else {
 			eprintln!("Package `{}` not found!", name);
 			failed = true;
