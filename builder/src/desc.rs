@@ -11,11 +11,11 @@
 
 use anyhow::Result;
 use common::package::Package;
-use serde::Deserialize;
-use serde::Serialize;
-use std::fs;
-use std::path::Path;
-use std::path::PathBuf;
+use serde::{Deserialize, Serialize};
+use std::{
+	fs,
+	path::{Path, PathBuf},
+};
 
 // TODO add an option to allow fetching a tarball without decompressing it?
 

@@ -1,9 +1,9 @@
 //! TODO doc
 
-use common::anyhow::Result;
-use common::anyhow::{anyhow, bail};
-use common::package;
-use common::Environment;
+use common::{
+	anyhow::{anyhow, bail, Result},
+	package, Environment,
+};
 
 // TODO ask for confirm before remove
 

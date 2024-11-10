@@ -1,8 +1,9 @@
 //! This module implements a confirmation prompt.
 
-use std::io;
-use std::io::BufRead;
-use std::io::Write;
+use std::{
+	io,
+	io::{BufRead, Write},
+};
 
 /// Asks for confirmation. If yes, true is returned. Else, false is returned.
 pub fn prompt() -> bool {

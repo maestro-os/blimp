@@ -1,19 +1,19 @@
 //! A package is a software that can be installed using the package manager.
 //! Packages are usualy downloaded from a remote host.
 
-use crate::repository::Repository;
-use crate::version::Version;
-use crate::version::VersionConstraint;
-use serde::Deserialize;
-use serde::Serialize;
-use std::collections::HashMap;
-use std::fmt;
-use std::fmt::Display;
-use std::fmt::Formatter;
-use std::fs;
-use std::io;
-use std::io::ErrorKind;
-use std::path::PathBuf;
+use crate::{
+	repository::Repository,
+	version::{Version, VersionConstraint},
+};
+use serde::{Deserialize, Serialize};
+use std::{
+	collections::HashMap,
+	fmt,
+	fmt::{Display, Formatter},
+	fs, io,
+	io::ErrorKind,
+	path::PathBuf,
+};
 
 /// The directory storing packages' descriptions on the serverside.
 pub const SERVER_PACKAGES_DESC_DIR: &str = "public_desc";

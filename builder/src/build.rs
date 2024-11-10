@@ -1,18 +1,17 @@
 //! Implementation of the package building procedure.
 
-use crate::desc::BuildDescriptor;
-use crate::WORK_DIR;
+use crate::{desc::BuildDescriptor, WORK_DIR};
 use anyhow::Result;
-use flate2::write::GzEncoder;
-use flate2::Compression;
-use std::fs;
-use std::fs::File;
-use std::io;
-use std::path::Path;
-use std::path::PathBuf;
-use std::process::Command;
-use std::str;
-use std::sync::Arc;
+use flate2::{write::GzEncoder, Compression};
+use std::{
+	fs,
+	fs::File,
+	io,
+	path::{Path, PathBuf},
+	process::Command,
+	str,
+	sync::Arc,
+};
 
 /// A build process is the operation of converting source code into an installable package.
 ///

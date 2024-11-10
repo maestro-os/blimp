@@ -2,13 +2,13 @@
 
 use anyhow::Result;
 use bytes::Bytes;
-use futures_util::stream::Stream;
-use futures_util::stream::StreamExt;
-use std::fs::File;
-use std::fs::OpenOptions;
-use std::io::Write;
-use std::path::Path;
-use std::pin::Pin;
+use futures_util::stream::{Stream, StreamExt};
+use std::{
+	fs::{File, OpenOptions},
+	io::Write,
+	path::Path,
+	pin::Pin,
+};
 
 /// A download task, running until the file has been downloaded entirely.
 pub struct DownloadTask {

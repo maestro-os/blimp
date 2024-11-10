@@ -14,16 +14,15 @@ pub use anyhow;
 pub mod download;
 
 use anyhow::Result;
-use package::InstalledPackage;
-use package::Package;
+use package::{InstalledPackage, Package};
 use repository::Repository;
-use std::collections::HashMap;
-use std::error::Error;
-use std::fs;
-use std::io;
-use std::io::ErrorKind;
-use std::path::Path;
-use std::path::PathBuf;
+use std::{
+	collections::HashMap,
+	error::Error,
+	fs, io,
+	io::ErrorKind,
+	path::{Path, PathBuf},
+};
 
 /// The directory containing cached packages.
 const LOCKFILE_PATH: &str = "/usr/lib/blimp/.lock";

@@ -1,18 +1,12 @@
 //! A remote is a remote host from which packages can be downloaded.
 
-use crate::download::DownloadTask;
-use crate::package::Package;
-use crate::repository::Repository;
-use crate::Environment;
-use anyhow::anyhow;
-use anyhow::Result;
-use std::fs::File;
-use std::fs::OpenOptions;
-use std::io;
-use std::io::BufRead;
-use std::io::BufReader;
-use std::io::BufWriter;
-use std::io::Write;
+use crate::{download::DownloadTask, package::Package, repository::Repository, Environment};
+use anyhow::{anyhow, Result};
+use std::{
+	fs::{File, OpenOptions},
+	io,
+	io::{BufRead, BufReader, BufWriter, Write},
+};
 
 // TODO Use https
 
