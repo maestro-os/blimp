@@ -10,7 +10,7 @@ use common::{
 	repository::Repository,
 	Environment,
 };
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, io, path::PathBuf};
 
 // TODO Clean
 /// Installs the given list of packages.
@@ -22,20 +22,17 @@ use std::{collections::HashMap, path::PathBuf};
 pub async fn install(
 	names: &[String],
 	env: &mut Environment,
-	local_repos: &[PathBuf],
+	local_repos: Vec<PathBuf>,
 ) -> Result<()> {
-	let installed = env.load_installed_list()?;
-
-	let mut failed = false;
-
 	// The list of repositories
 	let repos = local_repos
-		.iter()
-		.map(|path| Repository::load(path.clone()))
-		.collect::<Result<Vec<_>, _>>()?;
+		.into_iter()
+		.map(Repository::load)
+		.collect::<io::Result<Vec<_>>>()?;
+	// Tells whether the operation failed
+	let mut failed = false;
 	// The list of packages to install with their respective repository
 	let mut packages = HashMap::<Package, &Repository>::new();
-
 	for name in names {
 		let pkg = repository::get_package_with_constraint(&repos, name, None)?;
 		let Some((repo, pkg)) = pkg else {
@@ -44,23 +41,17 @@ pub async fn install(
 			continue;
 		};
 		packages.insert(pkg, repo);
-
-		if let Some(installed) = installed.get(name) {
-			println!(
-				"Package `{name}` version `{}` is already installed. Reinstalling",
-				installed.desc.version
-			);
+		// If already installed, print message
+		if let Some(version) = env.get_installed_version(name) {
+			println!("Package `{name}` version `{version}` is already installed. Reinstalling",);
 		}
 	}
 	if failed {
 		bail!("installation failed");
 	}
-
 	println!("Resolving dependencies...");
-
 	// The list of all packages, dependencies included
 	let mut total_packages = packages.clone();
-
 	// TODO check dependencies for all packages at once to avoid duplicate errors
 	// Resolving dependencies
 	for (package, _) in packages {
@@ -79,14 +70,11 @@ pub async fn install(
 						return None;
 					}
 				};
-
 				match pkg {
 					Some((repo, pkg)) => Some((pkg, repo)),
-
 					// If not present, check on remote
 					None => {
-						// TODO
-						todo!();
+						todo!()
 					}
 				}
 			},
@@ -95,16 +83,13 @@ pub async fn install(
 			for e in errs {
 				eprintln!("{e}");
 			}
-
 			failed = true;
 		}
 	}
 	if failed {
 		bail!("installation failed");
 	}
-
 	println!("Packages to be installed:");
-
 	// List packages to be installed
 	#[cfg(feature = "network")]
 	{
@@ -112,22 +97,17 @@ pub async fn install(
 		for (pkg, repo) in &total_packages {
 			let name = &pkg.name;
 			let version = &pkg.version;
-
 			match repo.get_package(name, version)? {
 				Some(_) => println!("\t- {name} ({version}) - cached"),
-
 				None => {
-					let remote = repo.get_remote().unwrap();
-
 					// Get package size from remote
+					let remote = repo.get_remote().unwrap();
 					let size = remote.get_size(pkg).await?;
 					total_size += size;
-
 					println!("\t- {name} ({version}) - download size: {size}");
 				}
 			}
 		}
-
 		println!(
 			"Total download size: {}",
 			common::maestro_utils::util::ByteSize(total_size)
@@ -139,24 +119,20 @@ pub async fn install(
 			println!("\t- {} ({}) - cached", pkg.name, pkg.version);
 		}
 	}
-
 	if !confirm::prompt() {
 		println!("Aborting.");
 		return Ok(());
 	}
-
 	#[cfg(feature = "network")]
 	{
 		println!("Downloading packages...");
 		let mut futures = Vec::new();
-
 		// TODO download biggest packages first (sort_unstable by decreasing size)
 		for (pkg, repo) in &total_packages {
 			if repo.is_in_cache(&pkg.name, &pkg.version) {
 				println!("`{}` is in cache.", &pkg.name);
 				continue;
 			}
-
 			if let Some(remote) = repo.get_remote() {
 				// TODO limit the number of packages downloaded concurrently
 				futures.push((
@@ -173,7 +149,6 @@ pub async fn install(
 				));
 			}
 		}
-
 		// TODO Add progress bar
 		for (name, version, f) in futures {
 			match f.await {
@@ -187,14 +162,11 @@ pub async fn install(
 			bail!("installation failed");
 		}
 	}
-
 	println!();
 	println!("Installing packages...");
-
-	// Installing all packages
+	// Install all packages
 	for (pkg, repo) in total_packages {
 		println!("Installing `{}`...", pkg.name);
-
 		let archive_path = repo.get_archive_path(&pkg.name, &pkg.version);
 		if let Err(e) = env.install(&pkg, &archive_path) {
 			eprintln!("Failed to install `{}`: {e}", &pkg.name);
@@ -204,6 +176,5 @@ pub async fn install(
 	if failed {
 		bail!("installation failed");
 	}
-
 	Ok(())
 }

@@ -12,7 +12,7 @@ use std::{
 };
 
 /// The file which contains the list of remotes.
-const REMOTES_FILE: &str = "usr/lib/blimp/remotes_list";
+const REMOTES_FILE: &str = "var/lib/blimp/remotes_list";
 
 /// A remote host.
 #[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -30,7 +30,7 @@ impl Borrow<str> for Remote {
 impl Remote {
 	/// Loads and returns the list of remote hosts.
 	pub fn load_list(env: &Environment) -> io::Result<HashSet<Self>> {
-		let path = env.get_sysroot().join(REMOTES_FILE);
+		let path = env.sysroot().join(REMOTES_FILE);
 		let file = File::open(path)?;
 		let reader = BufReader::new(file);
 		reader
@@ -45,7 +45,7 @@ impl Remote {
 
 	/// Saves the list of remote hosts.
 	pub fn save_list(env: &Environment, remotes: impl Iterator<Item = Remote>) -> io::Result<()> {
-		let path = env.get_sysroot().join(REMOTES_FILE);
+		let path = env.sysroot().join(REMOTES_FILE);
 		let file = OpenOptions::new()
 			.read(true)
 			.write(true)
@@ -61,13 +61,12 @@ impl Remote {
 	}
 
 	/// Returns the remote's motd.
-	pub fn fetch_motd(&self) -> Result<String> {
+	pub async fn fetch_motd(&self) -> Result<String> {
 		let url = format!("https://{}/motd", &self.host);
-		let response = reqwest::blocking::get(url)?;
+		let response = reqwest::get(url).await?;
 		let status = response.status();
-		let content = response.text()?;
 		match status {
-			StatusCode::OK => Ok(content),
+			StatusCode::OK => Ok(response.text().await?),
 			_ => bail!("Failed to retrieve motd (status {status})"),
 		}
 	}

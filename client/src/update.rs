@@ -1,45 +1,35 @@
 //! This module handles packages list updating.
 
 use common::{
-	anyhow::{anyhow, Result},
+	anyhow::{anyhow, bail, Result},
 	repository::remote::Remote,
 	Environment,
 };
 
 /// Updates the packages list.
 pub async fn update(env: &mut Environment) -> Result<()> {
-	let remotes =
-		Remote::load_list(env).map_err(|e| anyhow!("Could not update packages list: {}", e))?;
-
+	let remotes = Remote::load_list(env)
+		.map_err(|error| anyhow!("Could not update packages list: {error}"))?;
 	println!("Updating from remotes...");
-
 	let mut futures = Vec::new();
-	for r in remotes {
-		let host = r.host.to_owned();
-		// TODO limit the number of concurrent tasks running
-		futures.push((host, tokio::spawn(async move { r.fetch_list().await })));
+	for r in &remotes {
+		futures.push((&r.host, r.fetch_list()));
 	}
-
-	let mut err = false;
+	let mut failed = false;
 	for (host, f) in futures {
-		match f.await? {
+		match f.await {
 			Ok(packages) => {
 				println!("Remote `{host}`: Found {} package(s).", packages.len());
-
-				// TODO
-				todo!();
+				todo!()
 			}
-
 			Err(e) => {
 				eprintln!("Remote `{host}`: {e}");
-				err = true;
+				failed = true;
 			}
 		}
 	}
-
-	if err {
-		Err(anyhow!("update failed"))
-	} else {
-		Ok(())
+	if failed {
+		bail!("update failed");
 	}
+	Ok(())
 }

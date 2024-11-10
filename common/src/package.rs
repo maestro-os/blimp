@@ -99,7 +99,7 @@ pub struct Package {
 impl Package {
 	/// Loads a package from the given path.
 	///
-	/// If the package doesn't exist, the function returns None.
+	/// If the package does not exist, the function returns None.
 	pub fn load(path: PathBuf) -> io::Result<Option<Package>> {
 		match fs::read_to_string(path.join("desc")) {
 			Ok(content) => Ok(Some(serde_json::from_str(&content)?)),
