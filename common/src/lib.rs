@@ -8,6 +8,8 @@ pub mod repository;
 pub mod util;
 pub mod version;
 
+pub use anyhow;
+
 #[cfg(feature = "network")]
 pub mod download;
 

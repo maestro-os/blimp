@@ -7,8 +7,8 @@ mod remove;
 #[cfg(feature = "network")]
 mod update;
 
-use anyhow::anyhow;
-use anyhow::Result;
+use common::anyhow::anyhow;
+use common::anyhow::Result;
 use common::Environment;
 use install::install;
 use remove::remove;
