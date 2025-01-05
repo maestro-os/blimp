@@ -14,7 +14,7 @@ cargo build --release --features network
 Then, you can specify the target triplet for which the toolchain compiles with the `TARGET` environment variable. Example:
 
 ```sh
-export TARGET="i686-unknown-linux-musl"
+export TARGET="x86_64-unknown-linux-musl"
 ```
 
 Then, in this directory use `build.sh` to build the toolchain:

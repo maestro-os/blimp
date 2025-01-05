@@ -2,6 +2,20 @@
 
 set -e
 
+case $TARGET in
+	i*86-*)
+		ARCH=i386
+		;;
+	x86_64-*)
+		ARCH=x86_64
+		;;
+	*)
+		>&2 echo "Unsupported architecture"
+		exit 1
+esac
+
+MAJOR_VERSION=${PKG_VERSION%%.*}
+
 mv llvm-* llvm
 mkdir {clang,libc++,compiler-rt}-build
 
@@ -62,14 +76,14 @@ LDFLAGS="-nostdlib" cmake \
   -DCOMPILER_RT_BUILD_ORC=ON \
   -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON \
   -DCOMPILER_RT_BUILTINS_ENABLE_PIC=OFF \
-  -DCMAKE_INSTALL_PREFIX="$SYSROOT/lib/clang/$PKG_VERSION/"
+  -DCMAKE_INSTALL_PREFIX="$SYSROOT/lib/clang/$MAJOR_VERSION/"
 ninja -j$JOBS
 ninja -j$JOBS install
 cd ..
 
 # Patch
 mkdir -p "$SYSROOT/usr/lib"
-ln -fsv "../../lib/clang/$PKG_VERSION/lib/linux/clang_rt.crtbegin-i386.o" "$SYSROOT/usr/lib/crtbegin.o"
+ln -fsv "../../lib/clang/$MAJOR_VERSION/lib/linux/clang_rt.crtbegin-$ARCH.o" "$SYSROOT/usr/lib/crtbegin.o"
 ln -fsv crtbegin.o "$SYSROOT/usr/lib/crtbeginS.o"
 ln -fsv crtbegin.o "$SYSROOT/usr/lib/crtbeginT.o"
-ln -fsv "../../lib/clang/$PKG_VERSION/lib/linux/clang_rt.crtend-i386.o" "$SYSROOT/usr/lib/crtend.o"
+ln -fsv "../../lib/clang/$MAJOR_VERSION/lib/linux/clang_rt.crtend-$ARCH.o" "$SYSROOT/usr/lib/crtend.o"
