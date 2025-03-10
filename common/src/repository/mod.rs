@@ -5,15 +5,13 @@
 #[cfg(feature = "network")]
 pub mod remote;
 
-use crate::package::Package;
-use crate::version::Version;
-use crate::version::VersionConstraint;
-use std::fs;
-use std::io;
-use std::path::PathBuf;
-
+use crate::{
+	package::Package,
+	version::{Version, VersionConstraint},
+};
 #[cfg(feature = "network")]
 use remote::Remote;
+use std::{fs, io, path::PathBuf};
 
 /// Structure representing a local repository.
 pub struct Repository {
@@ -110,7 +108,7 @@ impl Repository {
 	/// Arguments:
 	/// - `name` is the name of the package.
 	/// - `version_constraint` is the version constraint to match. If no constraint is specified,
-	/// the latest version is selected.
+	///   the latest version is selected.
 	///
 	/// If the package doesn't exist, the function returns `None`.
 	pub fn get_package_with_constraint(
@@ -171,8 +169,8 @@ pub fn get_package<'a>(
 ///
 /// Arguments:
 /// - `name` is the name of the package.
-/// - `version_constraint` is the version constraint to match. If no constraint is specified,
-/// the latest version is selected.
+/// - `version_constraint` is the version constraint to match. If no constraint is specified, the
+///   latest version is selected.
 ///
 /// If the package doesn't exist, the function returns `None`.
 pub fn get_package_with_constraint<'a>(
@@ -188,5 +186,5 @@ pub fn get_package_with_constraint<'a>(
 				_ => None,
 			},
 		)
-		.max_by(|(_, p0), (_, p1)| p0.get_version().cmp(p1.get_version())))
+		.max_by(|(_, p0), (_, p1)| p0.version.cmp(&p1.version)))
 }
