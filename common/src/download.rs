@@ -33,7 +33,15 @@ impl DownloadTask {
 	/// - `url` is the URL to download the file from.
 	/// - `path` is the path to which the file has to be saved.
 	pub async fn new(url: &str, path: &Path) -> Result<Self> {
-		let response = reqwest::get(url).await?;
+		let client = reqwest::Client::new();
+
+		const BLIMP_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+		let response = client
+			.get(url)
+			.header("User-Agent", format!("blimp/{}", BLIMP_VERSION))
+			.send()
+			.await?;
 		let total_size = response.content_length();
 		let stream = response.bytes_stream();
 
