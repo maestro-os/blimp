@@ -76,7 +76,10 @@ pub fn decompress(src: &Path, dest: &Path) -> io::Result<()> {
 		Some("application/x-bzip2") => decompress_impl(BzDecoder::new(file), dest),
 		_ => Err(io::Error::new(
 			io::ErrorKind::Other,
-			"Invalid or unsupported archive format",
+			format!(
+				"Invalid or unsupported archive format: {}",
+				file_type.unwrap_or("<not detected>")
+			),
 		)),
 	}
 }
