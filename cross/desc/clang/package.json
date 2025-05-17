@@ -2,12 +2,12 @@
   "sources": [
     {
       "location": "/",
-      "url": "https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-18.1.4.tar.gz"
+      "url": "https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-20.1.5.tar.gz"
     }
   ],
   "package": {
     "name": "clang",
-    "version": "18.1.4",
+    "version": "20.1.5",
 
     "description": "The Clang project provides a language front-end and tooling infrastructure for languages in the C language family (C, C++, Objective C/C++, OpenCL, CUDA, and RenderScript) for the LLVM project.",
 

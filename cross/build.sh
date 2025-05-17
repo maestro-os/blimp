@@ -12,11 +12,11 @@ fi
 if [ -z "$LOCAL_REPO" ]; then
 	export LOCAL_REPO="$SYSROOT/repo/"
 fi
-SYSROOT="$(realpath "$SYSROOT")"
-LOCAL_REPO="$(realpath "$LOCAL_REPO")"
 
 # Prepare
 mkdir -p "$SYSROOT" "$LOCAL_REPO"
+SYSROOT="$(realpath "$SYSROOT")"
+LOCAL_REPO="$(realpath "$LOCAL_REPO")"
 PATH="$(pwd)/../target/release:$PATH"
 
 # binutils
