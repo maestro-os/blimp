@@ -42,12 +42,14 @@ cmake \
   -B ../libc++-build \
   -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind" \
   -DLIBCXX_USE_COMPILER_RT=OFF \
+  -DLIBCXX_HAS_MUSL_LIBC=ON \
   -DCMAKE_C_COMPILER="$SYSROOT/bin/clang" \
   -DCMAKE_CXX_COMPILER="$SYSROOT/bin/clang++" \
   -DCMAKE_ASM_COMPILER_TARGET="$TARGET" \
   -DCMAKE_C_COMPILER_TARGET="$TARGET" \
   -DCMAKE_CXX_COMPILER_TARGET="$TARGET" \
-  -DCMAKE_CXX_FLAGS="-nostdlib++" \
+  -DCMAKE_C_FLAGS="-I$TOOLCHAIN/usr/include" \
+  -DCMAKE_CXX_FLAGS="-I$TOOLCHAIN/usr/include -nostdlib++" \
   -DCMAKE_INSTALL_PREFIX="$SYSROOT"
 cd ../libc++-build
 ninja -j$JOBS cxx cxxabi unwind

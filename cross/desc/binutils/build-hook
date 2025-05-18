@@ -13,6 +13,7 @@ cd build
 	--host="$HOST" \
 	--target="$TARGET" \
 	--disable-werror \
+	--disable-nls \
 	--enable-64-bit-bfd \
 	--enable-gprofng=no
 make -j${JOBS}

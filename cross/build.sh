@@ -6,27 +6,27 @@ set -e
 if [ -z "$TARGET" ]; then
   export TARGET=x86_64-unknown-linux-musl
 fi
-if [ -z "$SYSROOT" ]; then
-	export SYSROOT="toolchain/"
+if [ -z "$TOOLCHAIN" ]; then
+	export TOOLCHAIN="toolchain/"
 fi
 if [ -z "$LOCAL_REPO" ]; then
-	export LOCAL_REPO="$SYSROOT/repo/"
+	export LOCAL_REPO="$TOOLCHAIN/repo/"
 fi
 
 # Prepare
-mkdir -p "$SYSROOT" "$LOCAL_REPO"
-SYSROOT="$(realpath "$SYSROOT")"
+mkdir -p "$TOOLCHAIN" "$LOCAL_REPO"
+TOOLCHAIN="$(realpath "$TOOLCHAIN")"
 LOCAL_REPO="$(realpath "$LOCAL_REPO")"
 PATH="$(pwd)/../target/release:$PATH"
 
-# binutils
+## binutils
 blimp-builder desc/binutils "$LOCAL_REPO"
 yes | blimp install binutils
 
 # musl
-TOOLCHAIN="$SYSROOT" source ./env.sh
+source ./env.sh
 HOST="$TARGET" blimp-builder desc/musl "$LOCAL_REPO"
-unset CC LD CFLAGS LDFLAGS RUSTFLAGS
+unset CC CXX LD CFLAGS CXXFLAGS LDFLAGS LIBCC RUSTFLAGS
 yes | blimp install musl
 
 # clang
