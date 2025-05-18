@@ -16,6 +16,7 @@ fi
 # Prepare
 mkdir -p "$TOOLCHAIN" "$LOCAL_REPO"
 TOOLCHAIN="$(realpath "$TOOLCHAIN")"
+export SYSROOT="$TOOLCHAIN"
 LOCAL_REPO="$(realpath "$LOCAL_REPO")"
 PATH="$(pwd)/../target/release:$PATH"
 

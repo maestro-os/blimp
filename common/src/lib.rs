@@ -203,6 +203,7 @@ impl Environment {
 impl Drop for Environment {
 	fn drop(&mut self) {
 		let path = util::concat_paths(&self.sysroot, LOCKFILE_PATH);
-		lockfile::unlock(&path).unwrap_or_else(|e| eprintln!("blimp: could remove lockfile: {e}"));
+		lockfile::unlock(&path)
+			.unwrap_or_else(|e| eprintln!("blimp: could not remove lockfile: {e}"));
 	}
 }
