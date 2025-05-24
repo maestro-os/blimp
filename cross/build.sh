@@ -4,7 +4,7 @@ set -e
 
 # If the target is not specified, set to default
 if [ -z "$TARGET" ]; then
-  export TARGET=x86_64-unknown-linux-musl
+	export TARGET=x86_64-unknown-linux-musl
 fi
 if [ -z "$TOOLCHAIN" ]; then
 	export TOOLCHAIN="toolchain/"
@@ -20,7 +20,7 @@ export SYSROOT="$TOOLCHAIN"
 LOCAL_REPO="$(realpath "$LOCAL_REPO")"
 PATH="$(pwd)/../target/release:$PATH"
 
-## binutils
+# binutils
 blimp-builder desc/binutils "$LOCAL_REPO"
 yes | blimp install binutils
 
