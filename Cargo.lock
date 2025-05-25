@@ -165,6 +165,7 @@ dependencies = [
  "axum",
  "common",
  "envy",
+ "serde",
  "tracing",
  "tracing-subscriber",
 ]
