@@ -81,7 +81,7 @@ impl Remote {
 	/// Fetches the list of all the packages from the remote.
 	pub async fn fetch_list(&self) -> Result<Vec<Package>> {
 		let client = reqwest::Client::new();
-		let url = format!("https://{}/package", &self.host);
+		let url = format!("https://{}/package", self.host);
 		let response = client
 			.get(url)
 			.header("User-Agent", USER_AGENT)
@@ -121,6 +121,6 @@ impl Remote {
 			self.host, package.name, package.version
 		);
 		let path = repo.get_archive_path(&package.name, &package.version);
-		DownloadTask::new(&url, &path).await.map_err(Into::into)
+		DownloadTask::new(&url, &path).await
 	}
 }
