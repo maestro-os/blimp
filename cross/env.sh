@@ -5,7 +5,7 @@
 if [ -z $TOOLCHAIN ]; then
 	TOOLCHAIN="toolchain/"
 fi
-TOOLCHAIN="$(realpath "$TOOLCHAIN")"
+export TOOLCHAIN="$(realpath "$TOOLCHAIN")"
 
 export PATH="$TOOLCHAIN/usr/bin:$TOOLCHAIN/bin:$PATH"
 
