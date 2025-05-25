@@ -8,10 +8,13 @@ use crate::{
 	build::BuildProcess,
 	util::{get_build_triplet, get_jobs_count},
 };
-use anyhow::{anyhow, bail, Result};
-use common::{repository::Repository, serde_json};
+use common::{
+	anyhow::{anyhow, bail, Result},
+	repository::Repository,
+	serde_json,
+	tokio::runtime::Runtime,
+};
 use std::{env, fs, io, path::PathBuf, process::exit, str};
-use tokio::runtime::Runtime;
 
 /// The path to the work directory.
 const WORK_DIR: &str = "work/";

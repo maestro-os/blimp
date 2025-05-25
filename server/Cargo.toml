@@ -4,9 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-axum = "0.7.7"
+axum = "0.8.3"
 common = { path = "../common" }
 envy = "0.4.2"
-serde = { version = "1.0.214", features = ["derive"] }
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"

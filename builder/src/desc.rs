@@ -9,8 +9,7 @@
 //! Tarballs may contain a single directory in which all files are present. "Unwrapping" is the
 //! action of moving all the files out of this directory while decompressing the archive.
 
-use anyhow::Result;
-use common::package::Package;
+use common::{anyhow::Result, package::Package};
 use serde::{Deserialize, Serialize};
 use std::{
 	fs,

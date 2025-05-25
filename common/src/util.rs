@@ -2,7 +2,7 @@
 
 use bzip2::read::BzDecoder;
 use flate2::read::GzDecoder;
-use rand::{distributions::Alphanumeric, thread_rng, Rng};
+use rand::{distr::Alphanumeric, rng, Rng};
 use std::{
 	fs,
 	fs::{File, OpenOptions},
@@ -18,8 +18,8 @@ fn create_tmp<T, F: Fn(&Path) -> io::Result<T>>(parent: &Path, f: F) -> io::Resu
 	fs::create_dir_all(parent)?;
 	let parent = parent.canonicalize()?;
 	for _ in 0..100 {
-		let name: String = thread_rng()
-			.sample_iter(&Alphanumeric)
+		let name: String = rng()
+			.sample_iter(Alphanumeric)
 			.take(16)
 			.map(char::from)
 			.collect();

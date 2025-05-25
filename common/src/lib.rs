@@ -3,7 +3,9 @@
 #![feature(io_error_more)]
 
 pub use anyhow;
+pub use flate2;
 pub use serde_json;
+pub use tar;
 pub use tokio;
 pub use tokio_util;
 pub use utils as maestro_utils;
@@ -156,6 +158,7 @@ impl Environment {
 impl Drop for Environment {
 	fn drop(&mut self) {
 		let path = self.sysroot.join(LOCKFILE_PATH);
-		lockfile::unlock(&path).unwrap_or_else(|e| eprintln!("blimp: could not remove lockfile: {e}"));
+		lockfile::unlock(&path)
+			.unwrap_or_else(|e| eprintln!("blimp: could not remove lockfile: {e}"));
 	}
 }
