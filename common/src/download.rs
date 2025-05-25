@@ -1,5 +1,6 @@
 //! This module handles files download.
 
+use crate::USER_AGENT;
 use anyhow::Result;
 use bytes::Bytes;
 use futures_util::stream::{Stream, StreamExt};
@@ -30,7 +31,6 @@ impl DownloadTask {
 	/// - `url` is the URL to download the file from.
 	/// - `path` is the path to which the file has to be saved.
 	pub async fn new(url: &str, path: &Path) -> Result<Self> {
-		const USER_AGENT: &str = concat!("blimp/", env!("CARGO_PKG_VERSION"));
 		let client = reqwest::Client::new();
 		let response = client
 			.get(url)

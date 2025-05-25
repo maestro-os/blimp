@@ -34,6 +34,9 @@ const LOCKFILE_PATH: &str = "var/lib/blimp/.lock";
 /*/// The path to directory storing information about installed packages.
 const INSTALLED_DB: &str = "var/lib/blimp/installed";*/
 
+/// The user agent for HTTP requests.
+pub const USER_AGENT: &str = concat!("blimp/", env!("CARGO_PKG_VERSION"));
+
 /// An environment is a system managed by the package manager.
 ///
 /// On creation, the environment creates a lockfile to ensure no other instance can access it at

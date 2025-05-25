@@ -35,7 +35,7 @@ fn print_usage() {
 	eprintln!("\tinstall <package...>: Installs the given package(s)");
 	#[cfg(feature = "network")]
 	{
-		eprintln!("\tupdate: Synchronizes packets information from remote");
+		eprintln!("\tupdate: Synchronizes packages information from remote");
 	}
 	eprintln!(
 		"\tupgrade [package...]: Upgrades the given package(s). If no package is specified, \

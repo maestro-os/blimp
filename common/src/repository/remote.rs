@@ -1,6 +1,8 @@
 //! A remote is a remote host from which packages can be downloaded.
 
-use crate::{download::DownloadTask, package::Package, repository::Repository, Environment};
+use crate::{
+	download::DownloadTask, package::Package, repository::Repository, Environment, USER_AGENT,
+};
 use anyhow::{anyhow, bail, Result};
 use reqwest::StatusCode;
 use std::{
@@ -62,8 +64,13 @@ impl Remote {
 
 	/// Returns the remote's motd.
 	pub async fn fetch_motd(&self) -> Result<String> {
+		let client = reqwest::Client::new();
 		let url = format!("https://{}/motd", &self.host);
-		let response = reqwest::get(url).await?;
+		let response = client
+			.get(url)
+			.header("User-Agent", USER_AGENT)
+			.send()
+			.await?;
 		let status = response.status();
 		match status {
 			StatusCode::OK => Ok(response.text().await?),
@@ -73,8 +80,13 @@ impl Remote {
 
 	/// Fetches the list of all the packages from the remote.
 	pub async fn fetch_list(&self) -> Result<Vec<Package>> {
+		let client = reqwest::Client::new();
 		let url = format!("https://{}/package", &self.host);
-		let response = reqwest::get(url).await?;
+		let response = client
+			.get(url)
+			.header("User-Agent", USER_AGENT)
+			.send()
+			.await?;
 		let status = response.status();
 		match status {
 			StatusCode::OK => Ok(response.json().await?),
@@ -84,16 +96,18 @@ impl Remote {
 
 	/// Returns the download size of the package `package` in bytes.
 	pub async fn get_size(&self, package: &Package) -> Result<u64> {
+		let client = reqwest::Client::new();
 		let url = format!(
 			"https://{}/package/{}/version/{}/archive",
 			self.host, package.name, package.version
 		);
-		let client = reqwest::Client::new();
-		let response = client.head(url).send().await?;
-		let len = response
+		client
+			.head(url)
+			.header("User-Agent", USER_AGENT)
+			.send()
+			.await?
 			.content_length()
-			.ok_or_else(|| anyhow!("Content-Length field not present in response"))?;
-		Ok(len)
+			.ok_or_else(|| anyhow!("Content-Length field not present in response"))
 	}
 
 	/// Downloads the archive of package `package` to the given repository `repo`.
