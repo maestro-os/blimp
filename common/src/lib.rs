@@ -30,8 +30,9 @@ use std::{
 
 /// The directory containing cached packages.
 const LOCKFILE_PATH: &str = "var/lib/blimp/.lock";
-/// The path to directory storing information about installed packages.
-const INSTALLED_DB: &str = "var/lib/blimp/installed";
+// TODO
+/*/// The path to directory storing information about installed packages.
+const INSTALLED_DB: &str = "var/lib/blimp/installed";*/
 
 /// An environment is a system managed by the package manager.
 ///
