@@ -20,7 +20,7 @@ jobs:
       - name: Check release compilation
         run: cargo build --release
       - name: Clippy
-        run: cargo clippy --all-targets
+        run: cargo clippy --all-targets -- -D warnings
       - name: Unit tests
         run: cargo test
   online:
@@ -32,6 +32,6 @@ jobs:
       - name: Check release compilation
         run: cargo build --release --features network
       - name: Clippy
-        run: cargo clippy --features network --all-targets
+        run: cargo clippy --features network --all-targets -- -D warnings
       - name: Unit tests
         run: cargo test --features network --all-targets

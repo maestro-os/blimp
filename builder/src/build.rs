@@ -1,18 +1,20 @@
 //! Implementation of the package building procedure.
 
-use crate::desc::BuildDescriptor;
-use crate::WORK_DIR;
-use anyhow::Result;
-use flate2::write::GzEncoder;
-use flate2::Compression;
-use std::fs;
-use std::fs::File;
-use std::io;
-use std::path::Path;
-use std::path::PathBuf;
-use std::process::Command;
-use std::str;
-use std::sync::Arc;
+use crate::{desc::BuildDescriptor, WORK_DIR};
+use common::{
+	anyhow::Result,
+	flate2::{write::GzEncoder, Compression},
+	serde_json, tar, tokio,
+};
+use std::{
+	fs,
+	fs::File,
+	io,
+	path::{Path, PathBuf},
+	process::Command,
+	str,
+	sync::Arc,
+};
 
 /// A build process is the operation of converting source code into an installable package.
 ///
@@ -38,7 +40,8 @@ impl BuildProcess {
 	/// `input_path` is the path to the directory containing information to build the package.
 	pub fn new(input_path: PathBuf) -> io::Result<Self> {
 		let build_desc_path = input_path.join("package.json");
-		let build_desc = common::util::read_json::<BuildDescriptor>(&build_desc_path)?;
+		let build_desc = fs::read_to_string(build_desc_path)?;
+		let build_desc = serde_json::from_str(&build_desc)?;
 		Ok(Self {
 			input_path,
 			build_desc,
@@ -98,12 +101,9 @@ impl BuildProcess {
 			.env("HOST", host)
 			.env("TARGET", target)
 			.env("SYSROOT", &self.sysroot)
-			.env("PKG_NAME", self.build_desc.package.get_name())
-			.env(
-				"PKG_VERSION",
-				self.build_desc.package.get_version().to_string(),
-			)
-			.env("PKG_DESC", self.build_desc.package.get_description())
+			.env("PKG_NAME", &self.build_desc.package.name)
+			.env("PKG_VERSION", self.build_desc.package.version.to_string())
+			.env("PKG_DESC", &self.build_desc.package.description)
 			.env("JOBS", jobs.to_string())
 			.current_dir(&self.build_dir)
 			.status()

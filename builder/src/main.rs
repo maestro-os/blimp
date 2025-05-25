@@ -4,17 +4,17 @@ mod build;
 mod desc;
 mod util;
 
-use crate::build::BuildProcess;
-use crate::util::{get_build_triplet, get_jobs_count};
-use anyhow::Result;
-use anyhow::{anyhow, bail};
-use common::repository::Repository;
-use std::env;
-use std::fs;
-use std::path::PathBuf;
-use std::process::exit;
-use std::str;
-use tokio::runtime::Runtime;
+use crate::{
+	build::BuildProcess,
+	util::{get_build_triplet, get_jobs_count},
+};
+use common::{
+	anyhow::{anyhow, bail, Result},
+	repository::Repository,
+	serde_json,
+	tokio::runtime::Runtime,
+};
+use std::{env, fs, io, path::PathBuf, process::exit, str};
 
 /// The path to the work directory.
 const WORK_DIR: &str = "work/";
@@ -42,6 +42,25 @@ fn print_usage(bin: &str) {
 	eprintln!("\tBLIMP_DEBUG: If set to `true`, build files are kept for troubleshooting purpose");
 	eprintln!();
 	eprintln!("All environment variable are optional");
+}
+
+/// Prepares the repository's directory for the package.
+///
+/// On success, the function returns the output archive path.
+fn prepare(build_process: &BuildProcess, to: PathBuf) -> io::Result<PathBuf> {
+	// Create directory
+	let build_desc = build_process.get_build_desc();
+	let name = &build_desc.package.name;
+	let version = &build_desc.package.version;
+	let package_path = to.join(name).join(version.to_string());
+	fs::create_dir_all(&package_path)?;
+	// Create descriptor
+	let desc_path = package_path.join("desc");
+	let desc = serde_json::to_string(&build_desc.package)?;
+	fs::write(desc_path, desc)?;
+	// Get archive path
+	let repo = Repository::load(to)?;
+	Ok(repo.get_archive_path(name, version))
 }
 
 /// Builds the package.
@@ -73,18 +92,8 @@ fn build(from: PathBuf, to: PathBuf) -> Result<()> {
 		bail!("Package build failed!");
 	}
 	println!("[INFO] Prepare repository at `{}`...", to.display());
-	// TODO Move to separate function
-	let archive_path = {
-		let build_desc = build_process.get_build_desc();
-		let name = build_desc.package.get_name();
-		let version = build_desc.package.get_version();
-		let package_path = to.join(name).join(version.to_string());
-		fs::create_dir_all(&package_path)?;
-		let desc_path = package_path.join("desc");
-		common::util::write_json(&desc_path, &build_desc.package)?;
-		let repo = Repository::load(to)?;
-		repo.get_archive_path(name, version)
-	};
+	let archive_path = prepare(&build_process, to)
+		.map_err(|e| anyhow!("Failed to prepare directory for package: {e}"))?;
 	println!("[INFO] Create archive...");
 	build_process
 		.create_archive(&archive_path)

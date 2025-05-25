@@ -1,57 +1,50 @@
 //! The blimp server serves packages to be installed by the package manager.
 
-mod config;
-mod global_data;
-mod package;
-mod util;
+mod route;
 
-use actix_web::{get, middleware, web, App, HttpResponse, HttpServer, Responder};
-use common::repository::Repository;
-use config::Config;
-use global_data::GlobalData;
-use std::env;
-use std::io;
+use axum::{routing::get, Router};
+use common::{repository::Repository, tokio};
+use serde::Deserialize;
+use std::{io, path::PathBuf, sync::Arc};
 
-#[get("/")]
-async fn root() -> impl Responder {
-	let body = format!("Blimp server version {}", env!("CARGO_PKG_VERSION"));
-	HttpResponse::Ok().body(body)
+/// The server's configuration.
+#[derive(Deserialize)]
+pub struct Config {
+	/// The server's port.
+	pub port: u16,
+	/// The server's motd.
+	pub motd: String,
+	/// The path to the repository containing the server's packages.
+	pub repo_path: String,
 }
 
-#[get("/motd")]
-async fn motd(data: web::Data<GlobalData>) -> impl Responder {
-	HttpResponse::Ok().body(data.motd.clone())
+/// The server's global context.
+pub struct Context {
+	/// The server's motd.
+	motd: String,
+	/// The server's repository.
+	repo: Repository,
 }
 
-#[actix_web::main]
+#[tokio::main]
 async fn main() -> io::Result<()> {
-	// Reading config and initializing global data
-	let config = Config::read()?;
-	let port = config.port;
-
-	let data = web::Data::new(GlobalData {
+	tracing_subscriber::fmt::init();
+	let config: Config = envy::from_env().expect("configuration");
+	let ctx = Arc::new(Context {
 		motd: config.motd,
-
-		repo: Repository::load(config.repo_path.clone())?,
+		repo: Repository::load(PathBuf::from(config.repo_path))?,
 	});
-
-	// Enabling logging
-	env::set_var("RUST_LOG", "actix_web=info");
-	env_logger::init();
-
-	HttpServer::new(move || {
-		App::new()
-			.wrap(middleware::Logger::new(
-				"[%t] %a: %r - Response: %s (in %D ms)",
-			))
-			.app_data(data.clone())
-			.service(root)
-			.service(motd)
-			.service(package::list)
-			.service(package::info)
-			.service(package::archive)
-	})
-	.bind(format!("0.0.0.0:{}", port))?
-	.run()
-	.await
+	let router = Router::new()
+		.route("/", get(route::root))
+		.route("/motd", get(route::motd))
+		.route("/package", get(route::package::list))
+		.route("/package/:name/version/:version", get(route::package::info))
+		.route(
+			"/package/:name/version/:version/archive",
+			get(route::package::archive),
+		)
+		// TODO logging layer
+		.with_state(ctx);
+	let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", config.port)).await?;
+	axum::serve(listener, router).await
 }

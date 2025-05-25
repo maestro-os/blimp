@@ -4,12 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.87"
 common = { path = "../common" }
-flate2 = "1.0.33"
-serde = { version = "*", features = ["derive"] }
-tar = "0.4.41"
-tokio = "1.40.0"
+serde = { version = "1.0.219", features = ["derive"] }
 
 [features]
 default = []

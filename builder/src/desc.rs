@@ -9,15 +9,12 @@
 //! Tarballs may contain a single directory in which all files are present. "Unwrapping" is the
 //! action of moving all the files out of this directory while decompressing the archive.
 
-use anyhow::Result;
-use common::package::Package;
-use serde::Deserialize;
-use serde::Serialize;
-use std::fs;
-use std::path::Path;
-use std::path::PathBuf;
-
-// TODO add an option to allow fetching a tarball without decompressing it?
+use common::{anyhow::Result, package::Package};
+use serde::{Deserialize, Serialize};
+use std::{
+	fs,
+	path::{Path, PathBuf},
+};
 
 /// Source-type specific fields.
 #[derive(Clone, Deserialize, Serialize)]
@@ -71,7 +68,7 @@ impl Source {
 				}
 			}
 			#[cfg(not(feature = "network"))]
-			_ => panic!("Feature `network` is not enabled! Please recompile blimp common with this feature enabled"),
+			_ => panic!("Feature `network` is not enabled! Please recompile blimp with this feature enabled"),
 			#[cfg(feature = "network")]
 			_ => {}
 		}
@@ -87,7 +84,7 @@ impl Source {
 				let (path, _) = common::util::create_tmp_file(WORK_DIR)?;
 				let mut download_task = DownloadTask::new(url, &path).await?;
 				// TODO progress bar
-				while download_task.next().await? {}
+				while download_task.next().await? > 0 {}
 				// TODO check integrity with hash if specified
 				common::util::decompress(&path, &dest_path)?;
 				// TODO remove archive?
@@ -96,7 +93,7 @@ impl Source {
 				git_url,
 				branch,
 			} => {
-				use anyhow::bail;
+				use common::anyhow::bail;
 				use std::process::Command;
 				let mut cmd = Command::new("git");
 				cmd.arg("clone")
@@ -119,7 +116,7 @@ impl Source {
 	}
 }
 
-/// Structure describing how to build a package.
+/// Description of how to build a package.
 #[derive(Deserialize, Serialize)]
 pub struct BuildDescriptor {
 	/// The list of sources for the package.
