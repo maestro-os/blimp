@@ -30,7 +30,7 @@ fn create_tmp<T, F: Fn(&Path) -> io::Result<T>>(parent: &Path, f: F) -> io::Resu
 			Err(e) => return Err(e),
 		}
 	}
-	Err(io::Error::new(io::ErrorKind::Other, "too many tries"))
+	Err(io::Error::other("too many tries"))
 }
 
 /// Creates a temporary directory. The function returns the path to the directory.
@@ -69,13 +69,10 @@ pub fn decompress(src: &Path, dest: &Path) -> io::Result<()> {
 		Some("application/gzip") => decompress_impl(GzDecoder::new(file), dest),
 		Some("application/x-xz") => decompress_impl(XzDecoder::new(file), dest),
 		Some("application/x-bzip2") => decompress_impl(BzDecoder::new(file), dest),
-		_ => Err(io::Error::new(
-			io::ErrorKind::Other,
-			format!(
-				"Invalid or unsupported archive format: {}",
-				file_type.unwrap_or("<not detected>")
-			),
-		)),
+		_ => Err(io::Error::other(format!(
+			"Invalid or unsupported archive format: {}",
+			file_type.unwrap_or("<not detected>")
+		))),
 	}
 }
 

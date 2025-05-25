@@ -16,8 +16,6 @@ use std::{
 	path::{Path, PathBuf},
 };
 
-// TODO add an option to allow fetching a tarball without decompressing it?
-
 /// Source-type specific fields.
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(untagged)]
@@ -70,7 +68,7 @@ impl Source {
 				}
 			}
 			#[cfg(not(feature = "network"))]
-			_ => panic!("Feature `network` is not enabled! Please recompile blimp common with this feature enabled"),
+			_ => panic!("Feature `network` is not enabled! Please recompile blimp with this feature enabled"),
 			#[cfg(feature = "network")]
 			_ => {}
 		}
@@ -118,7 +116,7 @@ impl Source {
 	}
 }
 
-/// Structure describing how to build a package.
+/// Description of how to build a package.
 #[derive(Deserialize, Serialize)]
 pub struct BuildDescriptor {
 	/// The list of sources for the package.

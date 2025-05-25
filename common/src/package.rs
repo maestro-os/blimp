@@ -132,7 +132,7 @@ impl Package {
 		for d in &self.run_deps {
 			// TODO check already installed packages
 			// Get package in the installation list
-			let pkg = packages.iter().map(|(p, _)| p).find(|p| p.name == d.name);
+			let pkg = packages.keys().find(|p| p.name == d.name);
 			// Check for conflict
 			if let Some(pkg) = pkg {
 				if !d.version_constraint.is_valid(&pkg.version) {
