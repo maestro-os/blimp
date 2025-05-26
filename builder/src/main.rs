@@ -1,6 +1,7 @@
 //! Utility allowing to build packages.
 
 mod build;
+mod cache;
 mod desc;
 mod util;
 
