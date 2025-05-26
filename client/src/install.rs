@@ -3,13 +3,12 @@
 use crate::confirm;
 use common::{
 	anyhow::{bail, Result},
-	download::DownloadTask,
 	package::Package,
 	repository,
 	repository::Repository,
 	Environment,
 };
-use std::{collections::HashMap, fs::OpenOptions, io, path::PathBuf};
+use std::{collections::HashMap, io, path::PathBuf};
 
 // TODO Clean
 /// Installs the given list of packages.
@@ -139,6 +138,9 @@ pub async fn install(
 					&pkg.version,
 					// TODO spawn task
 					async {
+						use common::download::DownloadTask;
+						use std::fs::OpenOptions;
+
 						let path = repo.get_archive_path(&pkg.name, &pkg.version);
 						let file = OpenOptions::new()
 							.create(true)

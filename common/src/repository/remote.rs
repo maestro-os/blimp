@@ -1,8 +1,6 @@
 //! A remote is a remote host from which packages can be downloaded.
 
-use crate::{
-	download::DownloadTask, package::Package, repository::Repository, Environment, USER_AGENT,
-};
+use crate::{package::Package, Environment, USER_AGENT};
 use anyhow::{anyhow, bail, Result};
 use reqwest::StatusCode;
 use std::{

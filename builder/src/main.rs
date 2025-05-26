@@ -1,6 +1,7 @@
 //! Utility allowing to build packages.
 
 mod build;
+#[allow(unused)]
 mod cache;
 mod desc;
 mod util;
