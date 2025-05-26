@@ -1,41 +1,89 @@
 //! Packages sources cache.
 
-use crate::desc::SourceRemote;
-use common::{serde_json, util::create_tmp_file};
-use std::{
-	collections::HashMap,
-	env, fs,
-	fs::{File, OpenOptions},
-	io,
-	io::{Read, Write},
-	path::PathBuf,
-};
+use base64::{prelude::BASE64_STANDARD, Engine};
+use file_lock::{FileLock, FileOptions};
+use std::{env, fs, io, path::PathBuf};
+use std::io::{Read, Seek, SeekFrom, Write};
+use std::path::Path;
+use sha2::{Digest, Sha256};
 
-// TODO metadata file locking
-/// Creates a new entry in the cache.
-pub fn new(remote: &SourceRemote) -> io::Result<(PathBuf, File)> {
+fn cache_directory() -> io::Result<PathBuf> {
 	// TODO handle error
 	let home = env::var_os("HOME").unwrap();
 	// Create the cache directory if not present
 	let dir_path = PathBuf::from(home).join(".cache/blimp/sources");
 	fs::create_dir_all(&dir_path)?;
-	// Open metadata file
-	let metadata_path = dir_path.join("metadata.json");
-	let mut metadata_file = OpenOptions::new()
-		.create(true)
-		.write(true)
-		.open(metadata_path)?;
-	// Read metadata
-	let mut metadata = String::new();
-	metadata_file.read_to_string(&mut metadata)?;
-	let mut metadata: HashMap<SourceRemote, &str> =
-		serde_json::from_str(&metadata).unwrap_or_default();
-	// Create file and insert entry
-	let cache_file = create_tmp_file(&dir_path)?;
-	let cache_file_name = cache_file.0.file_name().unwrap().to_str().unwrap();
-	metadata.insert(remote.clone(), cache_file_name);
-	// Writeback
-	let metadata = serde_json::to_string(&metadata)?;
-	metadata_file.write_all(metadata.as_bytes())?;
-	Ok(cache_file)
+	Ok(dir_path)
+}
+
+fn compute_checksum(file: &mut FileLock) -> io::Result<[u8; 32]> {
+	let mut hasher = Sha256::new();
+	file.file.seek(SeekFrom::Start(0))?;
+	const BUF_SIZE: usize = 4096;
+	let mut buf: [u8; BUF_SIZE] = [0; BUF_SIZE];
+	loop {
+		let l = file.file.read(&mut buf)?;
+		if l == 0 {
+			break;
+		}
+		hasher.write_all(&buf[..l])?;
+	}
+	let hash = hasher.finalize();
+	Ok(hash[..].try_into().unwrap())
+}
+
+fn verify_checksum(dir_path: &Path, encoded_key: &str, checksum: &[u8]) -> io::Result<bool> {
+	// `.` is not part of the base64 character set
+	let path = dir_path.join(format!("{encoded_key}.checksum"));
+	// Open file
+	let res = FileLock::lock(path, true, Default::default());
+	let mut file = match res {
+		Ok(f) => f,
+		Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(false),
+		Err(e) => return Err(e),
+	};
+	// Read file
+	let mut buf = Vec::new();
+	file.file.read_to_end(&mut buf)?;
+	// Compare
+	Ok(buf == checksum)
+}
+
+/// Retrieves or insert the entry with the given `key`.
+///
+/// The function returns the entry's file, along with a boolean indicating whether the file existed before.
+pub fn get_or_insert(key: &[u8]) -> io::Result<(FileLock, bool)> {
+	let dir_path = cache_directory()?;
+	let encoded_key = BASE64_STANDARD.encode(key);
+	let path = dir_path.join(&encoded_key);
+	// Open file
+	let opt = FileOptions::new().write(true).create(true);
+	let mut file = FileLock::lock(path, true, opt)?;
+	// Verify checksum
+	let checksum = compute_checksum(&mut file)?;
+	let valid = verify_checksum(&dir_path, &encoded_key, &checksum)?;
+	if !valid {
+		// Invalid checksum. Truncate file
+		file.file.set_len(0)?;
+	}
+	Ok((file, valid))
+}
+
+/// Flushes the entry with the given `key` by computing and storing its checksum.
+pub fn flush_entry(key: &[u8]) -> io::Result<()> {
+	let dir_path = cache_directory()?;
+	let encoded_key = BASE64_STANDARD.encode(key);
+	let path = dir_path.join(&encoded_key);
+	// `.` is not part of the base64 character set
+	let checksum_path = dir_path.join(format!("{encoded_key}.checksum"));
+	// Open file
+	let opt = FileOptions::new().write(true).create(true);
+	let mut file = FileLock::lock(path, true, opt)?;
+	// Compute checksum
+	let checksum = compute_checksum(&mut file)?;
+	// Open checksum file
+	let opt = FileOptions::new().write(true).create(true).truncate(true);
+	let mut file = FileLock::lock(checksum_path, true, opt)?;
+	file.file.write_all(&checksum)?;
+	Ok(())
 }

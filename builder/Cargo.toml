@@ -4,8 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+base64 = "0.22.1"
 common = { path = "../common" }
+file-lock = "2.1.11"
 serde = { version = "1.0.219", features = ["derive"] }
+sha2 = "0.10.9"
 
 [features]
 default = []
