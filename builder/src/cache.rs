@@ -2,10 +2,14 @@
 
 use base64::{prelude::BASE64_STANDARD, Engine};
 use file_lock::{FileLock, FileOptions};
-use std::{env, fs, io, path::PathBuf};
-use std::io::{Read, Seek, SeekFrom, Write};
-use std::path::Path;
 use sha2::{Digest, Sha256};
+use std::{
+	env, fs,
+	fs::File,
+	io,
+	io::{Read, Seek, SeekFrom, Write},
+	path::{Path, PathBuf},
+};
 
 fn cache_directory() -> io::Result<PathBuf> {
 	// TODO handle error
@@ -49,10 +53,50 @@ fn verify_checksum(dir_path: &Path, encoded_key: &str, checksum: &[u8]) -> io::R
 	Ok(buf == checksum)
 }
 
+/// Entry in the cache.
+pub struct CacheEntry {
+	encoded_key: String,
+	file: FileLock,
+	cached: bool,
+}
+
+impl CacheEntry {
+	/// Returns a reference to the inner file.
+	#[inline]
+	pub fn file(&mut self) -> &mut File {
+		&mut self.file.file
+	}
+
+	/// Tells whether the entry already existed before it was fetched.
+	#[inline]
+	pub fn cached(&self) -> bool {
+		self.cached
+	}
+
+	/// Flushes the entry to the cache by computing and storing its checksum.
+	pub fn flush(&mut self) -> io::Result<()> {
+		let dir_path = cache_directory()?;
+		let path = dir_path.join(&self.encoded_key);
+		// `.` is not part of the base64 character set
+		let checksum_path = dir_path.join(format!("{}.checksum", self.encoded_key));
+		// Open file
+		let opt = FileOptions::new().write(true).create(true);
+		let mut file = FileLock::lock(path, true, opt)?;
+		// Compute checksum
+		let checksum = compute_checksum(&mut file)?;
+		// Open checksum file
+		let opt = FileOptions::new().write(true).create(true).truncate(true);
+		let mut file = FileLock::lock(checksum_path, true, opt)?;
+		file.file.write_all(&checksum)?;
+		Ok(())
+	}
+}
+
 /// Retrieves or insert the entry with the given `key`.
 ///
-/// The function returns the entry's file, along with a boolean indicating whether the file existed before.
-pub fn get_or_insert(key: &[u8]) -> io::Result<(FileLock, bool)> {
+/// The function returns the entry's file, along with a boolean indicating whether the file existed
+/// before.
+pub fn get_or_insert(key: &[u8]) -> io::Result<CacheEntry> {
 	let dir_path = cache_directory()?;
 	let encoded_key = BASE64_STANDARD.encode(key);
 	let path = dir_path.join(&encoded_key);
@@ -66,24 +110,9 @@ pub fn get_or_insert(key: &[u8]) -> io::Result<(FileLock, bool)> {
 		// Invalid checksum. Truncate file
 		file.file.set_len(0)?;
 	}
-	Ok((file, valid))
-}
-
-/// Flushes the entry with the given `key` by computing and storing its checksum.
-pub fn flush_entry(key: &[u8]) -> io::Result<()> {
-	let dir_path = cache_directory()?;
-	let encoded_key = BASE64_STANDARD.encode(key);
-	let path = dir_path.join(&encoded_key);
-	// `.` is not part of the base64 character set
-	let checksum_path = dir_path.join(format!("{encoded_key}.checksum"));
-	// Open file
-	let opt = FileOptions::new().write(true).create(true);
-	let mut file = FileLock::lock(path, true, opt)?;
-	// Compute checksum
-	let checksum = compute_checksum(&mut file)?;
-	// Open checksum file
-	let opt = FileOptions::new().write(true).create(true).truncate(true);
-	let mut file = FileLock::lock(checksum_path, true, opt)?;
-	file.file.write_all(&checksum)?;
-	Ok(())
+	Ok(CacheEntry {
+		encoded_key,
+		file,
+		cached: valid,
+	})
 }

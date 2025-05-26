@@ -13,6 +13,7 @@ use common::{anyhow::Result, package::Package};
 use serde::{Deserialize, Serialize};
 use std::{
 	fs,
+	fs::File,
 	path::{Path, PathBuf},
 };
 
@@ -64,7 +65,8 @@ impl Source {
 					common::util::recursive_copy(path, &dest_path)?;
 				} else {
 					// TODO decompress only if it is an actual archive
-					common::util::decompress(path, &dest_path)?;
+					let file = File::open(path)?;
+					common::util::decompress(&file, &dest_path)?;
 				}
 			}
 			#[cfg(not(feature = "network"))]
@@ -77,16 +79,19 @@ impl Source {
 			SourceRemote::Url {
 				url,
 			} => {
-				use crate::WORK_DIR;
+				use crate::cache;
 				use common::download::DownloadTask;
-
-				// Download
-				let (path, _) = common::util::create_tmp_file(WORK_DIR)?;
-				let mut download_task = DownloadTask::new(url, &path).await?;
-				// TODO progress bar
-				while download_task.next().await? > 0 {}
+				// Check whether the file is in cache
+				let mut ent = cache::get_or_insert(url.as_bytes())?;
+				if !ent.cached() {
+					// Not in cache, download
+					let mut download_task = DownloadTask::new(url, ent.file()).await?;
+					// TODO progress bar
+					while download_task.next().await? > 0 {}
+					ent.flush()?;
+				}
 				// TODO check integrity with hash if specified
-				common::util::decompress(&path, &dest_path)?;
+				common::util::decompress(ent.file(), &dest_path)?;
 			}
 			SourceRemote::Git {
 				git_url,
