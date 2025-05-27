@@ -60,6 +60,7 @@ impl Source {
 		let dest_path = common::util::concat_paths(build_dir, &self.location);
 		match &self.inner {
 			SourceRemote::Local { path } => {
+				println!("[INFO] Copy `{}`", path.display());
 				let metadata = fs::metadata(path)?;
 				if metadata.is_dir() {
 					common::util::recursive_copy(path, &dest_path)?;
@@ -84,11 +85,13 @@ impl Source {
 				// Check whether the file is in cache
 				let mut ent = cache::get_or_insert(url.as_bytes())?;
 				if !ent.cached() {
-					// Not in cache, download
+					println!("[INFO] Download `{url}`");
 					let mut download_task = DownloadTask::new(url, ent.file()).await?;
 					// TODO progress bar
 					while download_task.next().await? > 0 {}
 					ent.flush()?;
+				} else {
+					println!("[INFO] `{url}` is in cache");
 				}
 				// TODO check integrity with hash if specified
 				common::util::decompress(ent.file(), &dest_path)?;
@@ -99,6 +102,7 @@ impl Source {
 			} => {
 				use common::anyhow::bail;
 				use std::process::Command;
+				println!("[INFO] Clone `{git_url}`");
 				let mut cmd = Command::new("git");
 				cmd.arg("clone")
 					// Only keep the last commit
