@@ -65,8 +65,8 @@ impl Source {
 					common::util::recursive_copy(path, &dest_path)?;
 				} else {
 					// TODO decompress only if it is an actual archive
-					let file = File::open(path)?;
-					common::util::decompress(&file, &dest_path)?;
+					let mut file = File::open(path)?;
+					common::util::decompress(&mut file, &dest_path)?;
 				}
 			}
 			#[cfg(not(feature = "network"))]

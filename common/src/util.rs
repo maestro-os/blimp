@@ -7,7 +7,7 @@ use std::{
 	fs,
 	fs::{File, OpenOptions},
 	io,
-	io::Read,
+	io::{Read, Seek, SeekFrom},
 	os::{unix, unix::fs::FileExt},
 	path::{Path, PathBuf},
 };
@@ -62,7 +62,8 @@ fn decompress_impl<R: Read>(stream: R, dest: &Path) -> io::Result<()> {
 }
 
 /// Decompresses the given archive file `src` to the given location `dest`.
-pub fn decompress(src: &File, dest: &Path) -> io::Result<()> {
+pub fn decompress(src: &mut File, dest: &Path) -> io::Result<()> {
+	src.seek(SeekFrom::Start(0))?;
 	// The size of the buffer is determined by the amount `infer` needs for the supported types
 	let mut buf = [0; 6];
 	src.read_exact_at(&mut buf, 0)?;
