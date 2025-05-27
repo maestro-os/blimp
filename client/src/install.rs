@@ -1,8 +1,6 @@
 //! This module handles package installation.
 
 use crate::confirm;
-#[cfg(feature = "network")]
-use common::repository::remote::Remote;
 use common::{
 	anyhow::{bail, Result},
 	package::Package,
@@ -140,7 +138,17 @@ pub async fn install(
 					&pkg.version,
 					// TODO spawn task
 					async {
-						let mut task = Remote::fetch_archive(remote, repo, pkg).await?;
+						use common::download::DownloadTask;
+						use std::fs::OpenOptions;
+
+						let path = repo.get_archive_path(&pkg.name, &pkg.version);
+						let file = OpenOptions::new()
+							.create(true)
+							.write(true)
+							.truncate(true)
+							.open(path)?;
+						let url = remote.download_url(pkg);
+						let mut task = DownloadTask::new(&url, &file).await?;
 						while task.next().await? > 0 {
 							// TODO update progress bar
 						}

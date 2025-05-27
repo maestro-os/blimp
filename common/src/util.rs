@@ -7,8 +7,8 @@ use std::{
 	fs,
 	fs::{File, OpenOptions},
 	io,
-	io::Read,
-	os::unix,
+	io::{Read, Seek, SeekFrom},
+	os::{unix, unix::fs::FileExt},
 	path::{Path, PathBuf},
 };
 use tar::Archive;
@@ -62,17 +62,20 @@ fn decompress_impl<R: Read>(stream: R, dest: &Path) -> io::Result<()> {
 }
 
 /// Decompresses the given archive file `src` to the given location `dest`.
-pub fn decompress(src: &Path, dest: &Path) -> io::Result<()> {
-	let file_type = infer::get_from_path(src)?.map(|t| t.mime_type());
-	let file = File::open(src)?;
+pub fn decompress(src: &mut File, dest: &Path) -> io::Result<()> {
+	src.seek(SeekFrom::Start(0))?;
+	// The size of the buffer is determined by the amount `infer` needs for the supported types
+	let mut buf = [0; 6];
+	src.read_exact_at(&mut buf, 0)?;
+	let file_type = infer::get(&buf).map(|t| t.mime_type());
 	match file_type {
-		Some("application/gzip") => decompress_impl(GzDecoder::new(file), dest),
-		Some("application/x-xz") => decompress_impl(XzDecoder::new(file), dest),
-		Some("application/x-bzip2") => decompress_impl(BzDecoder::new(file), dest),
-		_ => Err(io::Error::other(format!(
-			"Invalid or unsupported archive format: {}",
-			file_type.unwrap_or("<not detected>")
+		Some("application/gzip") => decompress_impl(GzDecoder::new(src), dest),
+		Some("application/x-xz") => decompress_impl(XzDecoder::new(src), dest),
+		Some("application/x-bzip2") => decompress_impl(BzDecoder::new(src), dest),
+		Some(file_type) => Err(io::Error::other(format!(
+			"Invalid or unsupported archive format: {file_type}"
 		))),
+		None => Err(io::Error::other("Could not determine archive format")),
 	}
 }
 

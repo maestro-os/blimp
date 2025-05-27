@@ -1,6 +1,8 @@
 //! Utility allowing to build packages.
 
 mod build;
+#[allow(unused)]
+mod cache;
 mod desc;
 mod util;
 
@@ -79,7 +81,6 @@ fn build(from: PathBuf, to: PathBuf) -> Result<()> {
 		.unwrap_or(false);
 	println!("[INFO] Jobs: {jobs}; Build: {build}; Host: {host}; Target: {target}");
 	let build_process = BuildProcess::new(from)?;
-	println!("[INFO] Fetch sources...");
 	// TODO Progress bars
 	let rt = Runtime::new()?;
 	rt.block_on(build_process.fetch_sources())

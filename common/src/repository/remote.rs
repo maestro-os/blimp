@@ -1,8 +1,6 @@
 //! A remote is a remote host from which packages can be downloaded.
 
-use crate::{
-	download::DownloadTask, package::Package, repository::Repository, Environment, USER_AGENT,
-};
+use crate::{package::Package, Environment, USER_AGENT};
 use anyhow::{anyhow, bail, Result};
 use reqwest::StatusCode;
 use std::{
@@ -94,33 +92,23 @@ impl Remote {
 		}
 	}
 
+	/// Returns the download URL for the given `package`.
+	pub fn download_url(&self, package: &Package) -> String {
+		format!(
+			"https://{}/package/{}/version/{}/archive",
+			self.host, package.name, package.version
+		)
+	}
+
 	/// Returns the download size of the package `package` in bytes.
 	pub async fn get_size(&self, package: &Package) -> Result<u64> {
 		let client = reqwest::Client::new();
-		let url = format!(
-			"https://{}/package/{}/version/{}/archive",
-			self.host, package.name, package.version
-		);
 		client
-			.head(url)
+			.head(self.download_url(package))
 			.header("User-Agent", USER_AGENT)
 			.send()
 			.await?
 			.content_length()
 			.ok_or_else(|| anyhow!("Content-Length field not present in response"))
-	}
-
-	/// Downloads the archive of package `package` to the given repository `repo`.
-	pub async fn fetch_archive(
-		&self,
-		repo: &Repository,
-		package: &Package,
-	) -> Result<DownloadTask> {
-		let url = format!(
-			"https://{}/package/{}/version/{}/archive",
-			self.host, package.name, package.version
-		);
-		let path = repo.get_archive_path(&package.name, &package.version);
-		DownloadTask::new(&url, &path).await
 	}
 }

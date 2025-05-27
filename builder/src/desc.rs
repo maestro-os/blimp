@@ -3,7 +3,7 @@
 //! A build descriptor contains general information about the package, but also sources for files
 //! used for building the package.
 //!
-//! Source files may come from different sources. See [`SourceInner`].
+//! Source files may come from different sources. See [`SourceRemote`].
 //!
 //! A tarball is a compressed file containing sources for a package.
 //! Tarballs may contain a single directory in which all files are present. "Unwrapping" is the
@@ -13,13 +13,14 @@ use common::{anyhow::Result, package::Package};
 use serde::{Deserialize, Serialize};
 use std::{
 	fs,
+	fs::File,
 	path::{Path, PathBuf},
 };
 
-/// Source-type specific fields.
-#[derive(Clone, Deserialize, Serialize)]
+/// Remote location of a source.
+#[derive(Clone, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(untagged)]
-pub enum SourceInner {
+pub enum SourceRemote {
 	/// Download a tarball from a URL.
 	Url {
 		/// The URL of the sources.
@@ -46,7 +47,7 @@ pub enum SourceInner {
 pub struct Source {
 	/// Source-type specific fields.
 	#[serde(flatten)]
-	inner: SourceInner,
+	inner: SourceRemote,
 	/// The location relative to the build directory where the source files will be placed.
 	location: PathBuf,
 }
@@ -58,13 +59,15 @@ impl Source {
 	pub async fn fetch(&self, build_dir: &Path) -> Result<()> {
 		let dest_path = common::util::concat_paths(build_dir, &self.location);
 		match &self.inner {
-			SourceInner::Local { path } => {
+			SourceRemote::Local { path } => {
+				println!("[INFO] Copy `{}`", path.display());
 				let metadata = fs::metadata(path)?;
 				if metadata.is_dir() {
 					common::util::recursive_copy(path, &dest_path)?;
 				} else {
 					// TODO decompress only if it is an actual archive
-					common::util::decompress(path, &dest_path)?;
+					let mut file = File::open(path)?;
+					common::util::decompress(&mut file, &dest_path)?;
 				}
 			}
 			#[cfg(not(feature = "network"))]
@@ -74,27 +77,32 @@ impl Source {
 		}
 		#[cfg(feature = "network")]
 		match &self.inner {
-			SourceInner::Url {
+			SourceRemote::Url {
 				url,
 			} => {
-				use crate::WORK_DIR;
+				use crate::cache;
 				use common::download::DownloadTask;
-
-				// Download
-				let (path, _) = common::util::create_tmp_file(WORK_DIR)?;
-				let mut download_task = DownloadTask::new(url, &path).await?;
-				// TODO progress bar
-				while download_task.next().await? > 0 {}
+				// Check whether the file is in cache
+				let mut ent = cache::get_or_insert(url.as_bytes())?;
+				if !ent.cached() {
+					println!("[INFO] Download `{url}`");
+					let mut download_task = DownloadTask::new(url, ent.file()).await?;
+					// TODO progress bar
+					while download_task.next().await? > 0 {}
+					ent.flush()?;
+				} else {
+					println!("[INFO] `{url}` is in cache");
+				}
 				// TODO check integrity with hash if specified
-				common::util::decompress(&path, &dest_path)?;
-				// TODO remove archive?
+				common::util::decompress(ent.file(), &dest_path)?;
 			}
-			SourceInner::Git {
+			SourceRemote::Git {
 				git_url,
 				branch,
 			} => {
 				use common::anyhow::bail;
 				use std::process::Command;
+				println!("[INFO] Clone `{git_url}`");
 				let mut cmd = Command::new("git");
 				cmd.arg("clone")
 					// Only keep the last commit

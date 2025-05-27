@@ -4,19 +4,14 @@ use crate::USER_AGENT;
 use anyhow::Result;
 use bytes::Bytes;
 use futures_util::stream::{Stream, StreamExt};
-use std::{
-	fs::{File, OpenOptions},
-	io::Write,
-	path::Path,
-	pin::Pin,
-};
+use std::{fs::File, io::Write, pin::Pin};
 
 /// A download task, running until the file has been downloaded entirely.
-pub struct DownloadTask {
+pub struct DownloadTask<'f> {
 	/// The response byte stream.
 	stream: Pin<Box<dyn Stream<Item = Result<Bytes, reqwest::Error>> + Send>>,
 	/// The destination file.
-	file: File,
+	file: &'f File,
 
 	/// The total size to be downloaded in bytes. If unknown, the value is None.
 	total_size: Option<u64>,
@@ -24,24 +19,21 @@ pub struct DownloadTask {
 	curr_size: u64,
 }
 
-impl DownloadTask {
+impl<'f> DownloadTask<'f> {
 	/// Creates a new task.
 	///
 	/// Arguments:
-	/// - `url` is the URL to download the file from.
-	/// - `path` is the path to which the file has to be saved.
-	pub async fn new(url: &str, path: &Path) -> Result<Self> {
+	/// - `url` is the URL to download the file from
+	/// - `file` is the file where the data is to be written
+	pub async fn new(url: &str, file: &'f File) -> Result<Self> {
 		let client = reqwest::Client::new();
 		let response = client
 			.get(url)
 			.header("User-Agent", USER_AGENT)
 			.send()
 			.await?;
-		let file = OpenOptions::new()
-			.create(true)
-			.write(true)
-			.truncate(true)
-			.open(path)?;
+		// Truncate file
+		file.set_len(0)?;
 		let total_size = response.content_length();
 		Ok(Self {
 			stream: Box::pin(response.bytes_stream()),
@@ -73,5 +65,3 @@ impl DownloadTask {
 		}
 	}
 }
-
-// TODO File integrity verification
