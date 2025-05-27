@@ -40,7 +40,8 @@ fn verify_checksum(dir_path: &Path, encoded_key: &str, checksum: &[u8]) -> io::R
 	// `.` is not part of the base64 character set
 	let path = dir_path.join(format!("{encoded_key}.checksum"));
 	// Open file
-	let res = FileLock::lock(path, true, Default::default());
+	let opt = FileOptions::new().read(true);
+	let res = FileLock::lock(path, true, opt);
 	let mut file = match res {
 		Ok(f) => f,
 		Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(false),
@@ -79,11 +80,8 @@ impl CacheEntry {
 		let path = dir_path.join(&self.encoded_key);
 		// `.` is not part of the base64 character set
 		let checksum_path = dir_path.join(format!("{}.checksum", self.encoded_key));
-		// Open file
-		let opt = FileOptions::new().write(true).create(true);
-		let mut file = FileLock::lock(path, true, opt)?;
 		// Compute checksum
-		let checksum = compute_checksum(&mut file)?;
+		let checksum = compute_checksum(&mut self.file)?;
 		// Open checksum file
 		let opt = FileOptions::new().write(true).create(true).truncate(true);
 		let mut file = FileLock::lock(checksum_path, true, opt)?;
@@ -101,7 +99,7 @@ pub fn get_or_insert(key: &[u8]) -> io::Result<CacheEntry> {
 	let encoded_key = BASE64_STANDARD.encode(key);
 	let path = dir_path.join(&encoded_key);
 	// Open file
-	let opt = FileOptions::new().write(true).create(true);
+	let opt = FileOptions::new().read(true).write(true).create(true);
 	let mut file = FileLock::lock(path, true, opt)?;
 	// Verify checksum
 	let checksum = compute_checksum(&mut file)?;
@@ -109,6 +107,7 @@ pub fn get_or_insert(key: &[u8]) -> io::Result<CacheEntry> {
 	if !valid {
 		// Invalid checksum. Truncate file
 		file.file.set_len(0)?;
+		file.file.seek(SeekFrom::Start(0))?;
 	}
 	Ok(CacheEntry {
 		encoded_key,
