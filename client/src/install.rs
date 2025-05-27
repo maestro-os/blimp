@@ -149,15 +149,12 @@ pub async fn install(
 							.open(path)?;
 						let url = remote.download_url(pkg);
 						let mut task = DownloadTask::new(&url, &file).await?;
-						while task.next().await? > 0 {
-							// TODO update progress bar
-						}
+						while task.next().await? > 0 {}
 						Ok::<(), common::anyhow::Error>(())
 					},
 				));
 			}
 		}
-		// TODO Add progress bar
 		for (name, version, f) in futures {
 			match f.await {
 				Ok(()) => continue,

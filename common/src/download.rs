@@ -4,6 +4,7 @@ use crate::USER_AGENT;
 use anyhow::Result;
 use bytes::Bytes;
 use futures_util::stream::{Stream, StreamExt};
+use indicatif::{ProgressBar, ProgressStyle};
 use std::{fs::File, io::Write, pin::Pin};
 
 /// A download task, running until the file has been downloaded entirely.
@@ -13,10 +14,10 @@ pub struct DownloadTask<'f> {
 	/// The destination file.
 	file: &'f File,
 
-	/// The total size to be downloaded in bytes. If unknown, the value is None.
-	total_size: Option<u64>,
 	/// The current downloaded size in bytes.
-	curr_size: u64,
+	cur_size: u64,
+	/// Download progress bar.
+	progress_bar: ProgressBar,
 }
 
 impl<'f> DownloadTask<'f> {
@@ -34,34 +35,39 @@ impl<'f> DownloadTask<'f> {
 			.await?;
 		// Truncate file
 		file.set_len(0)?;
-		let total_size = response.content_length();
+		// Setup progress bar
+		let progress_bar = response
+			.content_length()
+			.map(ProgressBar::new)
+			.unwrap_or_else(ProgressBar::no_length);
+		let progress_style = ProgressStyle::with_template(
+			"[{elapsed_precise}] {bar:40.cyan/blue} {decimal_bytes}/{decimal_total_bytes}   {percent}%",
+		)
+		.unwrap()
+		.progress_chars("=> ");
+		progress_bar.set_style(progress_style);
 		Ok(Self {
 			stream: Box::pin(response.bytes_stream()),
 			file,
-			total_size,
-			curr_size: 0,
+			cur_size: 0,
+			progress_bar,
 		})
-	}
-
-	/// Returns the total size if known.
-	pub fn get_total_size(&self) -> Option<u64> {
-		self.total_size
-	}
-
-	/// Returns the downloaded size in bytes.
-	pub fn get_current_size(&self) -> u64 {
-		self.curr_size
 	}
 
 	/// Pulls the next chunk of data and returns the number of bytes downloaded.
 	pub async fn next(&mut self) -> Result<usize> {
-		if let Some(chunk) = self.stream.next().await {
-			let chunk = chunk?;
-			self.curr_size += chunk.len() as u64;
-			self.file.write_all(&chunk)?;
-			Ok(chunk.len())
-		} else {
-			Ok(0)
+		let Some(chunk) = self.stream.next().await else {
+			self.progress_bar.finish();
+			return Ok(0);
+		};
+		let chunk = chunk?;
+		if chunk.is_empty() {
+			self.progress_bar.finish();
+			return Ok(0);
 		}
+		self.cur_size += chunk.len() as u64;
+		self.file.write_all(&chunk)?;
+		self.progress_bar.set_position(self.cur_size);
+		Ok(chunk.len())
 	}
 }

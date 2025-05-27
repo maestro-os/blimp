@@ -87,7 +87,6 @@ impl Source {
 				if !ent.cached() {
 					println!("[INFO] Download `{url}`");
 					let mut download_task = DownloadTask::new(url, ent.file()).await?;
-					// TODO progress bar
 					while download_task.next().await? > 0 {}
 					ent.flush()?;
 				} else {
