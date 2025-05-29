@@ -7,10 +7,9 @@ mkdir build
 cd build
 
 ../configure \
-	--prefix="/usr" \
-	--build="$BUILD" \
-	--host="$HOST" \
+	--prefix="$SYSROOT/tools" \
 	--target="$TARGET" \
+	--with-sysroot="$SYSROOT" \
 	--disable-werror \
 	--disable-nls \
 	--enable-64-bit-bfd \

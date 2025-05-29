@@ -3,26 +3,34 @@
 set -e
 cd *
 
+# TODO use `sources` in `package.json`
+./contrib/download_prerequisites
+
 mkdir build
 cd build
 
 ../configure \
-	--prefix="/usr" \
+	--prefix="$SYSROOT/tools" \
 	--target="$TARGET" \
 	--with-sysroot="$SYSROOT" \
+	--with-newlib \
 	--without-headers \
-	--without-newlib \
 	--enable-languages=c,c++ \
-	--disable-shared \
 	--disable-hosted-libstdcxx \
-	--disable-wchar_t \
-	--disable-libssp \
+	--disable-libatomic \
+	--disable-libgomp \
+	--disable-libquadmath \
 	--disable-libsanitizer \
-	--disable-libquadmath
+	--disable-libssp \
+	--disable-multilib \
+	--disable-nls \
+	--disable-shared \
+	--disable-threads \
+	--disable-vtv
+
+mkdir -p "$SYSROOT/usr/include"
 
 make -j$JOBS all-gcc
 make install-gcc
 make -j$JOBS all-target-libgcc
 make install-target-libgcc
-make -j$JOBS all-target-libstdc++-v3
-make install-target-libstdc++-v3

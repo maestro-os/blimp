@@ -3,6 +3,9 @@
 set -e
 cd *
 
+# TODO use `sources` in `package.json`
+./contrib/download_prerequisites
+
 mkdir build
 cd build
 
@@ -13,6 +16,8 @@ cd build
 	--enable-languages=c,c++ \
 	--enable-initfini-array \
 	--enable-libstdcxx-filesystem-ts
+
+mkdir -p "$SYSROOT/usr/include"
 
 make -j$JOBS all-gcc
 make install-gcc
