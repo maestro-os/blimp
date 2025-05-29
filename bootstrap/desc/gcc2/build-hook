@@ -1,0 +1,22 @@
+#!/bin/bash
+
+set -e
+cd *
+
+mkdir build
+cd build
+
+../configure \
+	--prefix="/usr" \
+	--target="$TARGET" \
+	--with-sysroot="$SYSROOT" \
+	--enable-languages=c,c++ \
+	--enable-initfini-array \
+	--enable-libstdcxx-filesystem-ts
+
+make -j$JOBS all-gcc
+make install-gcc
+make -j$JOBS all-target-libgcc
+make install-target-libgcc
+make -j$JOBS all-target-libstdc++-v3
+make install-target-libstdc++-v3

@@ -1,0 +1,20 @@
+#!/bin/bash
+
+set -e
+cd *
+
+mkdir build
+cd build
+
+../configure \
+	--prefix="/usr" \
+	--build="$BUILD" \
+	--host="$HOST" \
+	--target="$TARGET" \
+	--disable-werror \
+	--disable-nls \
+	--enable-64-bit-bfd \
+	--enable-gprofng=no
+
+make -j${JOBS}
+make DESTDIR=$SYSROOT install -j1
