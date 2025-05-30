@@ -17,4 +17,4 @@ cd build
 
 make
 make DESTDIR=$SYSROOT install
-rm -v $SYSROOT/usr/lib/lib{stdc++,stdc++fs,supc++}.la
+rm -fv $SYSROOT/usr/lib/lib{stdc++,stdc++fs,supc++}.la

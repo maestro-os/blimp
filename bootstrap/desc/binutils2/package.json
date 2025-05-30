@@ -9,7 +9,7 @@
 		"name": "bootstrap-binutils",
 		"version": "2.44",
 
-		"description": "Binutils for bootstrapping",
+		"description": "Stage 2 binutils for bootstrapping",
 
 		"build_deps": [],
 		"run_deps": []

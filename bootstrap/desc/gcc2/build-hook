@@ -10,18 +10,27 @@ mkdir build
 cd build
 
 ../configure \
-	--prefix="/usr" \
-	--target="$TARGET" \
-	--with-sysroot="$SYSROOT" \
-	--enable-languages=c,c++ \
-	--enable-initfini-array \
-	--enable-libstdcxx-filesystem-ts
-
-mkdir -p "$SYSROOT/usr/include"
+	--prefix="/usr"                 \
+	--build="$BUILD"                \
+	--host="$HOST"                  \
+	--target="$TARGET"              \
+	--with-build-sysroot="$SYSROOT" \
+	--disable-nls                   \
+	--disable-multilib              \
+	--disable-libatomic             \
+	--disable-libgomp               \
+	--disable-libquadmath           \
+	--disable-libssp                \
+	--disable-libvtv                \
+	--enable-default-pie            \
+	--enable-default-ssp            \
+	--enable-languages=c,c++
 
 make -j$JOBS all-gcc
-make install-gcc
+make DESTDIR="$SYSROOT" install-gcc
 make -j$JOBS all-target-libgcc
-make install-target-libgcc
+make DESTDIR="$SYSROOT" install-target-libgcc
 make -j$JOBS all-target-libstdc++-v3
-make install-target-libstdc++-v3
+make DESTDIR="$SYSROOT" install-target-libstdc++-v3
+
+ln -sv gcc "$SYSROOT/usr/bin/cc"

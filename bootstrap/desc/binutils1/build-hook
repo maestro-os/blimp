@@ -6,6 +6,8 @@ cd *
 mkdir build
 cd build
 
+mkdir -p "$SYSROOT/tools/$TARGET/bin"
+
 ../configure \
 	--prefix="$SYSROOT/tools" \
 	--target="$TARGET" \
