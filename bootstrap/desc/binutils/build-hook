@@ -16,4 +16,4 @@ cd build
 	--enable-gprofng=no
 
 make -j${JOBS}
-make DESTDIR=$SYSROOT install -j1
+make install -j1
