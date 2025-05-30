@@ -1,0 +1,21 @@
+#!/bin/bash
+
+set -e
+cd *
+
+mkdir build
+cd build
+
+../configure            \
+	--prefix="/usr"     \
+	--build="$BUILD"    \
+	--host="$TARGET"    \
+	--disable-nls       \
+	--enable-shared     \
+	--enable-gprofng=no \
+	--disable-werror    \
+	--enable-64-bit-bfd
+
+make -j${JOBS}
+make DESTDIR="$SYSROOT" install -j1
+rm -v "$SYSROOT/usr/lib/lib"{bfd,ctf,ctf-nobfd,opcodes}.{a,la}

@@ -1,0 +1,22 @@
+{
+	"sources": [
+		{
+			"location": "/",
+			"url": "https://musl.libc.org/releases/musl-1.2.5.tar.gz"
+		}
+	],
+	"package": {
+		"name": "bootstrap-musl",
+		"version": "1.2.5",
+
+		"description": "musl for bootstrapping",
+
+		"build_deps": [
+			{
+				"name": "bootstrap-gcc1",
+				"version": "*"
+			}
+		],
+		"run_deps": []
+	}
+}

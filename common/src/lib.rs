@@ -3,6 +3,7 @@
 #![feature(io_error_more)]
 
 pub use anyhow;
+pub use clap;
 pub use flate2;
 pub use serde_json;
 pub use tar;
