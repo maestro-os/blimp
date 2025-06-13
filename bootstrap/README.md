@@ -14,6 +14,7 @@ Bootstrapping is done in several steps:
 | **gcc** (and **libgcc**)                    | A            | B              | gcc stage 1, used to compile the next step only |
 | **linux headers**                           | n/a          | n/a            | required by libc                                |
 | **musl**                                    | B            | n/a            | libc, used by gcc stage 2                       |
+| **zlib**                                    | B            | n/a            | zlib, used by binutils stage 2 while running    |
 | **libstdc++**                               | B            | n/a            | used by gcc stage 2, requires libc              |
 | **binutils**                                | B            | B              | binutils stage 2                                |
 | **gcc** (with **libgcc** and **libstdc++**) | B            | B              | gcc stage 2, used to cross-compile packages     |
