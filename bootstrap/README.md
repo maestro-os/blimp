@@ -6,7 +6,7 @@ Bootstrapping is the process of creating an environment which allows the cross c
 
 ## Overview
 
-Bootstrapping is done in several steps:
+The following build steps are required for bootstrapping:
 
 | Package                                     | Host triplet | Target triplet | Notes                                           |
 |---------------------------------------------|--------------|----------------|-------------------------------------------------|
@@ -19,7 +19,7 @@ Bootstrapping is done in several steps:
 | **binutils**                                | B            | B              | binutils stage 2                                |
 | **gcc** (with **libgcc** and **libstdc++**) | B            | B              | gcc stage 2, used to cross-compile packages     |
 
-> **Note**: one last compilation of gcc (stage 3) is necessary, but it is treated as a casual package.
+> **Note**: one last compilation of gcc (stage 3) will be necessary for a final system, but it is treated as a casual package and not discussed here.
 
 ## Building
 
