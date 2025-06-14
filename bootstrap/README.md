@@ -19,6 +19,20 @@ Bootstrapping is done in several steps:
 | **binutils**                                | B            | B              | binutils stage 2                                |
 | **gcc** (with **libgcc** and **libstdc++**) | B            | B              | gcc stage 2, used to cross-compile packages     |
 
-The second **gcc** is then able to cross compile other packages (autoconf, make, etc...)
-
 > **Note**: one last compilation of gcc (stage 3) is necessary, but it is treated as a casual package.
+
+## Building
+
+First, the `sysroot` directory must be created:
+```sh
+mkdir sysroot/
+```
+
+Then, each package has to be built, in the order of the table above.
+
+The command to use for building a package is:
+```sh
+PATH="$(pwd)/sysroot/tools:$PATH" HOST=<host-triplet> TARGET=<target-triplet> blimp-builder --from desc/<pkg>/ --to sysroot/
+```
+
+Once this is done, the second **gcc** can be used to cross compile packages (autoconf, make, etc...) on the target.
