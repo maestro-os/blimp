@@ -1,0 +1,17 @@
+{
+	"sources": [
+		{
+			"location": "/",
+			"url": "https://ftp.gnu.org/gnu/binutils/binutils-2.44.tar.gz"
+		}
+	],
+	"package": {
+		"name": "bootstrap-binutils",
+		"version": "2.44",
+
+		"description": "Stage 1 binutils for bootstrapping",
+
+		"build_deps": [],
+		"run_deps": []
+	}
+}

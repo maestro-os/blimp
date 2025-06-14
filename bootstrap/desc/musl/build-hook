@@ -3,7 +3,6 @@
 set -e
 cd *
 
-# Compile
 ./configure \
 	--build="$BUILD" \
 	--host="$HOST" \
@@ -11,7 +10,6 @@ cd *
 	--prefix="/usr" \
 	--enable-optimize \
 	--enable-shared
-make -j${JOBS}
 
-# Install
+make -j${JOBS}
 make DESTDIR=$SYSROOT install

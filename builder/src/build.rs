@@ -30,15 +30,17 @@ pub struct BuildProcess {
 	build_desc: BuildDescriptor,
 	/// The path to the build directory.
 	build_dir: PathBuf,
-	/// The path to the fake system root at which the package is "installed".
+	/// The path to the system root in which the package is installed.
 	sysroot: PathBuf,
 }
 
 impl BuildProcess {
 	/// Creates a new instance.
 	///
-	/// `input_path` is the path to the directory containing information to build the package.
-	pub fn new(input_path: PathBuf) -> io::Result<Self> {
+	/// Arguments:
+	/// - `input_path` is the path to the directory containing information to build the package.
+	/// - `sysroot` is the path to the system root. If `None`, a directory is created.
+	pub fn new(input_path: PathBuf, sysroot: Option<PathBuf>) -> io::Result<Self> {
 		let build_desc_path = input_path.join("package.json");
 		let build_desc = fs::read_to_string(build_desc_path)?;
 		let build_desc = serde_json::from_str(&build_desc)?;
@@ -46,7 +48,9 @@ impl BuildProcess {
 			input_path,
 			build_desc,
 			build_dir: common::util::create_tmp_dir(WORK_DIR)?,
-			sysroot: common::util::create_tmp_dir(WORK_DIR)?,
+			sysroot: sysroot
+				.map(fs::canonicalize)
+				.unwrap_or_else(|| common::util::create_tmp_dir(WORK_DIR))?,
 		})
 	}
 
@@ -126,9 +130,13 @@ impl BuildProcess {
 	}
 
 	/// Cleans files created by the build process.
-	pub fn cleanup(self) -> io::Result<()> {
-		fs::remove_dir_all(&self.build_dir)?;
-		fs::remove_dir_all(&self.sysroot)?;
+	///
+	/// `sysroot`: if `true`, the sysroot is also deleted.
+	pub fn cleanup(self, sysroot: bool) -> io::Result<()> {
+		fs::remove_dir_all(self.build_dir)?;
+		if sysroot {
+			fs::remove_dir_all(self.sysroot)?;
+		}
 		Ok(())
 	}
 }

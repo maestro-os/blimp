@@ -6,17 +6,16 @@ cd *
 mkdir build
 cd build
 
-# Compile
+mkdir -p "$SYSROOT/tools/$TARGET/bin"
+
 ../configure \
-	--prefix=/usr \
-	--build="$BUILD" \
-	--host="$HOST" \
+	--prefix="$SYSROOT/tools" \
 	--target="$TARGET" \
+	--with-sysroot="$SYSROOT" \
 	--disable-werror \
 	--disable-nls \
 	--enable-64-bit-bfd \
 	--enable-gprofng=no
-make -j${JOBS}
 
-# Install
-make DESTDIR=$SYSROOT install -j1
+make -j${JOBS}
+make install -j1

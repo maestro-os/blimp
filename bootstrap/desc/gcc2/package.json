@@ -1,0 +1,22 @@
+{
+	"sources": [
+		{
+			"location": "/",
+			"url": "https://ftp.gnu.org/gnu/gcc/gcc-15.1.0/gcc-15.1.0.tar.gz"
+		}
+	],
+	"package": {
+		"name": "bootstrap-gcc2",
+		"version": "15.1.0",
+
+		"description": "Stage 2 gcc for bootstrapping",
+
+		"build_deps": [
+			{
+				"name": "bootstrap-libstdc++",
+				"version": "*"
+			}
+		],
+		"run_deps": []
+	}
+}

@@ -1,0 +1,36 @@
+#!/bin/bash
+
+set -e
+cd *
+
+# TODO use `sources` in `package.json`
+./contrib/download_prerequisites
+
+mkdir build
+cd build
+
+../configure \
+	--prefix="/usr"                 \
+	--build="$BUILD"                \
+	--host="$HOST"                  \
+	--target="$TARGET"              \
+	--with-build-sysroot="$SYSROOT" \
+	--disable-nls                   \
+	--disable-multilib              \
+	--disable-libatomic             \
+	--disable-libgomp               \
+	--disable-libquadmath           \
+	--disable-libssp                \
+	--disable-libvtv                \
+	--enable-default-pie            \
+	--enable-default-ssp            \
+	--enable-languages=c,c++
+
+make -j$JOBS all-gcc
+make DESTDIR="$SYSROOT" install-gcc
+make -j$JOBS all-target-libgcc
+make DESTDIR="$SYSROOT" install-target-libgcc
+make -j$JOBS all-target-libstdc++-v3
+make DESTDIR="$SYSROOT" install-target-libstdc++-v3
+
+ln -sv gcc "$SYSROOT/usr/bin/cc"

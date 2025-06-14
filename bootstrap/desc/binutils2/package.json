@@ -6,10 +6,10 @@
 		}
 	],
 	"package": {
-		"name": "binutils",
+		"name": "bootstrap-binutils",
 		"version": "2.44",
 
-		"description": "The GNU Binutils are a collection of binary tools.",
+		"description": "Stage 2 binutils for bootstrapping",
 
 		"build_deps": [],
 		"run_deps": []
