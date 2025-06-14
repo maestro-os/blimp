@@ -83,17 +83,19 @@ blimp
 The general usage of the command is:
 
 ```sh
-blimp-builder <package descriptor> <output repository>
+blimp-builder --from <package descriptor> --to <output directory>
 ```
 
-The command builds the package according to the descriptor, then writes the result in the given output repository.
+The command builds the package according to the descriptor, then installs it in the given output repository (used as a system root).
 
-> **Note**: the structure of package descriptors and output packages is not yet documented as they are subject to changes
+The `--package` can be used to write the resulting package into an archive instead of installing it. In which case, the output directory is considered as a repository instead of a system root.
+
+> **Note**: the structure of output packages is not yet documented as it is subject to changes
 
 
 
-### Cross compilation
+### Bootstrapping
 
-Cross compilation is required when building package for a system with a different target triplet than the current system.
+When building packages for a new system on a different target triplet than the current system, **bootstrapping** is required.
 
-Toolchain building and usage scripts are available in `cross/`, more information is available [here](cross/README.md).
+Documentation about bootstrap toolchain building is available in `bootstrap/`, more information is available [here](bootstrap/README.md).
