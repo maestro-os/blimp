@@ -7,13 +7,13 @@ mkdir build
 cd build
 
 ../libstdc++-v3/configure   \
-    --host="$TARGET"        \
+    --host="$HOST"          \
     --build="$BUILD"        \
     --prefix="/usr"         \
     --disable-multilib      \
     --disable-nls           \
     --disable-libstdcxx-pch \
-    --with-gxx-include-dir="/tools/$TARGET/include/c++/15.1.0"
+    --with-gxx-include-dir="/tools/$HOST/include/c++/$PKG_VERSION"
 
 make
 make DESTDIR=$SYSROOT install

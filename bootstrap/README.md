@@ -23,9 +23,9 @@ The following build steps are required for bootstrapping:
 
 ## Building
 
-First, the `sysroot` directory must be created:
+First, the `sysroot` directory and a basic file hierarchy must be created. Use `init.sh`:
 ```sh
-mkdir sysroot/
+./init.sh
 ```
 
 Then, each package has to be built, in the order of the table above.
