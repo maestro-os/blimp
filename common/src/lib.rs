@@ -3,7 +3,6 @@
 #![feature(io_error_more)]
 
 pub use anyhow;
-pub use clap;
 pub use flate2;
 pub use serde_json;
 pub use tar;
@@ -45,27 +44,63 @@ pub const USER_AGENT: &str = concat!("blimp/", env!("CARGO_PKG_VERSION"));
 ///
 /// The lockfile is destroyed when the environment is dropped.
 pub struct Environment {
-	/// The path to the sysroot of the environment.
+	/// The path to the sysroot of the environment
 	sysroot: PathBuf,
+	/// Local repositories, if any
+	local_repos: Vec<PathBuf>,
+	/// The branch to install from
+	branch: String,
+	/// The architecture to install for
+	arch: String,
 }
 
 impl Environment {
-	/// Returns an instance for the environment with the given sysroot.
+	/// Tries to lock the environment at `sysroot` so that no other instance can access it at the same time.
 	///
-	/// The function tries to lock the environment so that no other instance can access it at the
-	/// same time. If already locked, the function returns `None`.
-	pub fn with_root(sysroot: &Path) -> io::Result<Option<Self>> {
+	/// Arguments:
+	/// - `sysroot` is the root directory of the system to lock
+	/// - `local_repos` is the list of local repositories, if any
+	/// - `branch` is the repository branch to use. Default: `stable`
+	/// - `arch` is the architecture to use. Defaults to the current
+	///
+	/// If the environment is already locked, the function returns `None`.
+	pub fn acquire(sysroot: &Path, local_repos: Vec<PathBuf>, branch: Option<String>, arch: Option<String>) -> io::Result<Option<Self>> {
 		let sysroot = sysroot.canonicalize()?;
 		let path = sysroot.join(LOCKFILE_PATH);
 		let acquired = lockfile::lock(&path)?;
+		#[cfg(target_arch = "x86")]
+		let default_arch = "x86";
+		#[cfg(target_arch = "x86_64")]
+		let default_arch = "x86_64";
 		Ok(acquired.then_some(Self {
 			sysroot,
+			local_repos,
+			branch: branch.unwrap_or_else(|| "stable".to_owned()),
+			arch: arch.unwrap_or_else(|| default_arch.to_owned()),
 		}))
 	}
 
 	/// Returns the sysroot of the current environment.
 	pub fn sysroot(&self) -> &Path {
 		&self.sysroot
+	}
+	
+	/// Returns the local repositories list
+	#[inline]
+	pub fn local_repos(&self) -> &[PathBuf] {
+		&self.local_repos
+	}
+	
+	/// Returns the repository branch to use
+	#[inline]
+	pub fn branch(&self) -> &str {
+		&self.branch
+	}
+
+	/// Returns the repository architecture to use
+	#[inline]
+	pub fn architecture(&self) -> &str {
+		&self.arch
 	}
 
 	/// Returns the installed version for the package with the given `name`.

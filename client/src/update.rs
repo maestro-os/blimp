@@ -9,11 +9,11 @@ use common::{
 /// Updates the packages list.
 pub async fn update(env: &mut Environment) -> Result<()> {
 	let remotes = Remote::load_list(env)
-		.map_err(|error| anyhow!("Could not update packages list: {error}"))?;
-	println!("Updating from remotes...");
+		.map_err(|error| anyhow!("could not update packages list: {error}"))?;
+	println!("Update from remotes...");
 	let mut futures = Vec::new();
 	for r in &remotes {
-		futures.push((&r.host, r.fetch_list()));
+		futures.push((&r.host, r.fetch_list(env)));
 	}
 	let mut failed = false;
 	for (host, f) in futures {

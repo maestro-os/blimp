@@ -8,7 +8,7 @@ use common::{
 	repository::Repository,
 	Environment,
 };
-use std::{collections::HashMap, io, path::PathBuf};
+use std::{collections::HashMap, io};
 
 // TODO Clean
 /// Installs the given list of packages.
@@ -16,15 +16,15 @@ use std::{collections::HashMap, io, path::PathBuf};
 /// Arguments:
 /// - `names` is the list of packages to install.
 /// - `env` is the blimp environment.
-/// - `local_repos` is the list of paths to local package repositories.
-pub async fn install(
-	names: &[String],
-	env: &mut Environment,
-	local_repos: Vec<PathBuf>,
-) -> Result<()> {
+pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
+	if names.is_empty() {
+		bail!("must specify at least one package");
+	}
 	// The list of repositories
-	let repos = local_repos
-		.into_iter()
+	let repos = env
+		.local_repos()
+		.iter()
+		.cloned()
 		.map(Repository::load)
 		.collect::<io::Result<Vec<_>>>()?;
 	// Tells whether the operation failed
@@ -100,7 +100,7 @@ pub async fn install(
 				None => {
 					// Get package size from remote
 					let remote = repo.get_remote().unwrap();
-					let size = remote.get_size(pkg).await?;
+					let size = remote.get_size(env, pkg).await?;
 					total_size += size;
 					println!("\t- {name} ({version}) - download size: {size}");
 				}
@@ -147,7 +147,7 @@ pub async fn install(
 							.write(true)
 							.truncate(true)
 							.open(path)?;
-						let url = remote.download_url(pkg);
+						let url = remote.download_url(env, pkg);
 						let mut task = DownloadTask::new(&url, &file).await?;
 						while task.next().await? > 0 {}
 						Ok::<(), common::anyhow::Error>(())

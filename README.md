@@ -18,7 +18,6 @@ Blimp is a simple package manager for Unix-like operating systems, more specific
 This repository contains the following components:
 - `blimp`: The package manager itself
 - `blimp-builder`: An utility to build packages
-- `blimp-server`: The package manager's server
 
 The `common` crate is a library with utilities shared across components.
 

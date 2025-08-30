@@ -12,12 +12,12 @@ use crate::{
 };
 use common::{
 	anyhow::{anyhow, bail, Result},
-	clap::Parser,
 	repository::Repository,
 	serde_json,
 	tokio::runtime::Runtime,
 };
 use std::{env, fs, io, path::PathBuf, process::exit, str};
+use clap::Parser;
 
 /// The path to the work directory.
 const WORK_DIR: &str = "work/";
@@ -31,7 +31,7 @@ const WORK_DIR: &str = "work/";
 \tTARGET: Target triplet for which the package builds (this is useful when cross-compiling compilers)
 \tBLIMP_DEBUG: If set to `true`, build files are kept for troubleshooting purpose
 
-All environment variable are optional")]
+All environment variables are optional")]
 #[command(version, about, long_about = None)]
 struct Args {
 	/// Path to the directory containing the package to build.
