@@ -1,0 +1,73 @@
+.TH BLIMP 7
+.SH NAME
+blimp - package manager internals
+.SH DESCRIPTION
+.TP
+.BR "Server-side files hierarchy"
+.RS
+Blimp downloads packages from a HTTP server. The server-side files hierarchy is designed in such a way to allow hosting packages without requiring a specific server program.
+
+Example:
+.nf
+.B - metadata
+.B - stable/
+.B "    "- index
+.B "    "- dist/
+.B "        "- x86_64/
+.B "            "- <package-name>_<package-version>.tar.zstd
+.B "            "- <package-name>_<package-version>.meta
+             ...
+.B "        "- x86/
+             ...
+         ...
+.B "    "- i18n/
+.B "        "- en/
+.B "            "- <package-name>_<package-version>/
+                 ...
+             ...
+.B "        "- fr/
+             ...
+         ...
+.B "    "- src/
+.B "        "- <package-name>_<package-version>/
+             ...
+         ...
+.B - nightly/
+        ...
+.fi
+
+.B metadata
+contains information about the server, in TOML format
+
+.B dist/
+contains all branches.
+.B stable
+is the canonical name for production-ready packages, while
+.B nightly
+is for unstable packages
+
+.B index
+contains the list of all packages and their supported architecture, in TOML format. It is used by the client to determine the list of packages present on the server
+
+.B dist/
+contains packages (*.tar.zstd) and their metadata (*.meta), sorted by CPU architecture
+
+.B i18n/
+contains internationalization files, sorted by locale
+
+.B src/
+contains package sources
+
+When updating the packages list, the client first looks at
+.B metadata
+to determine the list of branches, and then it looks at the
+.B index
+in each, containing the list of packages.
+
+To download a package, the client looks up the required version in its local copy of the server's index. Then it downloads the
+.B .meta
+file, to look at the required dependencies. Dependencies are looked-up recursively until they are all found. Then, the client downloads all packages and installs them.
+.RE
+.SH "SEE ALSO"
+.sp
+\fBblimp\fP(1), \fBblimp-builder\fP(1)

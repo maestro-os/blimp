@@ -1,0 +1,75 @@
+.TH BLIMP 8
+.SH NAME
+blimp \- Maestro's package manager
+.SH SYNOPSIS
+.B blimp
+update
+.br
+.B blimp
+info <package>
+.br
+.B blimp
+install <package...>
+.br
+.B blimp
+upgrade [package...]
+.br
+.B blimp
+remove <package...>
+.br
+.B blimp
+clean
+.br
+.B blimp
+remote-list
+.br
+.B blimp
+remote-add <remote>
+.br
+.B blimp
+remote-remove <remote>
+.SH DESCRIPTION
+.PP
+Maestro's package manager installs and upgrades packages on the system. It is able to download packages from remote servers, manages dependencies, and bootstrap new systems.
+.TP
+Each command has to specify an action to perform:
+.TP
+.B update
+synchronizes packages information from remotes
+.TP
+.B info
+prints information about the given package(s)
+.TP
+.B install
+installs the given package(s)
+.TP
+.B upgrade
+upgrades the given package(s). If no package is specified, the package manager updates every package that is not up-to-date
+.TP
+.B remove
+removes the given package(s)
+.TP
+.B clean
+cleans the cache
+.TP
+.B remote-list
+lists remote servers
+.TP
+.B remote-add
+adds a remote server
+.TP
+.B remote-remove
+removes a remote server
+.SH "ENVIRONMENT VARIABLES"
+The following environment variables are relevant to blimp:
+.TP
+.B SYSROOT
+path treated as the root directory of the system on which packages are installed, upgraded or removed. This is useful when bootstrapping a new system
+.TP
+.B LOCAL_REPO
+paths to local package repositories, separated by `:`.
+.B SYSROOT
+does not apply to these paths
+.SH "SEE ALSO"
+.sp
+\fBblimp\fP(7), \fBblimp-builder\fP(1)
