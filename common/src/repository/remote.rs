@@ -10,7 +10,6 @@ use std::{
 	io,
 	io::{BufRead, BufReader, BufWriter, Write},
 };
-use serde::Deserialize;
 
 /// The file which contains the list of remotes.
 const REMOTES_FILE: &str = "var/lib/blimp/remotes";
@@ -20,14 +19,6 @@ const REMOTES_FILE: &str = "var/lib/blimp/remotes";
 pub struct Remote {
 	/// The host's address and port (optional).
 	pub host: String,
-}
-
-#[derive(Deserialize)]
-pub struct RemoteMetadata {
-	/// The server's motd
-	pub motd: String,
-	/// Available branches on the server
-	pub branches: Vec<String>,
 }
 
 impl Borrow<str> for Remote {
@@ -69,8 +60,8 @@ impl Remote {
 		Ok(())
 	}
 
-	/// Returns the remote's motd.
-	pub async fn fetch_metadata(&self) -> Result<RemoteMetadata> {
+	/// Fetches the remote's motd
+	pub async fn fetch_motd(&self) -> Result<String> {
 		let client = reqwest::Client::new();
 		let url = format!("https://{}/motd", &self.host);
 		let response = client
@@ -84,15 +75,15 @@ impl Remote {
 				let s = response.text().await?;
 				let metadata = toml::from_str(&s)?;
 				Ok(metadata)
-			},
-			_ => bail!("Failed to retrieve remote metadata (status {status})"),
+			}
+			_ => bail!("failed to retrieve remote metadata (status {status})"),
 		}
 	}
 
 	/// Fetches the list of all the packages from the remote.
-	pub async fn fetch_list(&self, env: &Environment) -> Result<Vec<Package>> {
+	pub async fn fetch_list(&self) -> Result<Vec<Package>> {
 		let client = reqwest::Client::new();
-		let url = format!("https://{}/{}/package", self.host, env.branch);
+		let url = format!("https://{}/index", self.host);
 		let response = client
 			.get(url)
 			.header("User-Agent", USER_AGENT)
@@ -100,7 +91,9 @@ impl Remote {
 			.await?;
 		let status = response.status();
 		match status {
-			StatusCode::OK => Ok(response.json().await?),
+			StatusCode::OK => {
+				todo!()
+			},
 			_ => bail!("Failed to retrieve packages list from remote (status {status})"),
 		}
 	}
@@ -108,8 +101,8 @@ impl Remote {
 	/// Returns the download URL for the given `package`.
 	pub fn download_url(&self, env: &Environment, package: &Package) -> String {
 		format!(
-			"https://{}/{}/dist/{}/{}_{}.tar.zstd",
-			self.host, env.branch, env.arch, package.name, package.version
+			"https://{}/dist/{}/{}_{}.tar.zstd",
+			self.host, env.arch, package.name, package.version
 		)
 	}
 

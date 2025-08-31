@@ -2,12 +2,18 @@
 //!
 //! Packages are usually downloaded from a remote host.
 
+use anyhow::Result;
 use crate::{
 	repository::Repository,
 	version::{Version, VersionConstraint},
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt, fs, io, io::ErrorKind, path::PathBuf};
+use std::{
+	collections::HashMap,
+	fmt, fs, io,
+	io::ErrorKind,
+	path::{Path, PathBuf},
+};
 
 /// Tells whether the given package name is valid.
 pub fn is_valid_name(name: &str) -> bool {
@@ -97,14 +103,14 @@ pub struct Package {
 }
 
 impl Package {
-	/// Loads a package from the given path.
+	/// Loads a package from the metadata file.
 	///
-	/// If the package does not exist, the function returns None.
-	pub fn load(path: PathBuf) -> io::Result<Option<Package>> {
-		match fs::read_to_string(path.join("desc")) {
-			Ok(content) => Ok(Some(serde_json::from_str(&content)?)),
+	/// If the package does not exist, the function returns `None`.
+	pub fn load(metadata_path: &Path) -> Result<Option<Package>> {
+		match fs::read_to_string(metadata_path) {
+			Ok(content) => Ok(Some(toml::from_str(&content)?)),
 			Err(e) if e.kind() == ErrorKind::NotFound => Ok(None),
-			Err(e) => Err(e),
+			Err(e) => Err(e.into()),
 		}
 	}
 

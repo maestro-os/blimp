@@ -1,11 +1,7 @@
 //! Implementation of the package building procedure.
 
 use crate::{desc::BuildDescriptor, WORK_DIR};
-use common::{
-	anyhow::Result,
-	flate2::{write::GzEncoder, Compression},
-	serde_json, tar, tokio,
-};
+use common::{anyhow::Result, repository::Repository, tar, tokio, zstd};
 use std::{
 	fs,
 	fs::File,
@@ -19,7 +15,7 @@ use std::{
 /// A build process is the operation of converting source code into an installable package.
 ///
 /// To build a package, the following files are required:
-/// - `package.json`: The file describing the package
+/// - `build.toml`: Information to prepare for building the package
 /// - `build-hook`: The script to build the package
 ///
 /// The package is build and then installed to a fake system root, which is then compressed.
@@ -28,6 +24,7 @@ pub struct BuildProcess {
 	input_path: PathBuf,
 	/// The build descriptor.
 	build_desc: BuildDescriptor,
+
 	/// The path to the build directory.
 	build_dir: PathBuf,
 	/// The path to the system root in which the package is installed.
@@ -40,23 +37,19 @@ impl BuildProcess {
 	/// Arguments:
 	/// - `input_path` is the path to the directory containing information to build the package.
 	/// - `sysroot` is the path to the system root. If `None`, a directory is created.
-	pub fn new(input_path: PathBuf, sysroot: Option<PathBuf>) -> io::Result<Self> {
-		let build_desc_path = input_path.join("package.json");
+	pub fn new(input_path: PathBuf, sysroot: Option<PathBuf>) -> Result<Self> {
+		let build_desc_path = input_path.join("metadata.toml");
 		let build_desc = fs::read_to_string(build_desc_path)?;
-		let build_desc = serde_json::from_str(&build_desc)?;
+		let build_desc = toml::from_str(&build_desc)?;
 		Ok(Self {
 			input_path,
 			build_desc,
+
 			build_dir: common::util::create_tmp_dir(WORK_DIR)?,
 			sysroot: sysroot
 				.map(fs::canonicalize)
 				.unwrap_or_else(|| common::util::create_tmp_dir(WORK_DIR))?,
 		})
-	}
-
-	/// Returns the build descriptor of the package to be built.
-	pub fn get_build_desc(&self) -> &BuildDescriptor {
-		&self.build_desc
 	}
 
 	/// Returns the path to the build directory.
@@ -114,16 +107,36 @@ impl BuildProcess {
 			.map(|s| s.success())
 	}
 
+	/// Writes the package's metadata to the repository
+	pub fn write_metadata(&self, repo: &Repository, arch: &str) -> Result<()> {
+		// Make sure the arch directory exists
+		fs::create_dir_all(repo.get_path().join(arch))?;
+		// Create metadata
+		let metadata = toml::to_string(&self.build_desc.package)?;
+		fs::write(
+			repo.get_metadata_path(
+				arch,
+				&self.build_desc.package.name,
+				&self.build_desc.package.version,
+			),
+			metadata,
+		)?;
+		Ok(())
+	}
+
 	/// Creates the archive of the package after being build.
-	///
-	/// `output_path` is the path at which the package's archive will be created.
-	pub fn create_archive(&self, output_path: &Path) -> io::Result<()> {
-		let build_desc_path = self.input_path.join("package.json");
-		let tar_gz = File::create(output_path)?;
-		let enc = GzEncoder::new(tar_gz, Compression::default());
+	pub fn create_archive(&self, repo: &Repository, arch: &str) -> io::Result<()> {
+		let output_path = repo.get_archive_path(
+			arch,
+			&self.build_desc.package.name,
+			&self.build_desc.package.version,
+		);
+		let build_desc_path = self.input_path.join("metadata.toml");
+		let archive = File::create(output_path)?;
+		let enc = zstd::stream::Encoder::new(archive, 0)?;
 		let mut tar = tar::Builder::new(enc);
 		tar.follow_symlinks(false);
-		tar.append_path_with_name(build_desc_path, "package.json")?;
+		tar.append_path_with_name(build_desc_path, "metadata.toml")?;
 		tar.append_dir_all("data", &self.sysroot)?;
 		// TODO add install/update/remove hooks
 		tar.finish()

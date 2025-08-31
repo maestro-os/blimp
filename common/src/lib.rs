@@ -4,11 +4,11 @@
 
 pub use anyhow;
 pub use flate2;
-pub use serde_json;
 pub use tar;
 pub use tokio;
 pub use tokio_util;
 pub use utils as maestro_utils;
+pub use zstd;
 
 #[cfg(feature = "network")]
 pub mod download;
@@ -48,23 +48,25 @@ pub struct Environment {
 	sysroot: PathBuf,
 	/// Local repositories, if any
 	local_repos: Vec<PathBuf>,
-	/// The branch to install from
-	branch: String,
 	/// The architecture to install for
 	arch: String,
 }
 
 impl Environment {
-	/// Tries to lock the environment at `sysroot` so that no other instance can access it at the same time.
+	/// Tries to lock the environment at `sysroot` so that no other instance can access it at the
+	/// same time.
 	///
 	/// Arguments:
 	/// - `sysroot` is the root directory of the system to lock
 	/// - `local_repos` is the list of local repositories, if any
-	/// - `branch` is the repository branch to use. Default: `stable`
 	/// - `arch` is the architecture to use. Defaults to the current
 	///
 	/// If the environment is already locked, the function returns `None`.
-	pub fn acquire(sysroot: &Path, local_repos: Vec<PathBuf>, branch: Option<String>, arch: Option<String>) -> io::Result<Option<Self>> {
+	pub fn acquire(
+		sysroot: &Path,
+		local_repos: Vec<PathBuf>,
+		arch: Option<String>,
+	) -> io::Result<Option<Self>> {
 		let sysroot = sysroot.canonicalize()?;
 		let path = sysroot.join(LOCKFILE_PATH);
 		let acquired = lockfile::lock(&path)?;
@@ -75,7 +77,6 @@ impl Environment {
 		Ok(acquired.then_some(Self {
 			sysroot,
 			local_repos,
-			branch: branch.unwrap_or_else(|| "stable".to_owned()),
 			arch: arch.unwrap_or_else(|| default_arch.to_owned()),
 		}))
 	}
@@ -84,22 +85,16 @@ impl Environment {
 	pub fn sysroot(&self) -> &Path {
 		&self.sysroot
 	}
-	
+
 	/// Returns the local repositories list
 	#[inline]
 	pub fn local_repos(&self) -> &[PathBuf] {
 		&self.local_repos
 	}
-	
-	/// Returns the repository branch to use
-	#[inline]
-	pub fn branch(&self) -> &str {
-		&self.branch
-	}
 
 	/// Returns the repository architecture to use
 	#[inline]
-	pub fn architecture(&self) -> &str {
+	pub fn arch(&self) -> &str {
 		&self.arch
 	}
 

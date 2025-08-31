@@ -8,7 +8,7 @@ use common::{
 	repository::Repository,
 	Environment,
 };
-use std::{collections::HashMap, io};
+use std::{collections::HashMap};
 
 // TODO Clean
 /// Installs the given list of packages.
@@ -26,13 +26,13 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 		.iter()
 		.cloned()
 		.map(Repository::load)
-		.collect::<io::Result<Vec<_>>>()?;
+		.collect::<Vec<_>>();
 	// Tells whether the operation failed
 	let mut failed = false;
 	// The list of packages to install with their respective repository
 	let mut packages = HashMap::<Package, &Repository>::new();
 	for name in names {
-		let pkg = repository::get_package_with_constraint(&repos, name, None)?;
+		let pkg = repository::get_package_with_constraint(&repos, env.arch(), name, None)?;
 		let Some((repo, pkg)) = pkg else {
 			eprintln!("Package `{name}` not found!");
 			failed = true;
@@ -58,6 +58,7 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 			&mut |name, version_constraint| {
 				let res = repository::get_package_with_constraint(
 					&repos,
+					env.arch(),
 					name,
 					Some(version_constraint),
 				);
@@ -95,7 +96,7 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 		for (pkg, repo) in &total_packages {
 			let name = &pkg.name;
 			let version = &pkg.version;
-			match repo.get_package(name, version)? {
+			match repo.get_package(env.arch(), name, version)? {
 				Some(_) => println!("\t- {name} ({version}) - cached"),
 				None => {
 					// Get package size from remote
@@ -127,7 +128,7 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 		let mut futures = Vec::new();
 		// TODO download biggest packages first (sort_unstable by decreasing size)
 		for (pkg, repo) in &total_packages {
-			if repo.is_in_cache(&pkg.name, &pkg.version) {
+			if repo.is_in_cache(env.arch(), &pkg.name, &pkg.version) {
 				println!("`{}` is in cache.", &pkg.name);
 				continue;
 			}
@@ -141,7 +142,7 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 						use common::download::DownloadTask;
 						use std::fs::OpenOptions;
 
-						let path = repo.get_archive_path(&pkg.name, &pkg.version);
+						let path = repo.get_archive_path(env.arch(), &pkg.name, &pkg.version);
 						let file = OpenOptions::new()
 							.create(true)
 							.write(true)
@@ -172,7 +173,7 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 	// Install all packages
 	for (pkg, repo) in total_packages {
 		println!("Installing `{}`...", pkg.name);
-		let archive_path = repo.get_archive_path(&pkg.name, &pkg.version);
+		let archive_path = repo.get_archive_path(env.arch(), &pkg.name, &pkg.version);
 		if let Err(e) = env.install(&pkg, &archive_path) {
 			eprintln!("Failed to install `{}`: {e}", &pkg.name);
 			failed = true;

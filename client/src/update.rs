@@ -13,7 +13,7 @@ pub async fn update(env: &mut Environment) -> Result<()> {
 	println!("Update from remotes...");
 	let mut futures = Vec::new();
 	for r in &remotes {
-		futures.push((&r.host, r.fetch_list(env)));
+		futures.push((&r.host, r.fetch_list()));
 	}
 	let mut failed = false;
 	for (host, f) in futures {

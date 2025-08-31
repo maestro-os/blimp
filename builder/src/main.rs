@@ -10,14 +10,13 @@ use crate::{
 	build::BuildProcess,
 	util::{get_build_triplet, get_jobs_count},
 };
+use clap::Parser;
 use common::{
 	anyhow::{anyhow, bail, Result},
 	repository::Repository,
-	serde_json,
 	tokio::runtime::Runtime,
 };
-use std::{env, fs, io, path::PathBuf, process::exit, str};
-use clap::Parser;
+use std::{env, path::PathBuf, process::exit, str};
 
 /// The path to the work directory.
 const WORK_DIR: &str = "work/";
@@ -34,36 +33,27 @@ const WORK_DIR: &str = "work/";
 All environment variables are optional")]
 #[command(version, about, long_about = None)]
 struct Args {
-	/// Path to the directory containing the package to build.
+	/// Path to the directory containing the package to build
 	#[arg(long)]
 	from: PathBuf,
-	/// Output directory path.
+	/// Output directory path
 	#[arg(long)]
 	to: PathBuf,
 	/// If set, the package is packed into an archive, written to this directory.
 	/// Else, the package is directly *installed* in this directory (which acts as the system
-	/// root).
+	/// root)
 	#[arg(long)]
 	package: bool,
 }
 
-/// Prepares the repository's directory for the package.
-///
-/// On success, the function returns the output archive path.
-fn prepare(build_process: &BuildProcess, to: PathBuf) -> io::Result<PathBuf> {
-	// Create directory
-	let build_desc = build_process.get_build_desc();
-	let name = &build_desc.package.name;
-	let version = &build_desc.package.version;
-	let package_path = to.join(name).join(version.to_string());
-	fs::create_dir_all(&package_path)?;
-	// Create descriptor
-	let desc_path = package_path.join("desc");
-	let desc = serde_json::to_string(&build_desc.package)?;
-	fs::write(desc_path, desc)?;
-	// Get archive path
-	let repo = Repository::load(to)?;
-	Ok(repo.get_archive_path(name, version))
+/// Returns the architecture directory name for the given `host`
+fn get_arch(host: &str) -> &str {
+	let arch = host.split_once('-').map(|(a, _)| a);
+	match arch {
+		Some("i386" | "i486" | "i586" | "i686") => "x86",
+		Some(a) => a,
+		None => host,
+	}
 }
 
 fn main_impl(args: Args) -> Result<()> {
@@ -72,31 +62,35 @@ fn main_impl(args: Args) -> Result<()> {
 	let build = get_build_triplet()?;
 	let host = env::var("HOST");
 	let host = host.as_deref().unwrap_or(build.as_str());
+	let arch = get_arch(host);
 	let target = env::var("TARGET");
 	let target = target.as_deref().unwrap_or(host);
 	let debug = env::var("BLIMP_DEBUG")
 		.map(|s| s == "true")
 		.unwrap_or(false);
 	println!("[INFO] Jobs: {jobs}; Build: {build}; Host: {host}; Target: {target}");
-	let build_process = BuildProcess::new(args.from, (!args.package).then(|| args.to.clone()))?;
+	let sysroot = (!args.package).then(|| args.to.clone());
+	let build_process = BuildProcess::new(args.from, sysroot)?;
 	let rt = Runtime::new()?;
 	rt.block_on(build_process.fetch_sources())
-		.map_err(|e| anyhow!("Cannot fetch sources: {e}"))?;
+		.map_err(|e| anyhow!("cannot fetch sources: {e}"))?;
 	println!("[INFO] Compilation...");
 	let success = build_process
 		.build(jobs, &build, host, target)
-		.map_err(|e| anyhow!("Cannot build package: {e}"))?;
+		.map_err(|e| anyhow!("cannot build package: {e}"))?;
 	if !success {
-		bail!("Package build failed!");
+		bail!("package build failed");
 	}
 	if args.package {
 		println!("[INFO] Prepare repository at `{}`...", args.to.display());
-		let archive_path = prepare(&build_process, args.to)
-			.map_err(|e| anyhow!("Failed to prepare directory for package: {e}"))?;
+		let repo = Repository::load(args.to.clone());
+		build_process
+			.write_metadata(&repo, arch)
+			.map_err(|e| anyhow!("failed to prepare directory for package: {e}"))?;
 		println!("[INFO] Create archive...");
 		build_process
-			.create_archive(&archive_path)
-			.map_err(|e| anyhow!("Cannot create archive: {e}"))?;
+			.create_archive(&repo, arch)
+			.map_err(|e| anyhow!("cannot create archive: {e}"))?;
 	}
 	if debug {
 		eprintln!(

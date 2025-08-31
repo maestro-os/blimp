@@ -75,7 +75,7 @@ async fn main_impl() -> Result<()> {
 	let local_repos = env::var("LOCAL_REPO") // TODO var_os
 		.map(|s| s.split(':').map(PathBuf::from).collect())
 		.unwrap_or_default();
-	let mut env = Environment::acquire(&sysroot, local_repos, args.branch, args.arch)?
+	let mut env = Environment::acquire(&sysroot, local_repos, args.arch)?
 		.ok_or_else(|| anyhow!("failed to acquire lockfile"))?;
 	match args.action {
 		#[cfg(feature = "network")]

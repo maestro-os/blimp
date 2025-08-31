@@ -8,8 +8,8 @@ pub async fn list(env: &Environment) -> std::io::Result<()> {
 	println!("Remotes list:");
 	for remote in remotes {
 		let host = &remote.host;
-		match remote.fetch_metadata().await {
-			Ok(metadata) => println!("- {host} (status: UP): {motd}", motd = metadata.motd),
+		match remote.fetch_motd().await {
+			Ok(motd) => println!("- {host} (status: UP): {motd}"),
 			Err(_) => println!("- {host} (status: DOWN)"),
 		}
 	}
