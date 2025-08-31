@@ -14,7 +14,7 @@ use anyhow::{bail, Result};
 #[cfg(feature = "network")]
 use remote::Remote;
 use std::{
-	fs, io,
+	fs,
 	path::{Path, PathBuf},
 };
 
