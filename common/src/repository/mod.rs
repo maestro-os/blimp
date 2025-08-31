@@ -5,11 +5,12 @@
 #[cfg(feature = "network")]
 pub mod remote;
 
-use anyhow::Result;
 use crate::{
+	package,
 	package::Package,
 	version::{Version, VersionConstraint},
 };
+use anyhow::{bail, Result};
 #[cfg(feature = "network")]
 use remote::Remote;
 use std::{
@@ -82,6 +83,9 @@ impl Repository {
 		name: &str,
 		version: &Version,
 	) -> Result<Option<Package>> {
+		if !package::is_valid_name(name) {
+			bail!("invalid package name: {name}");
+		}
 		let path = self.get_metadata_path(arch, name, version);
 		Package::load(&path)
 	}
@@ -170,7 +174,10 @@ pub fn get_package<'a>(
 	arch: &str,
 	name: &str,
 	version: &Version,
-) -> io::Result<Option<(&'a Repository, Package)>> {
+) -> Result<Option<(&'a Repository, Package)>> {
+	if !package::is_valid_name(name) {
+		bail!("invalid package name: {name}");
+	}
 	Ok(repos
 		.iter()
 		.filter_map(|repo| match repo.get_package(arch, name, version) {
@@ -195,7 +202,10 @@ pub fn get_package_with_constraint<'a>(
 	arch: &str,
 	name: &str,
 	version_constraint: Option<&VersionConstraint>,
-) -> io::Result<Option<(&'a Repository, Package)>> {
+) -> Result<Option<(&'a Repository, Package)>> {
+	if !package::is_valid_name(name) {
+		bail!("invalid package name: {name}");
+	}
 	Ok(repos
 		.iter()
 		.filter_map(|repo| {

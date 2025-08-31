@@ -1,7 +1,9 @@
 //! TODO doc
 
-use common::{anyhow::Result, Environment};
-use common::anyhow::bail;
+use common::{
+	anyhow::{bail, Result},
+	Environment,
+};
 
 /// Removes the given list of packages.
 ///

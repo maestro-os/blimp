@@ -93,7 +93,7 @@ impl Remote {
 		match status {
 			StatusCode::OK => {
 				todo!()
-			},
+			}
 			_ => bail!("Failed to retrieve packages list from remote (status {status})"),
 		}
 	}

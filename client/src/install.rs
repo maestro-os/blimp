@@ -8,7 +8,7 @@ use common::{
 	repository::Repository,
 	Environment,
 };
-use std::{collections::HashMap};
+use std::collections::HashMap;
 
 // TODO Clean
 /// Installs the given list of packages.

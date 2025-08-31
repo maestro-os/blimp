@@ -40,7 +40,8 @@ impl BuildProcess {
 	pub fn new(input_path: PathBuf, sysroot: Option<PathBuf>) -> Result<Self> {
 		let build_desc_path = input_path.join("metadata.toml");
 		let build_desc = fs::read_to_string(build_desc_path)?;
-		let build_desc = toml::from_str(&build_desc)?;
+		let build_desc = toml::from_str::<BuildDescriptor>(&build_desc)?;
+		build_desc.package.validate()?;
 		Ok(Self {
 			input_path,
 			build_desc,

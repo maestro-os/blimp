@@ -2,11 +2,11 @@
 //!
 //! Packages are usually downloaded from a remote host.
 
-use anyhow::Result;
 use crate::{
 	repository::Repository,
 	version::{Version, VersionConstraint},
 };
+use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use std::{
 	collections::HashMap,
@@ -112,6 +112,24 @@ impl Package {
 			Err(e) if e.kind() == ErrorKind::NotFound => Ok(None),
 			Err(e) => Err(e.into()),
 		}
+	}
+
+	/// Validates the package's metadata
+	pub fn validate(&self) -> Result<()> {
+		if !is_valid_name(&self.name) {
+			bail!("invalid package name: {}", self.name);
+		}
+		for d in &self.build_deps {
+			if !is_valid_name(&d.name) {
+				bail!("invalid dependency name: {}", d.name);
+			}
+		}
+		for d in &self.run_deps {
+			if !is_valid_name(&d.name) {
+				bail!("invalid dependency name: {}", d.name);
+			}
+		}
+		Ok(())
 	}
 
 	/// Resolves the dependencies of the package and inserts them into the given `HashMap`.
