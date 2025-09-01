@@ -8,7 +8,6 @@ pub use tar;
 pub use tokio;
 pub use tokio_util;
 pub use utils as maestro_utils;
-pub use zstd;
 
 #[cfg(feature = "network")]
 pub mod download;
@@ -30,9 +29,8 @@ use std::{
 
 /// The directory containing cached packages.
 const LOCKFILE_PATH: &str = "var/lib/blimp/.lock";
-// TODO
-/*/// The path to directory storing information about installed packages.
-const INSTALLED_DB: &str = "var/lib/blimp/installed";*/
+/// The path to directory storing information about installed packages.
+const INSTALLED_DB: &str = "var/lib/blimp/installed";
 
 /// The user agent for HTTP requests.
 pub const USER_AGENT: &str = concat!("blimp/", env!("CARGO_PKG_VERSION"));
@@ -98,20 +96,44 @@ impl Environment {
 		&self.arch
 	}
 
-	/// Returns the installed version for the package with the given `name`.
-	pub fn get_installed_version(&self, _name: &str) -> Option<Version> {
-		todo!()
+	/// If installed, returns the version of the package with the given `name`
+	pub fn get_installed_version(&self, name: &str) -> Result<Option<Version>> {
+		// Ensure the parent directory exists
+		let path = self.sysroot.join(INSTALLED_DB);
+		fs::create_dir_all(&path)?;
+		// Read file and get version
+		let path = path.join(name);
+		let res = fs::read_to_string(path);
+		let installed = match res {
+			Ok(i) => i,
+			Err(e) if e.kind() == ErrorKind::NotFound => return Ok(None),
+			Err(e) => return Err(e.into()),
+		};
+		let installed: InstalledPackage = toml::from_str(&installed)?;
+		Ok(Some(installed.desc.version))
+	}
+
+	/// Writes installed package information
+	fn write_installed_version(&self, pkg: &InstalledPackage) -> Result<()> {
+		// Ensure the parent directory exists
+		let path = self.sysroot.join(INSTALLED_DB);
+		fs::create_dir_all(&path)?;
+		// Write
+		let path = path.join(&pkg.desc.name);
+		let content = toml::to_string(pkg)?;
+		fs::write(path, content)?;
+		Ok(())
 	}
 
 	/// Installs the given package.
 	///
 	/// Arguments:
-	/// - `pkg` is the package to be installed.
-	/// - `archive_path` is the path to the archive of the package.
+	/// - `pkg` is the package to be installed
+	/// - `archive_path` is the path to the archive of the package
 	///
 	/// The function does not resolve dependencies. It is the caller's responsibility to install
 	/// them beforehand.
-	pub fn install(&self, _pkg: &Package, archive_path: &Path) -> Result<(), Box<dyn Error>> {
+	pub fn install(&self, pkg: &Package, archive_path: &Path) -> Result<(), Box<dyn Error>> {
 		// Read archive
 		let mut archive = util::read_package_archive(archive_path)?;
 		// TODO Get hooks (pre-install-hook and post-install-hook)
@@ -136,16 +158,19 @@ impl Environment {
 			files.push(path);
 		}
 		// TODO Execute post-install-hook
-		// TODO add package to installed db
+		self.write_installed_version(&InstalledPackage {
+			desc: pkg.clone(),
+			files,
+		})?;
 		Ok(())
 	}
 
 	/// Installs a new version of the package, removing the previous.
 	///
 	/// Arguments:
-	/// - `pkg` is the package to be updated.
-	/// - `archive_path` is the path to the archive of the new version of the package.
-	pub fn update(&self, _pkg: &Package, archive_path: &Path) -> Result<()> {
+	/// - `pkg` is the package to be updated
+	/// - `archive_path` is the path to the archive of the new version of the package
+	pub fn upgrade(&self, _pkg: &Package, archive_path: &Path) -> Result<()> {
 		// Read archive
 		let _archive = util::read_package_archive(archive_path)?;
 		// TODO Get hooks (pre-update-hook and post-update-hook)

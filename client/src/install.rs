@@ -40,8 +40,8 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 		};
 		packages.insert(pkg, repo);
 		// If already installed, print message
-		if let Some(version) = env.get_installed_version(name) {
-			println!("Package `{name}` version `{version}` is already installed. Reinstalling",);
+		if let Some(version) = env.get_installed_version(name)? {
+			println!("Package `{name}` version `{version}` is already installed. Reinstalling");
 		}
 	}
 	if failed {

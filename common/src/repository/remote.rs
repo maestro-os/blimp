@@ -102,7 +102,7 @@ impl Remote {
 	/// Returns the download URL for the given `package`.
 	pub fn download_url(&self, env: &Environment, package: &Package) -> String {
 		format!(
-			"https://{}/dist/{}/{}_{}.tar.zstd",
+			"https://{}/dist/{}/{}_{}.tar.gz",
 			self.host, env.arch, package.name, package.version
 		)
 	}

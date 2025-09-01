@@ -24,7 +24,6 @@ tokio-util = { version = "0.7.15", features = ["io"] }
 toml = { version = "0.9.5" }
 utils = { git = "https://github.com/maestro-os/maestro-utils" }
 xz2 = "0.1.7"
-zstd = "0.13.3"
 
 [features]
 default = []

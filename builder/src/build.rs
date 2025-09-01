@@ -1,7 +1,12 @@
 //! Implementation of the package building procedure.
 
 use crate::{desc::BuildDescriptor, WORK_DIR};
-use common::{anyhow::Result, repository::Repository, tar, tokio, zstd};
+use common::{
+	anyhow::Result,
+	flate2::{write::GzEncoder, Compression},
+	repository::Repository,
+	tar, tokio,
+};
 use std::{
 	fs,
 	fs::File,
@@ -132,7 +137,7 @@ impl BuildProcess {
 		);
 		let build_desc_path = self.input_path.join("metadata.toml");
 		let archive = File::create(output_path)?;
-		let enc = zstd::stream::Encoder::new(archive, 0)?;
+		let enc = GzEncoder::new(archive, Compression::default());
 		let mut tar = tar::Builder::new(enc);
 		tar.follow_symlinks(false);
 		tar.append_path_with_name(build_desc_path, "metadata.toml")?;

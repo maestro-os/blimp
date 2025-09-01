@@ -66,7 +66,7 @@ impl Repository {
 		self.path
 			.join("dist")
 			.join(arch)
-			.join(format!("{name}_{version}.tar.zstd"))
+			.join(format!("{name}_{version}.tar.gz"))
 	}
 
 	/// Tells whether the **archive** of a package is present in the repository.
@@ -135,16 +135,22 @@ impl Repository {
 		name: &str,
 		version_constraint: Option<&VersionConstraint>,
 	) -> Result<Option<Package>> {
-		let version = fs::read_dir(self.path.join(name))?
+		let base_path = self.path.join("dist").join(arch);
+		fs::read_dir(base_path)?
 			.filter_map(|ent| {
 				let ent = ent.ok()?;
-
-				if ent.file_type().ok()?.is_dir() {
-					let name = ent.file_name();
-					Version::try_from(name.to_str()?).ok()
-				} else {
-					None
+				if !ent.file_type().ok()?.is_file() {
+					return None;
 				}
+				let n = ent.file_name();
+				let n = n.to_str()?;
+				// Retrieve package name and version
+				let name_version = n.strip_suffix(".meta")?;
+				let (n, version) = name_version.split_once('_')?;
+				if n != name {
+					return None;
+				}
+				Version::try_from(version).ok()
 			})
 			.filter(|version| {
 				if let Some(c) = version_constraint {
@@ -153,12 +159,9 @@ impl Repository {
 					true
 				}
 			})
-			.max();
-
-		match version {
-			Some(version) => self.get_package(arch, name, &version),
-			None => Ok(None),
-		}
+			.max()
+			.and_then(|version| self.get_package(arch, name, &version).transpose())
+			.transpose()
 	}
 }
 
