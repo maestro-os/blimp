@@ -129,6 +129,6 @@ pub struct BuildDescriptor {
 	/// The package's descriptor
 	pub package: Package,
 	/// The list of sources for the package
-	#[serde(default)]
+	#[serde(default, skip_serializing_if = "Vec::is_empty")]
 	pub source: Vec<Source>,
 }

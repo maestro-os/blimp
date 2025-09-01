@@ -86,11 +86,11 @@ fn main_impl(args: Args) -> Result<()> {
 		let repo = Repository::load(args.to.clone());
 		build_process
 			.write_metadata(&repo, arch)
-			.map_err(|e| anyhow!("failed to prepare directory for package: {e}"))?;
+			.map_err(|e| anyhow!("failed to write package metadata: {e}"))?;
 		println!("[INFO] Create archive...");
 		build_process
 			.create_archive(&repo, arch)
-			.map_err(|e| anyhow!("cannot create archive: {e}"))?;
+			.map_err(|e| anyhow!("failed to create package archive: {e}"))?;
 	}
 	if debug {
 		eprintln!(

@@ -110,18 +110,16 @@ impl BuildProcess {
 
 	/// Writes the package's metadata to the repository
 	pub fn write_metadata(&self, repo: &Repository, arch: &str) -> Result<()> {
-		// Make sure the arch directory exists
-		fs::create_dir_all(repo.get_path().join(arch))?;
+		let path = repo.get_metadata_path(
+			arch,
+			&self.build_desc.package.name,
+			&self.build_desc.package.version,
+		);
+		// Make sure the parent directory exists
+		fs::create_dir_all(path.parent().unwrap())?;
 		// Create metadata
 		let metadata = toml::to_string(&self.build_desc.package)?;
-		fs::write(
-			repo.get_metadata_path(
-				arch,
-				&self.build_desc.package.name,
-				&self.build_desc.package.version,
-			),
-			metadata,
-		)?;
+		fs::write(path, metadata)?;
 		Ok(())
 	}
 

@@ -97,10 +97,10 @@ pub struct Package {
 	pub description: String,
 
 	/// Dependencies required to build the package
-	#[serde(default)]
+	#[serde(default, skip_serializing_if = "Vec::is_empty")]
 	pub build_dep: Vec<Dependency>,
 	/// Dependencies required to run the package
-	#[serde(default)]
+	#[serde(default, skip_serializing_if = "Vec::is_empty")]
 	pub run_dep: Vec<Dependency>,
 }
 
