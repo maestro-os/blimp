@@ -61,7 +61,7 @@ impl Remote {
 	}
 
 	/// Fetches the remote's motd
-	pub async fn fetch_motd(&self) -> Result<String> {
+	pub async fn fetch_motd(&self) -> Result<Option<String>> {
 		let client = reqwest::Client::new();
 		let url = format!("https://{}/motd", &self.host);
 		let response = client
@@ -74,14 +74,15 @@ impl Remote {
 			StatusCode::OK => {
 				let s = response.text().await?;
 				let metadata = toml::from_str(&s)?;
-				Ok(metadata)
+				Ok(Some(metadata))
 			}
+			StatusCode::NOT_FOUND => Ok(None),
 			_ => bail!("failed to retrieve remote metadata (status {status})"),
 		}
 	}
 
-	/// Fetches the list of all the packages from the remote.
-	pub async fn fetch_list(&self) -> Result<Vec<Package>> {
+	/// Fetches the remote's index
+	pub async fn fetch_index(&self) -> Result<Vec<Package>> {
 		let client = reqwest::Client::new();
 		let url = format!("https://{}/index", self.host);
 		let response = client

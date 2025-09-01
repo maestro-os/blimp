@@ -9,7 +9,8 @@ pub async fn list(env: &Environment) -> std::io::Result<()> {
 	for remote in remotes {
 		let host = &remote.host;
 		match remote.fetch_motd().await {
-			Ok(motd) => println!("- {host} (status: UP): {motd}"),
+			Ok(Some(motd)) => println!("- {host} (status: UP): {motd}"),
+			Ok(None) => println!("- {host} (status: UP)"),
 			Err(_) => println!("- {host} (status: DOWN)"),
 		}
 	}
