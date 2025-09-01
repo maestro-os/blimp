@@ -126,8 +126,9 @@ impl Source {
 /// Description of how to build a package.
 #[derive(Deserialize, Serialize)]
 pub struct BuildDescriptor {
-	/// The list of sources for the package.
-	pub sources: Vec<Source>,
-	/// The package's descriptor.
+	/// The package's descriptor
 	pub package: Package,
+	/// The list of sources for the package
+	#[serde(default)]
+	pub source: Vec<Source>,
 }

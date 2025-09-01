@@ -13,5 +13,5 @@ clap = { version = "4.5.39", features = ["derive"] }
 toml = "0.9.5"
 
 [features]
-default = []
+default = ["network"]
 network = ["common/network"]

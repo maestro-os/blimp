@@ -23,8 +23,9 @@ impl<'de> Deserialize<'de> for Version {
 	where
 		D: Deserializer<'de>,
 	{
-		let s: &str = Deserialize::deserialize(deserializer)?;
-		s.try_into().map_err(Error::custom)
+		// toml does not like &str
+		let s: String = Deserialize::deserialize(deserializer)?;
+		Self::try_from(s.as_str()).map_err(Error::custom)
 	}
 }
 

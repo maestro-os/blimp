@@ -1,0 +1,8 @@
+[package]
+name = "bootstrap-binutils"
+version = "2.44"
+description = "Stage 2 binutils for bootstrapping"
+
+[[source]]
+location = "/"
+url = "https://ftp.gnu.org/gnu/binutils/binutils-2.44.tar.gz"

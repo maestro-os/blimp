@@ -68,7 +68,7 @@ impl BuildProcess {
 		let build_dir = Arc::new(self.build_dir.clone());
 		let futures = self
 			.build_desc
-			.sources
+			.source
 			.iter()
 			.cloned()
 			.map(move |s| {
