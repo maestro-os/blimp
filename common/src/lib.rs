@@ -18,8 +18,6 @@
 
 //! The blimp library is the core of the Blimp package manager.
 
-#![feature(io_error_more)]
-
 pub use anyhow;
 pub use flate2;
 pub use tar;
