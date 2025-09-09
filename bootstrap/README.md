@@ -2,11 +2,9 @@
 
 Bootstrapping is the process of creating an environment which allows the cross compilation of packages.
 
+`./init.sh` builds a cross-compilation toolchain in `sysroot/`.
 
-
-## Overview
-
-The following build steps are required for bootstrapping:
+The following packages are built:
 
 | Package                                     | Host triplet | Target triplet | Notes                                           |
 |---------------------------------------------|--------------|----------------|-------------------------------------------------|
@@ -21,18 +19,4 @@ The following build steps are required for bootstrapping:
 
 > **Note**: one last compilation of gcc (stage 3) will be necessary for a final system, but it is treated as a casual package and not discussed here.
 
-## Building
-
-First, the `sysroot` directory and a basic file hierarchy must be created. Use `init.sh`:
-```sh
-./init.sh
-```
-
-Then, each package has to be built, in the order of the table above.
-
-The command to use for building a package is:
-```sh
-PATH="$(pwd)/sysroot/tools/bin:$PATH" HOST=<host-triplet> TARGET=<target-triplet> blimp-builder --from desc/<pkg>/ --to sysroot/
-```
-
-Once this is done, the second **gcc** can be used to cross compile packages (autoconf, make, etc...) on the target.
+Once built, the second **gcc** can be used to cross compile packages on the target.
