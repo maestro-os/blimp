@@ -32,7 +32,7 @@ Then, each package has to be built, in the order of the table above.
 
 The command to use for building a package is:
 ```sh
-PATH="$(pwd)/sysroot/tools:$PATH" HOST=<host-triplet> TARGET=<target-triplet> blimp-builder --from desc/<pkg>/ --to sysroot/
+PATH="$(pwd)/sysroot/tools/bin:$PATH" HOST=<host-triplet> TARGET=<target-triplet> blimp-builder --from desc/<pkg>/ --to sysroot/
 ```
 
 Once this is done, the second **gcc** can be used to cross compile packages (autoconf, make, etc...) on the target.

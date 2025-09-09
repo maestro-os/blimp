@@ -34,7 +34,7 @@ use common::{
 	repository::Repository,
 	tokio::runtime::Runtime,
 };
-use std::{env, path::PathBuf, process::exit, str};
+use std::{env, fs, path::PathBuf, process::exit, str};
 
 /// The path to the work directory.
 const WORK_DIR: &str = "work/";
@@ -86,6 +86,8 @@ fn main_impl(args: Args) -> Result<()> {
 	let debug = env::var("BLIMP_DEBUG")
 		.map(|s| s == "true")
 		.unwrap_or(false);
+	fs::create_dir_all(&args.to)
+		.map_err(|e| anyhow!("failed to create destination directory: {e}"))?;
 	println!("[INFO] Jobs: {jobs}; Build: {build}; Host: {host}; Target: {target}");
 	let sysroot = (!args.package).then(|| args.to.clone());
 	let build_process = BuildProcess::new(args.from, sysroot)?;
