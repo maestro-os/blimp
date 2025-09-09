@@ -35,7 +35,16 @@ use std::{
 
 /// Tells whether the given package name is valid.
 pub fn is_valid_name(name: &str) -> bool {
-	name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+	if name.len() < 2 {
+		return false;
+	}
+	name.chars().enumerate().all(|(i, c)| {
+		if i == 0 {
+			c.is_ascii_lowercase()
+		} else {
+			c.is_ascii_lowercase() || c.is_ascii_digit() || "+-.".contains(c)
+		}
+	})
 }
 
 /// Enumeration of package dependency resolution errors.
