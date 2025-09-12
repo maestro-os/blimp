@@ -95,7 +95,6 @@ impl CacheEntry {
 	/// Flushes the entry to the cache by computing and storing its checksum.
 	pub fn flush(&mut self) -> io::Result<()> {
 		let dir_path = cache_directory()?;
-		let path = dir_path.join(&self.encoded_key);
 		// `.` is not part of the base64 character set
 		let checksum_path = dir_path.join(format!("{}.checksum", self.encoded_key));
 		// Compute checksum
@@ -114,7 +113,8 @@ impl CacheEntry {
 /// before.
 pub fn get_or_insert(key: &[u8]) -> io::Result<CacheEntry> {
 	let dir_path = cache_directory()?;
-	let encoded_key = BASE64_STANDARD.encode(key);
+	// `/` causes issues with paths. Replace it by `-` which is not in the base64 characters set
+	let encoded_key = BASE64_STANDARD.encode(key).replace('/', "-");
 	let path = dir_path.join(&encoded_key);
 	// Open file
 	let opt = FileOptions::new().read(true).write(true).create(true);
