@@ -34,21 +34,13 @@ use common::{
 	repository::Repository,
 	tokio::runtime::Runtime,
 };
-use std::{env, fs, path::PathBuf, process::exit, str};
+use std::{fs, path::PathBuf, process::exit, str};
 
 /// The path to the work directory.
 const WORK_DIR: &str = "work/";
 
 /// Builds packages according to their descriptors.
 #[derive(Parser, Debug)]
-#[clap(after_long_help = "Environment variables:
-\tJOBS: Specifies the recommended number of jobs to build the package
-\tBUILD: Target triplet of the machine on which the package is built
-\tHOST: Target triplet for which the package is built
-\tTARGET: Target triplet for which the package builds (this is useful when cross-compiling compilers)
-\tBLIMP_DEBUG: If set to `true`, build files are kept for troubleshooting purpose
-
-All environment variables are optional")]
 #[command(version, about, long_about = None)]
 struct Args {
 	/// Path to the directory containing the package to build
@@ -62,6 +54,24 @@ struct Args {
 	/// root)
 	#[arg(long)]
 	package: bool,
+
+	/// Specifies the recommended number of jobs to build the package
+	#[arg(short, long)]
+	jobs: Option<usize>,
+	/// Target triplet of the machine on which the package is built
+	#[arg(long)]
+	build: Option<String>,
+	/// Target triplet of the machine for which the package is built
+	#[arg(long)]
+	host: Option<String>,
+	/// Target triplet for which the package builds (this is useful when cross-compiling
+	/// compilers)
+	#[arg(long)]
+	target: Option<String>,
+
+	/// If set, build files are kept for troubleshooting purpose
+	#[arg(long)]
+	debug: bool,
 }
 
 /// Returns the architecture directory name for the given `host`
@@ -76,16 +86,11 @@ fn get_arch(host: &str) -> &str {
 
 fn main_impl(args: Args) -> Result<()> {
 	// Read environment
-	let jobs = get_jobs_count()?;
-	let build = get_build_triplet()?;
-	let host = env::var("HOST");
-	let host = host.as_deref().unwrap_or(build.as_str());
+	let jobs = get_jobs_count(&args);
+	let build = get_build_triplet(&args)?;
+	let host = args.host.as_deref().unwrap_or(build.as_str());
 	let arch = get_arch(host);
-	let target = env::var("TARGET");
-	let target = target.as_deref().unwrap_or(host);
-	let debug = env::var("BLIMP_DEBUG")
-		.map(|s| s == "true")
-		.unwrap_or(false);
+	let target = args.target.as_deref().unwrap_or(host);
 	fs::create_dir_all(&args.to)
 		.map_err(|e| anyhow!("failed to create destination directory: {e}"))?;
 	println!("[INFO] Jobs: {jobs}; Build: {build}; Host: {host}; Target: {target}");
@@ -112,7 +117,7 @@ fn main_impl(args: Args) -> Result<()> {
 			.create_archive(&repo, arch)
 			.map_err(|e| anyhow!("failed to create package archive: {e}"))?;
 	}
-	if debug {
+	if args.debug {
 		eprintln!(
 			"[DEBUG] Build directory path: {}; Fake sysroot path: {}",
 			build_process.get_build_dir().display(),
