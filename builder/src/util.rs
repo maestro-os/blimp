@@ -18,7 +18,7 @@
 
 //! Utilities.
 
-use crate::Args;
+use crate::BuildArgs;
 use core::str;
 use std::{env, ffi::OsStr, io, num::NonZeroUsize, process::Command, thread};
 
@@ -26,7 +26,7 @@ use std::{env, ffi::OsStr, io, num::NonZeroUsize, process::Command, thread};
 const DEFAULT_BUILD_TRIPLET: &str = "x86_64-linux-gnu";
 
 /// Returns the recommended amount of CPUs to build the package.
-pub fn get_jobs_count(args: &Args) -> usize {
+pub fn get_jobs_count(args: &BuildArgs) -> usize {
 	args.jobs.unwrap_or_else(|| {
 		// Not specified by the user: get the amount of CPU on the system
 		thread::available_parallelism()
@@ -47,7 +47,7 @@ fn get_build_triplet_from_cc() -> io::Result<Option<String>> {
 }
 
 /// Returns the triplet of the machine on which the package is being built.
-pub fn get_build_triplet(args: &Args) -> io::Result<String> {
+pub fn get_build_triplet(args: &BuildArgs) -> io::Result<String> {
 	if let Some(triplet) = &args.build {
 		return Ok(triplet.clone());
 	}

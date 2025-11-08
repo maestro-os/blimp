@@ -135,7 +135,7 @@ impl Package {
 	/// Loads a package from the metadata file.
 	///
 	/// If the package does not exist, the function returns `None`.
-	pub fn load(metadata_path: &Path) -> Result<Option<Package>> {
+	pub fn from_file(metadata_path: &Path) -> Result<Option<Package>> {
 		match fs::read_to_string(metadata_path) {
 			Ok(content) => Ok(Some(toml::from_str(&content)?)),
 			Err(e) if e.kind() == ErrorKind::NotFound => Ok(None),

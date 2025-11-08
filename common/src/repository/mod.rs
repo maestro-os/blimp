@@ -31,10 +31,23 @@ use crate::{
 use anyhow::{bail, Result};
 #[cfg(feature = "network")]
 use remote::Remote;
-use std::{
-	fs,
-	path::{Path, PathBuf},
-};
+use std::{fs, path::{Path, PathBuf}};
+use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
+
+/// Packages for an architecture in an index
+#[derive(Default, Deserialize, Serialize)]
+pub struct IndexArch {
+	/// Packages list
+	pub package: Vec<Package>,
+}
+
+/// A repository's index
+#[derive(Default, Deserialize, Serialize)]
+pub struct Index {
+	/// List of architectures in the index
+	pub arch: HashMap<String, IndexArch>,
+}
 
 /// A local repository.
 pub struct Repository {
@@ -71,6 +84,13 @@ impl Repository {
 		self.remote.as_ref()
 	}
 
+	/// Reads the repository's index
+	pub fn read_index(&self) -> Result<Index> {
+		let path = self.path.join("index");
+		let content = fs::read_to_string(path)?;
+		Ok(toml::from_str(&content)?)
+	}
+
 	/// Returns the path to a package's metadata
 	pub fn get_metadata_path(&self, arch: &str, name: &str, version: &Version) -> PathBuf {
 		self.path
@@ -105,7 +125,7 @@ impl Repository {
 			bail!("invalid package name: {name}");
 		}
 		let path = self.get_metadata_path(arch, name, version);
-		Package::load(&path)
+		Package::from_file(&path)
 	}
 
 	/// Returns the list of packages with each versions in the repository.
@@ -130,7 +150,7 @@ impl Repository {
 					let version = Version::try_from(ent_name.as_ref()).ok()?;
 
 					let ent_path = ent_path.join(version.to_string());
-					Package::load(&ent_path).transpose()
+					Package::from_file(&ent_path).transpose()
 				});
 				Some(iter)
 			})

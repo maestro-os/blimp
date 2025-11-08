@@ -28,21 +28,37 @@ use crate::{
 	build::BuildProcess,
 	util::{get_build_triplet, get_jobs_count},
 };
-use clap::Parser;
+use clap::{Args, Parser, Subcommand};
 use common::{
 	anyhow::{anyhow, bail, Result},
-	repository::Repository,
+	repository::{Index, IndexArch, Repository},
 	tokio::runtime::Runtime,
 };
-use std::{fs, path::PathBuf, process::exit, str};
+use s3::{creds::Credentials, Region};
+use std::{fs, path::PathBuf, process::exit, str, str::FromStr};
 
 /// The path to the work directory.
 const WORK_DIR: &str = "work/";
 
-/// Builds packages according to their descriptors.
-#[derive(Parser, Debug)]
+/// Build, store and index packages
+#[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
-struct Args {
+struct Cli {
+	#[command(subcommand)]
+	command: Command,
+}
+
+#[derive(Debug, Subcommand)]
+enum Command {
+	/// Build a package
+	Build(BuildArgs),
+	/// Build the index of a s3 bucket repository
+	Index(IndexArgs),
+}
+
+/// Build a package according to its descriptor
+#[derive(Args, Debug)]
+struct BuildArgs {
 	/// Path to the directory containing the package to build
 	#[arg(long)]
 	from: PathBuf,
@@ -74,6 +90,20 @@ struct Args {
 	debug: bool,
 }
 
+/// Index a s3 bucket repository
+#[derive(Args, Debug)]
+struct IndexArgs {
+	/// Bucket name
+	#[arg(long)]
+	bucket: String,
+	/// Bucket region
+	#[arg(long)]
+	region: String,
+	/// Bucket endpoint
+	#[arg(long)]
+	endpoint: Option<String>,
+}
+
 /// Returns the architecture directory name for the given `host`
 fn get_arch(host: &str) -> &str {
 	let arch = host.split_once('-').map(|(a, _)| a);
@@ -84,7 +114,7 @@ fn get_arch(host: &str) -> &str {
 	}
 }
 
-fn main_impl(args: Args) -> Result<()> {
+fn build(args: BuildArgs) -> Result<()> {
 	// Read environment
 	let jobs = get_jobs_count(&args);
 	let build = get_build_triplet(&args)?;
@@ -130,9 +160,68 @@ fn main_impl(args: Args) -> Result<()> {
 	Ok(())
 }
 
+async fn index(args: IndexArgs) -> Result<()> {
+	let region = match args.endpoint {
+		Some(endpoint) => Region::Custom {
+			region: args.region,
+			endpoint,
+		},
+		None => Region::from_str(&args.region)?,
+	};
+	let credentials = Credentials::default()?;
+	let bucket = s3::Bucket::new(&args.bucket, region, credentials)?;
+	let entries = bucket.list("dist/".to_owned(), None).await?;
+	let iter = entries.into_iter().flat_map(|n| n.contents).flat_map(|e| {
+		let key = e.key.strip_prefix("dist/")?;
+		let separator_off = key.find('/')?;
+		let (arch, _) = key.split_at(separator_off);
+		if e.key.ends_with(".meta") {
+			Some((arch.to_owned(), e.key))
+		} else {
+			None
+		}
+	});
+	let mut index = Index::default();
+	for (arch, key) in iter {
+		println!("Download `{key}`...");
+		let data = bucket.get_object(&key).await?.to_vec();
+		let Ok(data) = str::from_utf8(&data) else {
+			eprintln!("warning: `{key}` has invalid UTF8, ignored");
+			continue;
+		};
+		let pkg = match toml::from_str(data) {
+			Ok(p) => p,
+			Err(e) => {
+				eprintln!("warning: `{key}` is invalid, ignored: {e}");
+				continue;
+			}
+		};
+		let ent = index.arch.entry(arch).or_insert(IndexArch::default());
+		ent.package.push(pkg);
+	}
+	if index.arch.is_empty() {
+		eprintln!("warning: no package found");
+	}
+	println!("Upload index...");
+	let index = toml::to_string(&index).unwrap();
+	bucket.put_object("/index", index.as_bytes()).await?;
+	println!("Done!");
+	Ok(())
+}
+
+fn main_impl(cmd: Command) -> Result<()> {
+	match cmd {
+		Command::Build(a) => build(a),
+		Command::Index(a) => {
+			let rt = Runtime::new()?;
+			rt.block_on(index(a))
+		}
+	}
+}
+
 fn main() {
-	let args = Args::parse();
-	if let Err(e) = main_impl(args) {
+	let cli = Cli::parse();
+	if let Err(e) = main_impl(cli.command) {
 		eprintln!("blimp-builder: error: {e}");
 		exit(1);
 	}
