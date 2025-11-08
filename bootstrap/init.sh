@@ -26,11 +26,11 @@ esac
 # TODO use release mode builder instead?
 OLD_PATH="$PATH"
 export PATH="$(pwd)/sysroot/tools/bin:$(pwd)/../target/debug:$PATH"
-HOST="$A" TARGET="$B" blimp-builder --from desc/binutils1/ --to sysroot/
-HOST="$A" TARGET="$B" blimp-builder --from desc/gcc1/ --to sysroot/
-blimp-builder --from desc/linux-headers/ --to sysroot/
-HOST="$B" blimp-builder --from desc/musl/ --to sysroot/
-HOST="$B" blimp-builder --from desc/zlib/ --to sysroot/
-HOST="$B" blimp-builder --from desc/libstdc++/ --to sysroot/
-HOST="$B" TARGET="$B" blimp-builder --from desc/binutils2/ --to sysroot/
-HOST="$B" TARGET="$B" blimp-builder --from desc/gcc2/ --to sysroot/
+blimp-builder build --from desc/binutils1/ --to sysroot/ --host "$A" --target "$B"
+blimp-builder build --from desc/gcc1/ --to sysroot/ --host "$A" --target "$B"
+blimp-builder build --from desc/linux-headers/ --to sysroot/
+blimp-builder build --from desc/musl/ --to sysroot/ --host "$B"
+blimp-builder build --from desc/zlib/ --to sysroot/ --host "$B"
+blimp-builder build --from desc/libstdc++/ --to sysroot/ --host "$B"
+blimp-builder build --from desc/binutils2/ --to sysroot/ --host "$B" --target "$B"
+blimp-builder build --from desc/gcc2/ --to sysroot/ --host "$B" --target "$B"
