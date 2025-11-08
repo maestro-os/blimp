@@ -31,9 +31,12 @@ use crate::{
 use anyhow::{bail, Result};
 #[cfg(feature = "network")]
 use remote::Remote;
-use std::{fs, path::{Path, PathBuf}};
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::{
+	collections::HashMap,
+	fs,
+	path::{Path, PathBuf},
+};
 
 /// Packages for an architecture in an index
 #[derive(Default, Deserialize, Serialize)]
