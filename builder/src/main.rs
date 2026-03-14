@@ -54,6 +54,8 @@ enum Command {
 	Build(BuildArgs),
 	/// Build the index of a s3 bucket repository
 	Index(IndexArgs),
+	/// Upload packages from a local repository to a s3 bucket
+	Upload(UploadArgs),
 }
 
 /// Build a package according to its descriptor
@@ -88,6 +90,23 @@ struct BuildArgs {
 	/// If set, build files are kept for troubleshooting purpose
 	#[arg(long)]
 	debug: bool,
+}
+
+/// Upload a package to a s3 bucket repository
+#[derive(Args, Debug)]
+struct UploadArgs {
+	/// Path to the package file (`.tar.gz` or `.meta`); both files are uploaded
+	#[arg(long)]
+	from: PathBuf,
+	/// Bucket name
+	#[arg(long)]
+	bucket: String,
+	/// Bucket region
+	#[arg(long)]
+	region: String,
+	/// Bucket endpoint
+	#[arg(long)]
+	endpoint: Option<String>,
 }
 
 /// Index a s3 bucket repository
@@ -160,6 +179,45 @@ fn build(args: BuildArgs) -> Result<()> {
 	Ok(())
 }
 
+async fn upload(args: UploadArgs) -> Result<()> {
+	let region = match args.endpoint {
+		Some(endpoint) => Region::Custom {
+			region: args.region,
+			endpoint,
+		},
+		None => Region::from_str(&args.region)?,
+	};
+	let credentials = Credentials::default()?;
+	let bucket = s3::Bucket::new(&args.bucket, region, credentials)?;
+	// Derive the stem (strip .tar.gz or .meta extension)
+	let path = args.from.canonicalize()?;
+	let dir = path
+		.parent()
+		.ok_or_else(|| anyhow!("path has no parent directory"))?;
+	let arch = dir
+		.file_name()
+		.and_then(|n| n.to_str())
+		.ok_or_else(|| anyhow!("cannot determine architecture from parent directory name"))?;
+	let filename = path
+		.file_name()
+		.and_then(|n| n.to_str())
+		.ok_or_else(|| anyhow!("invalid filename"))?;
+	let stem = filename
+		.strip_suffix(".tar.gz")
+		.or_else(|| filename.strip_suffix(".meta"))
+		.ok_or_else(|| anyhow!("file must end with `.tar.gz` or `.meta`"))?;
+	for ext in [".tar.gz", ".meta"] {
+		let file_path = dir.join(format!("{stem}{ext}"));
+		let key = format!("dist/{arch}/{stem}{ext}");
+		println!("Upload `{key}`...");
+		let data = fs::read(&file_path)
+			.map_err(|e| anyhow!("failed to read `{}`: {e}", file_path.display()))?;
+		bucket.put_object(&key, &data).await?;
+	}
+	println!("Done!");
+	Ok(())
+}
+
 async fn index(args: IndexArgs) -> Result<()> {
 	let region = match args.endpoint {
 		Some(endpoint) => Region::Custom {
@@ -215,6 +273,10 @@ fn main_impl(cmd: Command) -> Result<()> {
 		Command::Index(a) => {
 			let rt = Runtime::new()?;
 			rt.block_on(index(a))
+		}
+		Command::Upload(a) => {
+			let rt = Runtime::new()?;
+			rt.block_on(upload(a))
 		}
 	}
 }
