@@ -19,7 +19,7 @@
 //! This module handles files download.
 
 use crate::USER_AGENT;
-use anyhow::Result;
+use anyhow::{bail, Result};
 use bytes::Bytes;
 use futures_util::stream::{Stream, StreamExt};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -51,6 +51,10 @@ impl<'f> DownloadTask<'f> {
 			.header("User-Agent", USER_AGENT)
 			.send()
 			.await?;
+		let status = response.status();
+		if status.is_client_error() || status.is_server_error() {
+			bail!("HTTP error: {status}");
+		}
 		// Truncate file
 		file.set_len(0)?;
 		// Setup progress bar
