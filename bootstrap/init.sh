@@ -13,12 +13,12 @@ unset BUILD HOST TARGET
 # Create base directories
 mkdir -pv sysroot/tools sysroot/{etc,var} sysroot/usr/{bin,lib,lib32,sbin}
 for i in bin lib sbin; do
-  ln -sv "usr/$i" "sysroot/$i"
+  ln -fsv "usr/$i" "sysroot/$i"
 done
 case ${B%%-*} in
 	x86_64)
-		ln -sv usr/lib sysroot/lib64
-		ln -sv lib sysroot/usr/lib64
+		ln -fsv usr/lib sysroot/lib64
+		ln -fsv lib sysroot/usr/lib64
 	;;
 esac
 
