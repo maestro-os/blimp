@@ -5,13 +5,13 @@ edition = "2021"
 
 [dependencies]
 base64 = "0.22.1"
-clap = { version = "4.5.39", features = ["derive"] }
+clap = { version = "4.6.0", features = ["derive"] }
 common = { path = "../common" }
 file-lock = "2.1.11"
-rust-s3 = "0.37.0"
-serde = { version = "1.0.219", features = ["derive"] }
+rust-s3 = "0.37.1"
+serde = { version = "1.0.228", features = ["derive"] }
 sha2 = "0.10.9"
-toml = "0.9.5"
+toml = "0.9.8"
 
 [features]
 default = ["network"]

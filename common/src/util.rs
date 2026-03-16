@@ -20,7 +20,7 @@
 
 use bzip2::read::BzDecoder;
 use flate2::read::GzDecoder;
-use rand::{distr::Alphanumeric, rng, Rng};
+use rand::{distr::Alphanumeric, rng, RngExt};
 use std::{
 	fs,
 	fs::{File, OpenOptions},
