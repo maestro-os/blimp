@@ -18,7 +18,7 @@
 
 //! Implementation of the package building procedure.
 
-use crate::{desc::BuildDescriptor, WORK_DIR};
+use crate::desc::BuildDescriptor;
 use common::{
 	anyhow::Result,
 	flate2::{write::GzEncoder, Compression},
@@ -60,7 +60,8 @@ impl BuildProcess {
 	/// Arguments:
 	/// - `input_path` is the path to the directory containing information to build the package.
 	/// - `sysroot` is the path to the system root. If `None`, a directory is created.
-	pub fn new(input_path: PathBuf, sysroot: Option<PathBuf>) -> Result<Self> {
+	/// - `work_dir` is the directory where build directories are located
+	pub fn new(input_path: PathBuf, sysroot: Option<PathBuf>, work_dir: &Path) -> Result<Self> {
 		let build_desc_path = input_path.join("metadata.toml");
 		let build_desc = fs::read_to_string(build_desc_path)?;
 		let build_desc = toml::from_str::<BuildDescriptor>(&build_desc)?;
@@ -69,10 +70,10 @@ impl BuildProcess {
 			input_path,
 			build_desc,
 
-			build_dir: common::util::create_tmp_dir(WORK_DIR)?,
+			build_dir: common::util::create_tmp_dir(work_dir)?,
 			sysroot: sysroot
 				.map(fs::canonicalize)
-				.unwrap_or_else(|| common::util::create_tmp_dir(WORK_DIR))?,
+				.unwrap_or_else(|| common::util::create_tmp_dir(work_dir))?,
 		})
 	}
 

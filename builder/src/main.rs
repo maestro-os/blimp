@@ -37,9 +37,6 @@ use common::{
 use s3::{creds::Credentials, Region};
 use std::{fs, path::PathBuf, process::exit, str, str::FromStr};
 
-/// The path to the work directory.
-const WORK_DIR: &str = "work/";
-
 /// Build, store and index packages
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
@@ -90,6 +87,10 @@ struct BuildArgs {
 	/// If set, build files are kept for troubleshooting purpose
 	#[arg(long)]
 	debug: bool,
+
+	/// Path to the work directory, containing build directories
+	#[arg(long, default_value = "work/")]
+	work_dir: PathBuf,
 }
 
 /// Upload a package to a s3 bucket repository
@@ -144,7 +145,7 @@ fn build(args: BuildArgs) -> Result<()> {
 		.map_err(|e| anyhow!("failed to create destination directory: {e}"))?;
 	println!("[INFO] Jobs: {jobs}; Build: {build}; Host: {host}; Target: {target}");
 	let sysroot = (!args.package).then(|| args.to.clone());
-	let build_process = BuildProcess::new(args.from, sysroot)?;
+	let build_process = BuildProcess::new(args.from, sysroot, &args.work_dir)?;
 	let rt = Runtime::new()?;
 	rt.block_on(build_process.fetch_sources())
 		.map_err(|e| anyhow!("cannot fetch sources: {e}"))?;
