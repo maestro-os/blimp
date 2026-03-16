@@ -49,7 +49,11 @@ impl Remote {
 	/// Loads and returns the list of remote hosts.
 	pub fn load_list(env: &Environment) -> io::Result<HashSet<Self>> {
 		let path = env.sysroot().join(REMOTES_FILE);
-		let file = File::open(path)?;
+		let file = match File::open(path) {
+			Ok(file) => file,
+			Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(HashSet::new()),
+			Err(e) => return Err(e),
+		};
 		let reader = BufReader::new(file);
 		reader
 			.lines()
@@ -109,12 +113,10 @@ impl Remote {
 			.send()
 			.await?;
 		let status = response.status();
-		match status {
-			StatusCode::OK => {
-				todo!()
-			}
-			_ => bail!("Failed to retrieve packages list from remote (status {status})"),
+		if !status.is_success() {
+			bail!("Failed to retrieve packages list from remote (status {status})");
 		}
+		todo!()
 	}
 
 	/// Returns the download URL for the given `package`.

@@ -88,7 +88,7 @@ impl Environment {
 		let default_arch = "x86";
 		#[cfg(target_arch = "x86_64")]
 		let default_arch = "x86_64";
-		Ok(acquired.then_some(Self {
+		Ok(acquired.then(|| Self {
 			sysroot,
 			local_repos,
 			arch: arch.unwrap_or_else(|| default_arch.to_owned()),
