@@ -43,10 +43,14 @@ use std::{
 	path::{Path, PathBuf},
 };
 
-/// The directory containing cached packages.
+/// Lockfile
 const LOCKFILE_PATH: &str = "var/lib/blimp/.lock";
-/// The path to directory storing information about installed packages.
+/// Directory storing information about installed packages
 const INSTALLED_DB: &str = "var/lib/blimp/installed";
+/// The file which contains the list of remotes
+const REMOTES_LIST: &str = "var/lib/blimp/remotes-list";
+/// Directory containing remote repositories
+const REMOTES: &str = "var/lib/blimp/remotes";
 
 /// The user agent for HTTP requests.
 pub const USER_AGENT: &str = concat!("blimp/", env!("CARGO_PKG_VERSION"));

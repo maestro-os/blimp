@@ -81,6 +81,11 @@ impl Repository {
 		&self.path
 	}
 
+	/// Returns the path to the repository's index
+	pub fn get_index_path(&self) -> PathBuf {
+		self.path.join("index")
+	}
+
 	/// Returns the remote associated with the repository.
 	#[cfg(feature = "network")]
 	pub fn get_remote(&self) -> Option<&Remote> {

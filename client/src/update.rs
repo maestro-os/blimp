@@ -31,15 +31,12 @@ pub async fn update(env: &mut Environment) -> Result<()> {
 	println!("Update from remotes...");
 	let mut futures = Vec::new();
 	for r in &remotes {
-		futures.push((&r.host, r.fetch_index()));
+		futures.push((&r.host, r.fetch_index(env)));
 	}
 	let mut failed = false;
 	for (host, f) in futures {
 		match f.await {
-			Ok(packages) => {
-				println!("Remote `{host}`: Found {} package(s).", packages.len());
-				todo!()
-			}
+			Ok(cnt) => println!("Remote `{host}`: Found {cnt} package(s)."),
 			Err(e) => {
 				eprintln!("Remote `{host}`: {e}");
 				failed = true;

@@ -18,19 +18,21 @@
 
 //! A remote is a remote host from which packages can be downloaded.
 
-use crate::{package::Package, Environment, USER_AGENT};
+use crate::{
+	package::Package,
+	repository::{Index, Repository},
+	Environment, REMOTES, REMOTES_LIST, USER_AGENT,
+};
 use anyhow::{anyhow, bail, Result};
 use reqwest::StatusCode;
 use std::{
 	borrow::Borrow,
 	collections::HashSet,
+	fs,
 	fs::{File, OpenOptions},
 	io,
 	io::{BufRead, BufReader, BufWriter, Write},
 };
-
-/// The file which contains the list of remotes.
-const REMOTES_FILE: &str = "var/lib/blimp/remotes";
 
 /// A remote host.
 #[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -48,7 +50,7 @@ impl Borrow<str> for Remote {
 impl Remote {
 	/// Loads and returns the list of remote hosts.
 	pub fn load_list(env: &Environment) -> io::Result<HashSet<Self>> {
-		let path = env.sysroot().join(REMOTES_FILE);
+		let path = env.sysroot().join(REMOTES_LIST);
 		let file = match File::open(path) {
 			Ok(file) => file,
 			Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(HashSet::new()),
@@ -67,7 +69,7 @@ impl Remote {
 
 	/// Saves the list of remote hosts.
 	pub fn save_list(env: &Environment, remotes: impl Iterator<Item = Remote>) -> io::Result<()> {
-		let path = env.sysroot().join(REMOTES_FILE);
+		let path = env.sysroot().join(REMOTES_LIST);
 		let file = OpenOptions::new()
 			.read(true)
 			.write(true)
@@ -80,6 +82,13 @@ impl Remote {
 			writer.write_all(b"\n")?;
 		}
 		Ok(())
+	}
+
+	/// Returns the repository associated with the remote.
+	pub fn load_repository(&self, env: &Environment) -> io::Result<Repository> {
+		let path = env.sysroot().join(format!("{REMOTES}/{}", self.host));
+		fs::create_dir_all(&path)?;
+		Ok(Repository::load(path))
 	}
 
 	/// Fetches the remote's motd
@@ -104,7 +113,9 @@ impl Remote {
 	}
 
 	/// Fetches the remote's index
-	pub async fn fetch_index(&self) -> Result<Vec<Package>> {
+	///
+	/// The function returns the number of packages found
+	pub async fn fetch_index(&self, env: &Environment) -> Result<usize> {
 		let client = reqwest::Client::new();
 		let url = format!("https://{}/index", self.host);
 		let response = client
@@ -116,7 +127,18 @@ impl Remote {
 		if !status.is_success() {
 			bail!("Failed to retrieve packages list from remote (status {status})");
 		}
-		todo!()
+		// Check the index is valid and get package count
+		let index = response.text().await?;
+		let parsed_index: Index = toml::from_str(&index)?;
+		let cnt = parsed_index
+			.arch
+			.get(env.arch())
+			.map(|a| a.package.len())
+			.unwrap_or(0);
+		// Write to file
+		let repo = self.load_repository(env)?;
+		fs::write(repo.get_index_path(), index)?;
+		Ok(cnt)
 	}
 
 	/// Returns the download URL for the given `package`.
