@@ -16,14 +16,14 @@
  * Maestro. If not, see <https://www.gnu.org/licenses/>.
  */
 
-//! The lock file allows to prevent several instances of the package manager from running at the
-//! same time.
+//! The instance lock file allows to prevent several instances of the package manager from running
+//! at the same time.
 
 use std::{fs, fs::OpenOptions, io, path::Path};
 
-/// Creates the lock file if not present.
+/// Creates the instance lock file if not present.
 ///
-/// `path` is the path to the lockfile.
+/// `path` is the path to the file.
 ///
 /// If the file was successfully created, the function returns `true`. Else, it returns `false`.
 pub fn lock(path: &Path) -> io::Result<bool> {
@@ -40,9 +40,9 @@ pub fn lock(path: &Path) -> io::Result<bool> {
 	Ok(acquired)
 }
 
-/// Removes the lock file.
+/// Removes the instance lock file.
 ///
-/// `path` is the path to the lockfile.
+/// `path` is the path to the file.
 pub fn unlock(path: &Path) -> io::Result<()> {
 	fs::remove_file(path)
 }

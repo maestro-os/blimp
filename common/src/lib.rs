@@ -27,7 +27,7 @@ pub use utils as maestro_utils;
 
 #[cfg(feature = "network")]
 pub mod download;
-pub mod lockfile;
+pub mod lock;
 pub mod package;
 pub mod repository;
 pub mod util;
@@ -43,8 +43,8 @@ use std::{
 	path::{Path, PathBuf},
 };
 
-/// Lockfile
-const LOCKFILE_PATH: &str = "var/lib/blimp/.lock";
+/// Instance lock file
+const LOCK_PATH: &str = "var/lib/blimp/.lock";
 /// Directory storing information about installed packages
 const INSTALLED_DB: &str = "var/lib/blimp/installed";
 /// The file which contains the list of remotes
@@ -86,8 +86,8 @@ impl Environment {
 		arch: Option<String>,
 	) -> io::Result<Option<Self>> {
 		let sysroot = sysroot.canonicalize()?;
-		let path = sysroot.join(LOCKFILE_PATH);
-		let acquired = lockfile::lock(&path)?;
+		let path = sysroot.join(LOCK_PATH);
+		let acquired = lock::lock(&path)?;
 		#[cfg(target_arch = "x86")]
 		let default_arch = "x86";
 		#[cfg(target_arch = "x86_64")]
@@ -237,8 +237,7 @@ impl Environment {
 
 impl Drop for Environment {
 	fn drop(&mut self) {
-		let path = self.sysroot.join(LOCKFILE_PATH);
-		lockfile::unlock(&path)
-			.unwrap_or_else(|e| eprintln!("blimp: could not remove lockfile: {e}"));
+		let path = self.sysroot.join(LOCK_PATH);
+		lock::unlock(&path).unwrap_or_else(|e| eprintln!("blimp: could not remove lockfile: {e}"));
 	}
 }
