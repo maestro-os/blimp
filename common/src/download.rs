@@ -25,6 +25,9 @@ use futures_util::stream::{Stream, StreamExt};
 use indicatif::{ProgressBar, ProgressStyle};
 use std::{fs::File, io::Write, pin::Pin};
 
+const PROGRESS_TEMPLATE: &str =
+	"[{elapsed_precise}] {bar:40.cyan/blue} {decimal_bytes}/{decimal_total_bytes}   {percent}%";
+
 /// A download task, running until the file has been downloaded entirely.
 pub struct DownloadTask<'f> {
 	/// The response byte stream.
@@ -62,11 +65,9 @@ impl<'f> DownloadTask<'f> {
 			.content_length()
 			.map(ProgressBar::new)
 			.unwrap_or_else(ProgressBar::no_length);
-		let progress_style = ProgressStyle::with_template(
-			"[{elapsed_precise}] {bar:40.cyan/blue} {decimal_bytes}/{decimal_total_bytes}   {percent}%",
-		)
-		.unwrap()
-		.progress_chars("=> ");
+		let progress_style = ProgressStyle::with_template(PROGRESS_TEMPLATE)
+			.unwrap()
+			.progress_chars("=> ");
 		progress_bar.set_style(progress_style);
 		Ok(Self {
 			stream: Box::pin(response.bytes_stream()),
@@ -91,5 +92,15 @@ impl<'f> DownloadTask<'f> {
 		self.file.write_all(&chunk)?;
 		self.progress_bar.set_position(self.cur_size);
 		Ok(chunk.len())
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn progress_style_template_is_valid() {
+		ProgressStyle::with_template(PROGRESS_TEMPLATE).unwrap();
 	}
 }
