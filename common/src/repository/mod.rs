@@ -56,22 +56,18 @@ pub struct Index {
 pub struct Repository {
 	/// The path to the repository.
 	path: PathBuf,
-
 	/// The remote associated with the repository.
 	#[cfg(feature = "network")]
 	remote: Option<Remote>,
 }
 
 impl Repository {
-	/// Loads the repository at the given path.
-	///
-	/// If the repository is invalid, the function returns an error.
-	pub fn load(path: PathBuf) -> Self {
+	/// Read a local repository.
+	pub fn local(path: PathBuf) -> Self {
 		Self {
 			path,
-
 			#[cfg(feature = "network")]
-			remote: None, // TODO read from file
+			remote: None,
 		}
 	}
 
@@ -81,21 +77,20 @@ impl Repository {
 		&self.path
 	}
 
-	/// Returns the path to the repository's index
-	pub fn get_index_path(&self) -> PathBuf {
-		self.path.join("index")
-	}
-
 	/// Returns the remote associated with the repository.
 	#[cfg(feature = "network")]
 	pub fn get_remote(&self) -> Option<&Remote> {
 		self.remote.as_ref()
 	}
 
+	/// Returns the path to the repository's index
+	pub fn get_index_path(&self) -> PathBuf {
+		self.path.join("index")
+	}
+
 	/// Reads the repository's index
 	pub fn read_index(&self) -> Result<Index> {
-		let path = self.path.join("index");
-		let content = fs::read_to_string(path)?;
+		let content = fs::read_to_string(self.get_index_path())?;
 		Ok(toml::from_str(&content)?)
 	}
 
@@ -117,7 +112,8 @@ impl Repository {
 
 	/// Tells whether the **archive** of a package is present in the repository.
 	pub fn is_in_cache(&self, arch: &str, name: &str, version: &Version) -> bool {
-		self.get_archive_path(arch, name, version).exists()
+		self.get_metadata_path(arch, name, version).exists()
+			&& self.get_archive_path(arch, name, version).exists()
 	}
 
 	/// Returns a package in the repository
@@ -136,36 +132,6 @@ impl Repository {
 		Package::from_file(&path)
 	}
 
-	/// Returns the list of packages with each versions in the repository.
-	pub fn list_packages(&self) -> Result<Vec<Package>> {
-		fs::read_dir(&self.path)?
-			.filter_map(|ent| {
-				let ent = ent.ok()?;
-				if !ent.file_type().ok()?.is_dir() {
-					return None;
-				}
-
-				let name = ent.file_name().to_str()?.to_owned();
-				let ent_path = self.path.join(name);
-
-				let iter = fs::read_dir(&ent_path).ok()?.filter_map(move |ent| {
-					let ent = ent.ok()?;
-					if !ent.file_type().ok()?.is_dir() {
-						return None;
-					}
-
-					let ent_name = ent.file_name().to_str()?.to_owned();
-					let version = Version::try_from(ent_name.as_ref()).ok()?;
-
-					let ent_path = ent_path.join(version.to_string());
-					Package::from_file(&ent_path).transpose()
-				});
-				Some(iter)
-			})
-			.flatten()
-			.collect()
-	}
-
 	/// Returns the package with the given name.
 	///
 	/// Arguments:
@@ -174,40 +140,34 @@ impl Repository {
 	/// - `version_constraint` is the version constraint to match. If no constraint is specified,
 	///   the latest version is selected
 	///
-	/// If the package doesn't exist, the function returns `None`.
+	/// If the package does not exist, the function returns `None`.
 	pub fn get_package_with_constraint(
 		&self,
 		arch: &str,
 		name: &str,
 		version_constraint: Option<&VersionConstraint>,
 	) -> Result<Option<Package>> {
-		let base_path = self.path.join("dist").join(arch);
-		fs::read_dir(base_path)?
-			.filter_map(|ent| {
-				let ent = ent.ok()?;
-				if !ent.file_type().ok()?.is_file() {
-					return None;
+		let mut index = self.read_index()?;
+		// Remove to move the object out. We can do this since the index is dropped when the
+		// function returns
+		let Some(index_arch) = index.arch.remove(arch) else {
+			return Ok(None);
+		};
+		let pkg = index_arch
+			.package
+			.into_iter()
+			.filter(|pkg| {
+				if pkg.name != name {
+					return false;
 				}
-				let n = ent.file_name();
-				let n = n.to_str()?;
-				// Retrieve package name and version
-				let name_version = n.strip_suffix(".meta")?;
-				let (n, version) = name_version.split_once('_')?;
-				if n != name {
-					return None;
-				}
-				Version::try_from(version).ok()
-			})
-			.filter(|version| {
 				if let Some(c) = version_constraint {
-					c.is_valid(version)
+					c.is_valid(&pkg.version)
 				} else {
 					true
 				}
 			})
-			.max()
-			.and_then(|version| self.get_package(arch, name, &version).transpose())
-			.transpose()
+			.max_by(|p0, p1| p0.version.cmp(&p1.version));
+		Ok(pkg)
 	}
 }
 
@@ -229,11 +189,10 @@ pub fn get_package<'a>(
 	}
 	Ok(repos
 		.iter()
-		.filter_map(|repo| match repo.get_package(arch, name, version) {
+		.find_map(|repo| match repo.get_package(arch, name, version) {
 			Ok(Some(pack)) => Some((repo, pack)),
 			_ => None,
-		})
-		.next())
+		}))
 }
 
 // TODO Handle error reporting

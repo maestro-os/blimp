@@ -158,7 +158,7 @@ fn build(args: BuildArgs) -> Result<()> {
 	}
 	if args.package {
 		println!("[INFO] Prepare repository at `{}`...", args.to.display());
-		let repo = Repository::load(args.to.clone());
+		let repo = Repository::local(args.to.clone());
 		build_process
 			.write_metadata(&repo, arch)
 			.map_err(|e| anyhow!("failed to write package metadata: {e}"))?;

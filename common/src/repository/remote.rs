@@ -88,7 +88,10 @@ impl Remote {
 	pub fn load_repository(&self, env: &Environment) -> io::Result<Repository> {
 		let path = env.sysroot().join(format!("{REMOTES}/{}", self.host));
 		fs::create_dir_all(&path)?;
-		Ok(Repository::load(path))
+		Ok(Repository {
+			path,
+			remote: Some(self.clone()),
+		})
 	}
 
 	/// Fetches the remote's motd

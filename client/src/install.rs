@@ -21,12 +21,13 @@
 use crate::confirm;
 use common::{
 	anyhow::{bail, Result},
+	maestro_utils::util::ByteSize,
 	package::Package,
 	repository,
-	repository::Repository,
+	repository::{remote::Remote, Repository},
 	Environment,
 };
-use std::collections::HashMap;
+use std::{collections::HashMap, fs};
 
 // TODO Clean
 /// Installs the given list of packages.
@@ -43,7 +44,13 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 		.local_repos()
 		.iter()
 		.cloned()
-		.map(Repository::load)
+		.map(Repository::local)
+		// Add remote repositories
+		.chain(
+			Remote::load_list(env)?
+				.iter()
+				.map(|r| r.load_repository(env).unwrap()),
+		) // TODO handle error
 		.collect::<Vec<_>>();
 	// Tells whether the operation failed
 	let mut failed = false;
@@ -90,9 +97,7 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 				match pkg {
 					Some((repo, pkg)) => Some((pkg, repo)),
 					// If not present, check on remote
-					None => {
-						todo!()
-					}
+					None => todo!(),
 				}
 			},
 		)?;
@@ -106,8 +111,10 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 	if failed {
 		bail!("installation failed");
 	}
-	println!("Packages to be installed:");
 	// List packages to be installed
+	let mut total_packages: Vec<_> = total_packages.into_iter().collect();
+	total_packages.sort_unstable_by(|(p0, _), (p1, _)| p0.name.cmp(&p1.name));
+	println!("Packages to be installed:");
 	#[cfg(feature = "network")]
 	{
 		let mut total_size = 0;
@@ -115,25 +122,24 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 			let name = &pkg.name;
 			let version = &pkg.version;
 			match repo.get_package(env.arch(), name, version)? {
-				Some(_) => println!("\t- {name} ({version}) - cached"),
+				Some(_) => println!("\t- {name} {version} - cached"),
 				None => {
 					// Get package size from remote
 					let remote = repo.get_remote().unwrap();
 					let size = remote.get_size(env, pkg).await?;
 					total_size += size;
-					println!("\t- {name} ({version}) - download size: {size}");
+					println!("\t- {name} {version} (download size: {})", ByteSize(size));
 				}
 			}
 		}
-		println!(
-			"Total download size: {}",
-			common::maestro_utils::util::ByteSize(total_size)
-		);
+		println!();
+		println!("Total download size: {}", ByteSize(total_size));
+		println!();
 	}
 	#[cfg(not(feature = "network"))]
 	{
 		for pkg in total_packages.keys() {
-			println!("\t- {} ({}) - cached", pkg.name, pkg.version);
+			println!("\t- {} {} - cached", pkg.name, pkg.version);
 		}
 	}
 	if !confirm::prompt() {
@@ -158,14 +164,15 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 					// TODO spawn task
 					async {
 						use common::download::DownloadTask;
-						use std::fs::OpenOptions;
+						use std::fs::File;
 
 						let path = repo.get_archive_path(env.arch(), &pkg.name, &pkg.version);
-						let file = OpenOptions::new()
-							.create(true)
-							.write(true)
-							.truncate(true)
-							.open(path)?;
+						// Ensure the parent directory exists
+						if let Some(parent) = path.parent() {
+							fs::create_dir_all(parent)?;
+						}
+						// Download
+						let file = File::create(path)?;
 						let url = remote.download_url(env, pkg);
 						let mut task = DownloadTask::new(&url, &file).await?;
 						while task.next().await? > 0 {}
@@ -178,7 +185,7 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 			match f.await {
 				Ok(()) => continue,
 				Err(error) => {
-					eprintln!("Failed to download `{name}` version `{version}`: {error}")
+					eprintln!("Failed to download `{name}` version `{version}`: {error}");
 				}
 			}
 		}
