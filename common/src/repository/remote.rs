@@ -105,11 +105,7 @@ impl Remote {
 			.await?;
 		let status = response.status();
 		match status {
-			StatusCode::OK => {
-				let s = response.text().await?;
-				let metadata = toml::from_str(&s)?;
-				Ok(Some(metadata))
-			}
+			StatusCode::OK => Ok(Some(response.text().await?)),
 			StatusCode::NOT_FOUND => Ok(None),
 			_ => bail!("failed to retrieve remote metadata (status {status})"),
 		}
