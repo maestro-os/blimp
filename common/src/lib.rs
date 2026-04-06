@@ -33,7 +33,7 @@ pub mod repository;
 pub mod util;
 pub mod version;
 
-use crate::version::Version;
+use crate::{util::current_arch, version::Version};
 use anyhow::Result;
 use package::{InstalledPackage, Package};
 use std::{
@@ -88,14 +88,10 @@ impl Environment {
 		let sysroot = sysroot.canonicalize()?;
 		let path = sysroot.join(LOCK_PATH);
 		let acquired = lock::lock(&path)?;
-		#[cfg(target_arch = "x86")]
-		let default_arch = "x86";
-		#[cfg(target_arch = "x86_64")]
-		let default_arch = "x86_64";
 		Ok(acquired.then(|| Self {
 			sysroot,
 			local_repos,
-			arch: arch.unwrap_or_else(|| default_arch.to_owned()),
+			arch: arch.unwrap_or_else(|| current_arch().to_owned()),
 		}))
 	}
 

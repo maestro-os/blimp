@@ -136,3 +136,15 @@ pub fn concat_paths<P0: AsRef<Path>, P1: AsRef<Path>>(base: P0, other: P1) -> Pa
 	let other = other.strip_prefix("/").unwrap_or(other);
 	base.as_ref().join(other)
 }
+
+/// Get the current CPU architecture.
+pub fn current_arch() -> &'static str {
+	#[cfg(target_arch = "x86")]
+	return "x86";
+	#[cfg(target_arch = "x86_64")]
+	return "x86_64";
+	#[cfg(target_arch = "aarch64")]
+	return "aarch64";
+	#[cfg(not(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64")))]
+	compile_error!("Unsupported architecture");
+}
