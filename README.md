@@ -2,27 +2,24 @@
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/llenotre/maestro-lnf/master/logo-light.svg">
-    <img src="https://raw.githubusercontent.com/llenotre/maestro-lnf/master/logo.svg" alt="logo" width="50%" />
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/maestro-os/maestro-lnf/master/logo-light.svg">
+    <img src="https://raw.githubusercontent.com/maestro-os/maestro-lnf/master/logo.svg" alt="logo" width="50%" />
   </picture>
 </p>
 
-[![MIT license](https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge&logo=book)](./LICENSE)
-![Version](https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fllenotre%2Fblimp%2Fmaster%2Fclient%2FCargo.toml&query=%24.package.version&style=for-the-badge&label=version)
-![Continuous integration](https://img.shields.io/github/actions/workflow/status/llenotre/blimp/check.yml?style=for-the-badge&logo=github)
+[![AGPL-3.0 license](https://img.shields.io/badge/license-AGPL--3.0-blue.svg?style=for-the-badge&logo=book)](./COPYING)
+![Version](https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmaestro-os%2Fblimp%2Fmaster%2Fclient%2FCargo.toml&query=%24.package.version&style=for-the-badge&label=version)
+![Continuous integration](https://img.shields.io/github/actions/workflow/status/maestro-os/blimp/check.yml?style=for-the-badge&logo=github)
 
 # About
 
-Blimp is a simple package manager for Unix-like operating systems, more specifically for [Maestro](https://github.com/llenotre/maestro).
+Blimp is a simple package manager for Unix-like operating systems, more specifically for [Maestro](https://github.com/maestro-os/maestro).
 
 This repository contains the following components:
 - `blimp`: The package manager itself
 - `blimp-builder`: An utility to build packages
-- `blimp-server`: The package manager's server
 
 The `common` crate is a library with utilities shared across components.
-
-
 
 # Build
 
@@ -33,16 +30,12 @@ cargo build           # Debug mode
 cargo build --release # Release mode
 ```
 
-Building with network support required the `network` feature:
-
-```sh
-cargo build --features network           # Debug mode
-cargo build --features network --release # Release mode
-```
-
-
+Features:
+- `network` (default): Enable network support. Disabling this feature is necessary when the SSL library is not available.
 
 # Usage
+
+Man pages are shipped with this repository, and are available in `man/`.
 
 ## Blimp
 
@@ -76,8 +69,6 @@ Show the whole usage of the command:
 blimp
 ```
 
-
-
 ## Package builder
 
 The general usage of the command is:
@@ -91,8 +82,6 @@ The command builds the package according to the descriptor, then installs it in 
 The `--package` flag can be used to write the resulting package into an archive instead of installing it. In which case, the output directory is considered as a repository instead of a system root.
 
 > **Note**: the structure of package descriptors and output packages are not yet documented as they are unstable
-
-
 
 ### Bootstrapping
 

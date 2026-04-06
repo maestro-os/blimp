@@ -1,3 +1,21 @@
+/*
+ * Copyright 2025 Luc Lenôtre
+ *
+ * This file is part of Maestro.
+ *
+ * Maestro is free software: you can redistribute it and/or modify it under the
+ * terms of the GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option) any later
+ * version.
+ *
+ * Maestro is distributed in the hope that it will be useful, but WITHOUT ANY
+ * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+ * A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * Maestro. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 //! A repository contains packages that can be installed.
 //!
 //! A repository can be linked to a remote, from which packages can be fetched.
@@ -6,34 +24,57 @@
 pub mod remote;
 
 use crate::{
+	package,
 	package::Package,
 	version::{Version, VersionConstraint},
 };
+use anyhow::{bail, Result};
 #[cfg(feature = "network")]
 use remote::Remote;
-use std::{fs, io, path::PathBuf};
+use serde::{Deserialize, Serialize};
+use std::{
+	collections::HashMap,
+	fs,
+	path::{Path, PathBuf},
+};
 
-/// Structure representing a local repository.
+/// Packages for an architecture in an index
+#[derive(Default, Deserialize, Serialize)]
+pub struct IndexArch {
+	/// Packages list
+	pub package: Vec<Package>,
+}
+
+/// A repository's index
+#[derive(Default, Deserialize, Serialize)]
+pub struct Index {
+	/// List of architectures in the index
+	pub arch: HashMap<String, IndexArch>,
+}
+
+/// A local repository.
 pub struct Repository {
 	/// The path to the repository.
 	path: PathBuf,
-
 	/// The remote associated with the repository.
 	#[cfg(feature = "network")]
 	remote: Option<Remote>,
 }
 
 impl Repository {
-	/// Loads the repository at the given path.
-	///
-	/// If the repository is invalid, the function returns an error.
-	pub fn load(path: PathBuf) -> io::Result<Self> {
-		Ok(Self {
+	/// Read a local repository.
+	pub fn local(path: PathBuf) -> Self {
+		Self {
 			path,
-
 			#[cfg(feature = "network")]
-			remote: None, // TODO read from file
-		})
+			remote: None,
+		}
+	}
+
+	/// Returns the repository's path
+	#[inline]
+	pub fn get_path(&self) -> &Path {
+		&self.path
 	}
 
 	/// Returns the remote associated with the repository.
@@ -42,149 +83,144 @@ impl Repository {
 		self.remote.as_ref()
 	}
 
-	/// Returns the path to the descriptor of the package with the given name `name` and version
-	/// `version`.
-	pub fn get_desc_path(&self, name: &str, version: &Version) -> PathBuf {
-		self.path.join(name).join(version.to_string()).join("desc")
+	/// Returns the path to the repository's index
+	pub fn get_index_path(&self) -> PathBuf {
+		self.path.join("index")
 	}
 
-	/// Returns the path to the archive of the package with the given name `name` and version
-	/// `version`.
-	pub fn get_archive_path(&self, name: &str, version: &Version) -> PathBuf {
+	/// Reads the repository's index
+	pub fn read_index(&self) -> Result<Index> {
+		let content = fs::read_to_string(self.get_index_path())?;
+		Ok(toml::from_str(&content)?)
+	}
+
+	/// Returns the path to a package's metadata
+	pub fn get_metadata_path(&self, arch: &str, name: &str, version: &Version) -> PathBuf {
 		self.path
-			.join(name)
-			.join(version.to_string())
-			.join("archive")
+			.join("dist")
+			.join(arch)
+			.join(format!("{name}_{version}.meta"))
 	}
 
-	/// Tells whether the **archive** of the package with name `name` and version `version` is
-	/// present in the repository.
+	/// Returns the path to a package's archive
+	pub fn get_archive_path(&self, arch: &str, name: &str, version: &Version) -> PathBuf {
+		self.path
+			.join("dist")
+			.join(arch)
+			.join(format!("{name}_{version}.tar.gz"))
+	}
+
+	/// Tells whether the **archive** of a package is present in the repository.
+	pub fn is_in_cache(&self, arch: &str, name: &str, version: &Version) -> bool {
+		self.get_metadata_path(arch, name, version).exists()
+			&& self.get_archive_path(arch, name, version).exists()
+	}
+
+	/// Returns a package in the repository
 	///
-	/// Note: A package can be present in a repository with its archive.
-	pub fn is_in_cache(&self, name: &str, version: &Version) -> bool {
-		self.get_archive_path(name, version).exists()
-	}
-
-	/// Returns the package with name `name` and version `version`.
-	///
-	/// If the package doesn't exist, the function returns None.
-	pub fn get_package(&self, name: &str, version: &Version) -> io::Result<Option<Package>> {
-		let path = self.path.join(name).join(version.to_string());
-		Package::load(path)
-	}
-
-	/// Returns the list of packages with each versions in the repository.
-	pub fn list_packages(&self) -> io::Result<Vec<Package>> {
-		fs::read_dir(&self.path)?
-			.filter_map(|ent| {
-				let ent = ent.ok()?;
-				if !ent.file_type().ok()?.is_dir() {
-					return None;
-				}
-
-				let name = ent.file_name().to_str()?.to_owned();
-				let ent_path = self.path.join(name);
-
-				let iter = fs::read_dir(&ent_path).ok()?.filter_map(move |ent| {
-					let ent = ent.ok()?;
-					if !ent.file_type().ok()?.is_dir() {
-						return None;
-					}
-
-					let ent_name = ent.file_name().to_str()?.to_owned();
-					let version = Version::try_from(ent_name.as_ref()).ok()?;
-
-					let ent_path = ent_path.join(version.to_string());
-					Package::load(ent_path).transpose()
-				});
-				Some(iter)
-			})
-			.flatten()
-			.collect()
+	/// If the package does not exist, the function returns `None`.
+	pub fn get_package(
+		&self,
+		arch: &str,
+		name: &str,
+		version: &Version,
+	) -> Result<Option<Package>> {
+		if !package::is_valid_name(name) {
+			bail!("invalid package name: {name}");
+		}
+		let path = self.get_metadata_path(arch, name, version);
+		Package::from_file(&path)
 	}
 
 	/// Returns the package with the given name.
 	///
 	/// Arguments:
-	/// - `name` is the name of the package.
+	/// - `arch` is the required architecture
+	/// - `name` is the name of the package
 	/// - `version_constraint` is the version constraint to match. If no constraint is specified,
-	///   the latest version is selected.
+	///   the latest version is selected
 	///
-	/// If the package doesn't exist, the function returns `None`.
+	/// If the package does not exist, the function returns `None`.
 	pub fn get_package_with_constraint(
 		&self,
+		arch: &str,
 		name: &str,
 		version_constraint: Option<&VersionConstraint>,
-	) -> io::Result<Option<Package>> {
-		let version = fs::read_dir(self.path.join(name))?
-			.filter_map(|ent| {
-				let ent = ent.ok()?;
-
-				if ent.file_type().ok()?.is_dir() {
-					let name = ent.file_name();
-					Version::try_from(name.to_str()?).ok()
-				} else {
-					None
+	) -> Result<Option<Package>> {
+		let mut index = self.read_index()?;
+		// Remove to move the object out. We can do this since the index is dropped when the
+		// function returns
+		let Some(index_arch) = index.arch.remove(arch) else {
+			return Ok(None);
+		};
+		let pkg = index_arch
+			.package
+			.into_iter()
+			.filter(|pkg| {
+				if pkg.name != name {
+					return false;
 				}
-			})
-			.filter(|version| {
 				if let Some(c) = version_constraint {
-					c.is_valid(version)
+					c.is_valid(&pkg.version)
 				} else {
 					true
 				}
 			})
-			.max();
-
-		match version {
-			Some(version) => self.get_package(name, &version),
-			None => Ok(None),
-		}
+			.max_by(|p0, p1| p0.version.cmp(&p1.version));
+		Ok(pkg)
 	}
 }
 
 // TODO Handle error reporting
-/// Returns the package with name `name` and version `version` along with its associated
+/// Returns the package with the given `arch`, `name` and `version` along with its associated
 /// repository.
 ///
 /// `repos` is the list of repositories to check on.
 ///
-/// If the package doesn't exist, the function returns None.
+/// If the package does not exist, the function returns `None`.
 pub fn get_package<'a>(
 	repos: &'a [Repository],
+	arch: &str,
 	name: &str,
 	version: &Version,
-) -> io::Result<Option<(&'a Repository, Package)>> {
+) -> Result<Option<(&'a Repository, Package)>> {
+	if !package::is_valid_name(name) {
+		bail!("invalid package name: {name}");
+	}
 	Ok(repos
 		.iter()
-		.filter_map(|repo| match repo.get_package(name, version) {
+		.find_map(|repo| match repo.get_package(arch, name, version) {
 			Ok(Some(pack)) => Some((repo, pack)),
 			_ => None,
-		})
-		.next())
+		}))
 }
 
 // TODO Handle error reporting
-/// Returns the package with the given name along with its associated repository.
+/// Returns the package with the given constraints along with its associated repository.
 ///
 /// Arguments:
-/// - `name` is the name of the package.
+/// - `arch` is the required architecture
+/// - `name` is the name of the package
 /// - `version_constraint` is the version constraint to match. If no constraint is specified, the
-///   latest version is selected.
+///   latest version is selected
 ///
-/// If the package doesn't exist, the function returns `None`.
+/// If the package does not exist, the function returns `None`.
 pub fn get_package_with_constraint<'a>(
 	repos: &'a [Repository],
+	arch: &str,
 	name: &str,
 	version_constraint: Option<&VersionConstraint>,
-) -> io::Result<Option<(&'a Repository, Package)>> {
+) -> Result<Option<(&'a Repository, Package)>> {
+	if !package::is_valid_name(name) {
+		bail!("invalid package name: {name}");
+	}
 	Ok(repos
 		.iter()
-		.filter_map(
-			|repo| match repo.get_package_with_constraint(name, version_constraint) {
+		.filter_map(|repo| {
+			match repo.get_package_with_constraint(arch, name, version_constraint) {
 				Ok(Some(pack)) => Some((repo, pack)),
 				_ => None,
-			},
-		)
+			}
+		})
 		.max_by(|(_, p0), (_, p1)| p0.version.cmp(&p1.version)))
 }

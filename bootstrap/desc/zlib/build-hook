@@ -3,7 +3,7 @@
 set -e
 cd *
 
-PREFIX="/usr" CC=x86_64-unknown-linux-musl-gcc ./configure
+PREFIX="/usr" CC=$HOST-gcc ./configure
 
 make -j${JOBS}
 make DESTDIR="$SYSROOT" install

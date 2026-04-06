@@ -1,7 +1,29 @@
+/*
+ * Copyright 2025 Luc Lenôtre
+ *
+ * This file is part of Maestro.
+ *
+ * Maestro is free software: you can redistribute it and/or modify it under the
+ * terms of the GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option) any later
+ * version.
+ *
+ * Maestro is distributed in the hope that it will be useful, but WITHOUT ANY
+ * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+ * A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * Maestro. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 //! The version structure represents the version of a package.
 
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
-use std::{cmp::Ordering, fmt, num::ParseIntError};
+use std::{
+	cmp::{max, Ordering},
+	fmt,
+	num::ParseIntError,
+};
 
 /// A package version.
 #[derive(Clone, Eq, Hash, PartialEq)]
@@ -23,8 +45,9 @@ impl<'de> Deserialize<'de> for Version {
 	where
 		D: Deserializer<'de>,
 	{
-		let s: &str = Deserialize::deserialize(deserializer)?;
-		s.try_into().map_err(Error::custom)
+		// toml does not like &str
+		let s: String = Deserialize::deserialize(deserializer)?;
+		s.as_str().try_into().map_err(Error::custom)
 	}
 }
 
@@ -45,7 +68,10 @@ impl TryFrom<&str> for Version {
 
 impl Ord for Version {
 	fn cmp(&self, other: &Self) -> Ordering {
-		for (left, right) in self.components.iter().zip(other.components.iter()) {
+		let len = max(self.components.len(), other.components.len());
+		for i in 0..len {
+			let left = self.components.get(i).unwrap_or(&0);
+			let right = self.components.get(i).unwrap_or(&0);
 			let cmp = left.cmp(right);
 			if cmp != Ordering::Equal {
 				return cmp;
@@ -104,8 +130,9 @@ impl<'de> Deserialize<'de> for VersionConstraint {
 	where
 		D: Deserializer<'de>,
 	{
-		let s: &str = Deserialize::deserialize(deserializer)?;
-		s.try_into().map_err(Error::custom)
+		// toml does not like &str
+		let s: String = Deserialize::deserialize(deserializer)?;
+		s.as_str().try_into().map_err(Error::custom)
 	}
 }
 

@@ -4,8 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+clap = { version = "4.6.0", features = ["derive"] }
 common = { path = "../common" }
 
 [features]
-default = []
+default = ["network"]
 network = ["common/network"]

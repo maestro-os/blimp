@@ -6,7 +6,7 @@ cd *
 ./configure \
 	--build="$BUILD" \
 	--host="$HOST" \
-	--target="$TARGET" \
+	--target="$HOST" \
 	--prefix="/usr" \
 	--enable-optimize \
 	--enable-shared

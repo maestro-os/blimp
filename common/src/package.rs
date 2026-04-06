@@ -1,3 +1,21 @@
+/*
+ * Copyright 2025 Luc Lenôtre
+ *
+ * This file is part of Maestro.
+ *
+ * Maestro is free software: you can redistribute it and/or modify it under the
+ * terms of the GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option) any later
+ * version.
+ *
+ * Maestro is distributed in the hope that it will be useful, but WITHOUT ANY
+ * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+ * A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * Maestro. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 //! A package is a software that can be installed using the package manager.
 //!
 //! Packages are usually downloaded from a remote host.
@@ -6,12 +24,27 @@ use crate::{
 	repository::Repository,
 	version::{Version, VersionConstraint},
 };
+use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt, fs, io, io::ErrorKind, path::PathBuf};
+use std::{
+	collections::HashMap,
+	fmt, fs, io,
+	io::ErrorKind,
+	path::{Path, PathBuf},
+};
 
 /// Tells whether the given package name is valid.
 pub fn is_valid_name(name: &str) -> bool {
-	name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+	if name.len() < 2 {
+		return false;
+	}
+	name.chars().enumerate().all(|(i, c)| {
+		if i == 0 {
+			c.is_ascii_lowercase()
+		} else {
+			c.is_ascii_lowercase() || c.is_ascii_digit() || "+-.".contains(c)
+		}
+	})
 }
 
 /// Enumeration of package dependency resolution errors.
@@ -83,29 +116,49 @@ impl fmt::Display for Dependency {
 /// A package's description.
 #[derive(Clone, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Package {
-	/// The package's name.
+	/// The package's name
 	pub name: String,
-	/// The package's version.
+	/// The package's version
 	pub version: Version,
-	/// The package's description.
+	/// The package's description
 	pub description: String,
 
-	/// Dependencies required to build the package.
-	pub build_deps: Vec<Dependency>,
-	/// Dependencies required to run the package.
-	pub run_deps: Vec<Dependency>,
+	/// Dependencies required to build the package
+	#[serde(default, skip_serializing_if = "Vec::is_empty")]
+	pub build_dep: Vec<Dependency>,
+	/// Dependencies required to run the package
+	#[serde(default, skip_serializing_if = "Vec::is_empty")]
+	pub run_dep: Vec<Dependency>,
 }
 
 impl Package {
-	/// Loads a package from the given path.
+	/// Loads a package from the metadata file.
 	///
-	/// If the package does not exist, the function returns None.
-	pub fn load(path: PathBuf) -> io::Result<Option<Package>> {
-		match fs::read_to_string(path.join("desc")) {
-			Ok(content) => Ok(Some(serde_json::from_str(&content)?)),
+	/// If the package does not exist, the function returns `None`.
+	pub fn from_file(metadata_path: &Path) -> Result<Option<Package>> {
+		match fs::read_to_string(metadata_path) {
+			Ok(content) => Ok(Some(toml::from_str(&content)?)),
 			Err(e) if e.kind() == ErrorKind::NotFound => Ok(None),
-			Err(e) => Err(e),
+			Err(e) => Err(e.into()),
 		}
+	}
+
+	/// Validates the package's metadata
+	pub fn validate(&self) -> Result<()> {
+		if !is_valid_name(&self.name) {
+			bail!("invalid package name: {}", self.name);
+		}
+		for d in &self.build_dep {
+			if !is_valid_name(&d.name) {
+				bail!("invalid dependency name: {}", d.name);
+			}
+		}
+		for d in &self.run_dep {
+			if !is_valid_name(&d.name) {
+				bail!("invalid dependency name: {}", d.name);
+			}
+		}
+		Ok(())
 	}
 
 	/// Resolves the dependencies of the package and inserts them into the given `HashMap`.
@@ -129,7 +182,7 @@ impl Package {
 		let mut errors = vec![];
 
 		// TODO Add support for build dependencies
-		for d in &self.run_deps {
+		for d in &self.run_dep {
 			// TODO check already installed packages
 			// Get package in the installation list
 			let pkg = packages.keys().find(|p| p.name == d.name);
@@ -190,7 +243,7 @@ pub fn list_unmatched_dependencies(
 	pkgs.iter()
 		.flat_map(|(_, pkg)| {
 			pkg.desc
-				.run_deps
+				.run_dep
 				.iter()
 				.filter(|dep| {
 					pkgs.get(&dep.name)

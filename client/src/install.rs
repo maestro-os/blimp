@@ -1,14 +1,33 @@
+/*
+ * Copyright 2025 Luc Lenôtre
+ *
+ * This file is part of Maestro.
+ *
+ * Maestro is free software: you can redistribute it and/or modify it under the
+ * terms of the GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option) any later
+ * version.
+ *
+ * Maestro is distributed in the hope that it will be useful, but WITHOUT ANY
+ * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+ * A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * Maestro. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 //! This module handles package installation.
 
 use crate::confirm;
 use common::{
 	anyhow::{bail, Result},
+	maestro_utils::util::ByteSize,
 	package::Package,
 	repository,
-	repository::Repository,
+	repository::{remote::Remote, Repository},
 	Environment,
 };
-use std::{collections::HashMap, io, path::PathBuf};
+use std::{collections::HashMap, fs};
 
 // TODO Clean
 /// Installs the given list of packages.
@@ -16,23 +35,29 @@ use std::{collections::HashMap, io, path::PathBuf};
 /// Arguments:
 /// - `names` is the list of packages to install.
 /// - `env` is the blimp environment.
-/// - `local_repos` is the list of paths to local package repositories.
-pub async fn install(
-	names: &[String],
-	env: &mut Environment,
-	local_repos: Vec<PathBuf>,
-) -> Result<()> {
+pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
+	if names.is_empty() {
+		bail!("must specify at least one package");
+	}
 	// The list of repositories
-	let repos = local_repos
-		.into_iter()
-		.map(Repository::load)
-		.collect::<io::Result<Vec<_>>>()?;
+	let repos = env
+		.local_repos()
+		.iter()
+		.cloned()
+		.map(Repository::local)
+		// Add remote repositories
+		.chain(
+			Remote::load_list(env)?
+				.iter()
+				.map(|r| r.load_repository(env).unwrap()),
+		) // TODO handle error
+		.collect::<Vec<_>>();
 	// Tells whether the operation failed
 	let mut failed = false;
 	// The list of packages to install with their respective repository
 	let mut packages = HashMap::<Package, &Repository>::new();
 	for name in names {
-		let pkg = repository::get_package_with_constraint(&repos, name, None)?;
+		let pkg = repository::get_package_with_constraint(&repos, env.arch(), name, None)?;
 		let Some((repo, pkg)) = pkg else {
 			eprintln!("Package `{name}` not found!");
 			failed = true;
@@ -40,8 +65,8 @@ pub async fn install(
 		};
 		packages.insert(pkg, repo);
 		// If already installed, print message
-		if let Some(version) = env.get_installed_version(name) {
-			println!("Package `{name}` version `{version}` is already installed. Reinstalling",);
+		if let Some(version) = env.get_installed_version(name)? {
+			println!("Package `{name}` version `{version}` is already installed. Reinstalling");
 		}
 	}
 	if failed {
@@ -58,6 +83,7 @@ pub async fn install(
 			&mut |name, version_constraint| {
 				let res = repository::get_package_with_constraint(
 					&repos,
+					env.arch(),
 					name,
 					Some(version_constraint),
 				);
@@ -71,9 +97,7 @@ pub async fn install(
 				match pkg {
 					Some((repo, pkg)) => Some((pkg, repo)),
 					// If not present, check on remote
-					None => {
-						todo!()
-					}
+					None => todo!(),
 				}
 			},
 		)?;
@@ -87,34 +111,35 @@ pub async fn install(
 	if failed {
 		bail!("installation failed");
 	}
-	println!("Packages to be installed:");
 	// List packages to be installed
+	let mut total_packages: Vec<_> = total_packages.into_iter().collect();
+	total_packages.sort_unstable_by(|(p0, _), (p1, _)| p0.name.cmp(&p1.name));
+	println!("Packages to be installed:");
 	#[cfg(feature = "network")]
 	{
 		let mut total_size = 0;
 		for (pkg, repo) in &total_packages {
 			let name = &pkg.name;
 			let version = &pkg.version;
-			match repo.get_package(name, version)? {
-				Some(_) => println!("\t- {name} ({version}) - cached"),
+			match repo.get_package(env.arch(), name, version)? {
+				Some(_) => println!("\t- {name} {version} - cached"),
 				None => {
 					// Get package size from remote
 					let remote = repo.get_remote().unwrap();
-					let size = remote.get_size(pkg).await?;
+					let size = remote.get_size(env, pkg).await?;
 					total_size += size;
-					println!("\t- {name} ({version}) - download size: {size}");
+					println!("\t- {name} {version} (download size: {})", ByteSize(size));
 				}
 			}
 		}
-		println!(
-			"Total download size: {}",
-			common::maestro_utils::util::ByteSize(total_size)
-		);
+		println!();
+		println!("Total download size: {}", ByteSize(total_size));
+		println!();
 	}
 	#[cfg(not(feature = "network"))]
 	{
 		for pkg in total_packages.keys() {
-			println!("\t- {} ({}) - cached", pkg.name, pkg.version);
+			println!("\t- {} {} - cached", pkg.name, pkg.version);
 		}
 	}
 	if !confirm::prompt() {
@@ -127,7 +152,7 @@ pub async fn install(
 		let mut futures = Vec::new();
 		// TODO download biggest packages first (sort_unstable by decreasing size)
 		for (pkg, repo) in &total_packages {
-			if repo.is_in_cache(&pkg.name, &pkg.version) {
+			if repo.is_in_cache(env.arch(), &pkg.name, &pkg.version) {
 				println!("`{}` is in cache.", &pkg.name);
 				continue;
 			}
@@ -139,15 +164,16 @@ pub async fn install(
 					// TODO spawn task
 					async {
 						use common::download::DownloadTask;
-						use std::fs::OpenOptions;
+						use std::fs::File;
 
-						let path = repo.get_archive_path(&pkg.name, &pkg.version);
-						let file = OpenOptions::new()
-							.create(true)
-							.write(true)
-							.truncate(true)
-							.open(path)?;
-						let url = remote.download_url(pkg);
+						let path = repo.get_archive_path(env.arch(), &pkg.name, &pkg.version);
+						// Ensure the parent directory exists
+						if let Some(parent) = path.parent() {
+							fs::create_dir_all(parent)?;
+						}
+						// Download
+						let file = File::create(path)?;
+						let url = remote.download_url(env, pkg);
 						let mut task = DownloadTask::new(&url, &file).await?;
 						while task.next().await? > 0 {}
 						Ok::<(), common::anyhow::Error>(())
@@ -159,7 +185,7 @@ pub async fn install(
 			match f.await {
 				Ok(()) => continue,
 				Err(error) => {
-					eprintln!("Failed to download `{name}` version `{version}`: {error}")
+					eprintln!("Failed to download `{name}` version `{version}`: {error}");
 				}
 			}
 		}
@@ -172,7 +198,7 @@ pub async fn install(
 	// Install all packages
 	for (pkg, repo) in total_packages {
 		println!("Installing `{}`...", pkg.name);
-		let archive_path = repo.get_archive_path(&pkg.name, &pkg.version);
+		let archive_path = repo.get_archive_path(env.arch(), &pkg.name, &pkg.version);
 		if let Err(e) = env.install(&pkg, &archive_path) {
 			eprintln!("Failed to install `{}`: {e}", &pkg.name);
 			failed = true;

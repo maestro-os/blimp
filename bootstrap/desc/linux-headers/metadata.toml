@@ -1,0 +1,8 @@
+[package]
+name = "bootstrap-linux-headers"
+version = "6.15"
+description = "Linux kernel headers for bootstrapping"
+
+[[source]]
+location = "/"
+url = "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.15.tar.xz"

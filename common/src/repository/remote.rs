@@ -1,18 +1,38 @@
+/*
+ * Copyright 2025 Luc Lenôtre
+ *
+ * This file is part of Maestro.
+ *
+ * Maestro is free software: you can redistribute it and/or modify it under the
+ * terms of the GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option) any later
+ * version.
+ *
+ * Maestro is distributed in the hope that it will be useful, but WITHOUT ANY
+ * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+ * A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * Maestro. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 //! A remote is a remote host from which packages can be downloaded.
 
-use crate::{package::Package, Environment, USER_AGENT};
+use crate::{
+	package::Package,
+	repository::{Index, Repository},
+	Environment, REMOTES, REMOTES_LIST, USER_AGENT,
+};
 use anyhow::{anyhow, bail, Result};
 use reqwest::StatusCode;
 use std::{
 	borrow::Borrow,
 	collections::HashSet,
+	fs,
 	fs::{File, OpenOptions},
 	io,
 	io::{BufRead, BufReader, BufWriter, Write},
 };
-
-/// The file which contains the list of remotes.
-const REMOTES_FILE: &str = "var/lib/blimp/remotes_list";
 
 /// A remote host.
 #[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -30,8 +50,12 @@ impl Borrow<str> for Remote {
 impl Remote {
 	/// Loads and returns the list of remote hosts.
 	pub fn load_list(env: &Environment) -> io::Result<HashSet<Self>> {
-		let path = env.sysroot().join(REMOTES_FILE);
-		let file = File::open(path)?;
+		let path = env.sysroot().join(REMOTES_LIST);
+		let file = match File::open(path) {
+			Ok(file) => file,
+			Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(HashSet::new()),
+			Err(e) => return Err(e),
+		};
 		let reader = BufReader::new(file);
 		reader
 			.lines()
@@ -45,7 +69,7 @@ impl Remote {
 
 	/// Saves the list of remote hosts.
 	pub fn save_list(env: &Environment, remotes: impl Iterator<Item = Remote>) -> io::Result<()> {
-		let path = env.sysroot().join(REMOTES_FILE);
+		let path = env.sysroot().join(REMOTES_LIST);
 		let file = OpenOptions::new()
 			.read(true)
 			.write(true)
@@ -60,8 +84,18 @@ impl Remote {
 		Ok(())
 	}
 
-	/// Returns the remote's motd.
-	pub async fn fetch_motd(&self) -> Result<String> {
+	/// Returns the repository associated with the remote.
+	pub fn load_repository(&self, env: &Environment) -> io::Result<Repository> {
+		let path = env.sysroot().join(format!("{REMOTES}/{}", self.host));
+		fs::create_dir_all(&path)?;
+		Ok(Repository {
+			path,
+			remote: Some(self.clone()),
+		})
+	}
+
+	/// Fetches the remote's motd
+	pub async fn fetch_motd(&self) -> Result<Option<String>> {
 		let client = reqwest::Client::new();
 		let url = format!("https://{}/motd", &self.host);
 		let response = client
@@ -71,40 +105,58 @@ impl Remote {
 			.await?;
 		let status = response.status();
 		match status {
-			StatusCode::OK => Ok(response.text().await?),
-			_ => bail!("Failed to retrieve motd (status {status})"),
+			StatusCode::OK => {
+				let s = response.text().await?;
+				let metadata = toml::from_str(&s)?;
+				Ok(Some(metadata))
+			}
+			StatusCode::NOT_FOUND => Ok(None),
+			_ => bail!("failed to retrieve remote metadata (status {status})"),
 		}
 	}
 
-	/// Fetches the list of all the packages from the remote.
-	pub async fn fetch_list(&self) -> Result<Vec<Package>> {
+	/// Fetches the remote's index
+	///
+	/// The function returns the number of packages found
+	pub async fn fetch_index(&self, env: &Environment) -> Result<usize> {
 		let client = reqwest::Client::new();
-		let url = format!("https://{}/package", self.host);
+		let url = format!("https://{}/index", self.host);
 		let response = client
 			.get(url)
 			.header("User-Agent", USER_AGENT)
 			.send()
 			.await?;
 		let status = response.status();
-		match status {
-			StatusCode::OK => Ok(response.json().await?),
-			_ => bail!("Failed to retrieve packages list from remote (status {status})"),
+		if !status.is_success() {
+			bail!("Failed to retrieve packages list from remote (status {status})");
 		}
+		// Check the index is valid and get package count
+		let index = response.text().await?;
+		let parsed_index: Index = toml::from_str(&index)?;
+		let cnt = parsed_index
+			.arch
+			.get(env.arch())
+			.map(|a| a.package.len())
+			.unwrap_or(0);
+		// Write to file
+		let repo = self.load_repository(env)?;
+		fs::write(repo.get_index_path(), index)?;
+		Ok(cnt)
 	}
 
 	/// Returns the download URL for the given `package`.
-	pub fn download_url(&self, package: &Package) -> String {
+	pub fn download_url(&self, env: &Environment, package: &Package) -> String {
 		format!(
-			"https://{}/package/{}/version/{}/archive",
-			self.host, package.name, package.version
+			"https://{}/dist/{}/{}_{}.tar.gz",
+			self.host, env.arch, package.name, package.version
 		)
 	}
 
 	/// Returns the download size of the package `package` in bytes.
-	pub async fn get_size(&self, package: &Package) -> Result<u64> {
+	pub async fn get_size(&self, env: &Environment, package: &Package) -> Result<u64> {
 		let client = reqwest::Client::new();
 		client
-			.head(self.download_url(package))
+			.head(self.download_url(env, package))
 			.header("User-Agent", USER_AGENT)
 			.send()
 			.await?

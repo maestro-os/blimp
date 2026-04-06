@@ -1,0 +1,12 @@
+[package]
+name = "bootstrap-libstdc++"
+version = "15.2.0"
+description = "libstdc++ for bootstrapping"
+
+[[source]]
+location = "/"
+url = "https://ftp.gnu.org/gnu/gcc/gcc-15.2.0/gcc-15.2.0.tar.gz"
+
+[[package.build_dep]]
+name = "bootstrap-musl"
+version = "*"

@@ -1,11 +1,32 @@
+/*
+ * Copyright 2025 Luc Lenôtre
+ *
+ * This file is part of Maestro.
+ *
+ * Maestro is free software: you can redistribute it and/or modify it under the
+ * terms of the GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option) any later
+ * version.
+ *
+ * Maestro is distributed in the hope that it will be useful, but WITHOUT ANY
+ * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+ * A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * Maestro. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 //! This module handles files download.
 
 use crate::USER_AGENT;
-use anyhow::Result;
+use anyhow::{bail, Result};
 use bytes::Bytes;
 use futures_util::stream::{Stream, StreamExt};
 use indicatif::{ProgressBar, ProgressStyle};
 use std::{fs::File, io::Write, pin::Pin};
+
+const PROGRESS_TEMPLATE: &str =
+	"[{elapsed_precise}] {bar:40.cyan/blue} {decimal_bytes}/{decimal_total_bytes}   {percent}%";
 
 /// A download task, running until the file has been downloaded entirely.
 pub struct DownloadTask<'f> {
@@ -33,6 +54,10 @@ impl<'f> DownloadTask<'f> {
 			.header("User-Agent", USER_AGENT)
 			.send()
 			.await?;
+		let status = response.status();
+		if status.is_client_error() || status.is_server_error() {
+			bail!("HTTP error: {status}");
+		}
 		// Truncate file
 		file.set_len(0)?;
 		// Setup progress bar
@@ -40,11 +65,9 @@ impl<'f> DownloadTask<'f> {
 			.content_length()
 			.map(ProgressBar::new)
 			.unwrap_or_else(ProgressBar::no_length);
-		let progress_style = ProgressStyle::with_template(
-			"[{elapsed_precise}] {bar:40.cyan/blue} {decimal_bytes}/{decimal_total_bytes}   {percent}%",
-		)
-		.unwrap()
-		.progress_chars("=> ");
+		let progress_style = ProgressStyle::with_template(PROGRESS_TEMPLATE)
+			.unwrap()
+			.progress_chars("=> ");
 		progress_bar.set_style(progress_style);
 		Ok(Self {
 			stream: Box::pin(response.bytes_stream()),
@@ -69,5 +92,15 @@ impl<'f> DownloadTask<'f> {
 		self.file.write_all(&chunk)?;
 		self.progress_bar.set_position(self.cur_size);
 		Ok(chunk.len())
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn progress_style_template_is_valid() {
+		ProgressStyle::with_template(PROGRESS_TEMPLATE).unwrap();
 	}
 }

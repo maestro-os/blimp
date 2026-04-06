@@ -1,3 +1,21 @@
+/*
+ * Copyright 2025 Luc Lenôtre
+ *
+ * This file is part of Maestro.
+ *
+ * Maestro is free software: you can redistribute it and/or modify it under the
+ * terms of the GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option) any later
+ * version.
+ *
+ * Maestro is distributed in the hope that it will be useful, but WITHOUT ANY
+ * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+ * A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * Maestro. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 //! Packages sources cache.
 
 use base64::{prelude::BASE64_STANDARD, Engine};
@@ -77,7 +95,6 @@ impl CacheEntry {
 	/// Flushes the entry to the cache by computing and storing its checksum.
 	pub fn flush(&mut self) -> io::Result<()> {
 		let dir_path = cache_directory()?;
-		let path = dir_path.join(&self.encoded_key);
 		// `.` is not part of the base64 character set
 		let checksum_path = dir_path.join(format!("{}.checksum", self.encoded_key));
 		// Compute checksum
@@ -96,7 +113,8 @@ impl CacheEntry {
 /// before.
 pub fn get_or_insert(key: &[u8]) -> io::Result<CacheEntry> {
 	let dir_path = cache_directory()?;
-	let encoded_key = BASE64_STANDARD.encode(key);
+	// `/` causes issues with paths. Replace it by `-` which is not in the base64 characters set
+	let encoded_key = BASE64_STANDARD.encode(key).replace('/', "-");
 	let path = dir_path.join(&encoded_key);
 	// Open file
 	let opt = FileOptions::new().read(true).write(true).create(true);

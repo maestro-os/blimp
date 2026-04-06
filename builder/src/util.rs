@@ -1,6 +1,24 @@
+/*
+ * Copyright 2025 Luc Lenôtre
+ *
+ * This file is part of Maestro.
+ *
+ * Maestro is free software: you can redistribute it and/or modify it under the
+ * terms of the GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option) any later
+ * version.
+ *
+ * Maestro is distributed in the hope that it will be useful, but WITHOUT ANY
+ * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+ * A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * Maestro. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 //! Utilities.
 
-use common::anyhow::{anyhow, Result};
+use crate::BuildArgs;
 use core::str;
 use std::{env, ffi::OsStr, io, num::NonZeroUsize, process::Command, thread};
 
@@ -8,14 +26,13 @@ use std::{env, ffi::OsStr, io, num::NonZeroUsize, process::Command, thread};
 const DEFAULT_BUILD_TRIPLET: &str = "x86_64-linux-gnu";
 
 /// Returns the recommended amount of CPUs to build the package.
-pub fn get_jobs_count() -> Result<usize> {
-	match env::var("JOBS") {
-		Ok(s) => s.parse().map_err(|_| anyhow!("Invalid jobs count: {s}")),
+pub fn get_jobs_count(args: &BuildArgs) -> usize {
+	args.jobs.unwrap_or_else(|| {
 		// Not specified by the user: get the amount of CPU on the system
-		Err(_) => Ok(thread::available_parallelism()
+		thread::available_parallelism()
 			.map(NonZeroUsize::get)
-			.unwrap_or(1)),
-	}
+			.unwrap_or(1)
+	})
 }
 
 /// Retrieves the build triplet from the compiler.
@@ -30,9 +47,9 @@ fn get_build_triplet_from_cc() -> io::Result<Option<String>> {
 }
 
 /// Returns the triplet of the machine on which the package is being built.
-pub fn get_build_triplet() -> io::Result<String> {
-	if let Ok(triplet) = env::var("BUILD") {
-		return Ok(triplet);
+pub fn get_build_triplet(args: &BuildArgs) -> io::Result<String> {
+	if let Some(triplet) = &args.build {
+		return Ok(triplet.clone());
 	}
 	if let Some(triplet) = get_build_triplet_from_cc()? {
 		return Ok(triplet);

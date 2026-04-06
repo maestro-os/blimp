@@ -1,11 +1,25 @@
+/*
+ * Copyright 2025 Luc Lenôtre
+ *
+ * This file is part of Maestro.
+ *
+ * Maestro is free software: you can redistribute it and/or modify it under the
+ * terms of the GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option) any later
+ * version.
+ *
+ * Maestro is distributed in the hope that it will be useful, but WITHOUT ANY
+ * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+ * A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * Maestro. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 //! The blimp library is the core of the Blimp package manager.
 
-#![feature(io_error_more)]
-
 pub use anyhow;
-pub use clap;
 pub use flate2;
-pub use serde_json;
 pub use tar;
 pub use tokio;
 pub use tokio_util;
@@ -13,7 +27,7 @@ pub use utils as maestro_utils;
 
 #[cfg(feature = "network")]
 pub mod download;
-pub mod lockfile;
+pub mod lock;
 pub mod package;
 pub mod repository;
 pub mod util;
@@ -29,11 +43,14 @@ use std::{
 	path::{Path, PathBuf},
 };
 
-/// The directory containing cached packages.
-const LOCKFILE_PATH: &str = "var/lib/blimp/.lock";
-// TODO
-/*/// The path to directory storing information about installed packages.
-const INSTALLED_DB: &str = "var/lib/blimp/installed";*/
+/// Instance lock file
+const LOCK_PATH: &str = "var/lib/blimp/.lock";
+/// Directory storing information about installed packages
+const INSTALLED_DB: &str = "var/lib/blimp/installed";
+/// The file which contains the list of remotes
+const REMOTES_LIST: &str = "var/lib/blimp/remotes-list";
+/// Directory containing remote repositories
+const REMOTES: &str = "var/lib/blimp/remotes";
 
 /// The user agent for HTTP requests.
 pub const USER_AGENT: &str = concat!("blimp/", env!("CARGO_PKG_VERSION"));
@@ -45,21 +62,40 @@ pub const USER_AGENT: &str = concat!("blimp/", env!("CARGO_PKG_VERSION"));
 ///
 /// The lockfile is destroyed when the environment is dropped.
 pub struct Environment {
-	/// The path to the sysroot of the environment.
+	/// The path to the sysroot of the environment
 	sysroot: PathBuf,
+	/// Local repositories, if any
+	local_repos: Vec<PathBuf>,
+	/// The architecture to install for
+	arch: String,
 }
 
 impl Environment {
-	/// Returns an instance for the environment with the given sysroot.
+	/// Tries to lock the environment at `sysroot` so that no other instance can access it at the
+	/// same time.
 	///
-	/// The function tries to lock the environment so that no other instance can access it at the
-	/// same time. If already locked, the function returns `None`.
-	pub fn with_root(sysroot: &Path) -> io::Result<Option<Self>> {
+	/// Arguments:
+	/// - `sysroot` is the root directory of the system to lock
+	/// - `local_repos` is the list of local repositories, if any
+	/// - `arch` is the architecture to use. Defaults to the current
+	///
+	/// If the environment is already locked, the function returns `None`.
+	pub fn acquire(
+		sysroot: &Path,
+		local_repos: Vec<PathBuf>,
+		arch: Option<String>,
+	) -> io::Result<Option<Self>> {
 		let sysroot = sysroot.canonicalize()?;
-		let path = sysroot.join(LOCKFILE_PATH);
-		let acquired = lockfile::lock(&path)?;
-		Ok(acquired.then_some(Self {
+		let path = sysroot.join(LOCK_PATH);
+		let acquired = lock::lock(&path)?;
+		#[cfg(target_arch = "x86")]
+		let default_arch = "x86";
+		#[cfg(target_arch = "x86_64")]
+		let default_arch = "x86_64";
+		Ok(acquired.then(|| Self {
 			sysroot,
+			local_repos,
+			arch: arch.unwrap_or_else(|| default_arch.to_owned()),
 		}))
 	}
 
@@ -68,20 +104,56 @@ impl Environment {
 		&self.sysroot
 	}
 
-	/// Returns the installed version for the package with the given `name`.
-	pub fn get_installed_version(&self, _name: &str) -> Option<Version> {
-		todo!()
+	/// Returns the local repositories list
+	#[inline]
+	pub fn local_repos(&self) -> &[PathBuf] {
+		&self.local_repos
+	}
+
+	/// Returns the repository architecture to use
+	#[inline]
+	pub fn arch(&self) -> &str {
+		&self.arch
+	}
+
+	/// If installed, returns the version of the package with the given `name`
+	pub fn get_installed_version(&self, name: &str) -> Result<Option<Version>> {
+		// Ensure the parent directory exists
+		let path = self.sysroot.join(INSTALLED_DB);
+		fs::create_dir_all(&path)?;
+		// Read file and get version
+		let path = path.join(name);
+		let res = fs::read_to_string(path);
+		let installed = match res {
+			Ok(i) => i,
+			Err(e) if e.kind() == ErrorKind::NotFound => return Ok(None),
+			Err(e) => return Err(e.into()),
+		};
+		let installed: InstalledPackage = toml::from_str(&installed)?;
+		Ok(Some(installed.desc.version))
+	}
+
+	/// Writes installed package information
+	fn write_installed_version(&self, pkg: &InstalledPackage) -> Result<()> {
+		// Ensure the parent directory exists
+		let path = self.sysroot.join(INSTALLED_DB);
+		fs::create_dir_all(&path)?;
+		// Write
+		let path = path.join(&pkg.desc.name);
+		let content = toml::to_string(pkg)?;
+		fs::write(path, content)?;
+		Ok(())
 	}
 
 	/// Installs the given package.
 	///
 	/// Arguments:
-	/// - `pkg` is the package to be installed.
-	/// - `archive_path` is the path to the archive of the package.
+	/// - `pkg` is the package to be installed
+	/// - `archive_path` is the path to the archive of the package
 	///
 	/// The function does not resolve dependencies. It is the caller's responsibility to install
 	/// them beforehand.
-	pub fn install(&self, _pkg: &Package, archive_path: &Path) -> Result<(), Box<dyn Error>> {
+	pub fn install(&self, pkg: &Package, archive_path: &Path) -> Result<(), Box<dyn Error>> {
 		// Read archive
 		let mut archive = util::read_package_archive(archive_path)?;
 		// TODO Get hooks (pre-install-hook and post-install-hook)
@@ -106,16 +178,19 @@ impl Environment {
 			files.push(path);
 		}
 		// TODO Execute post-install-hook
-		// TODO add package to installed db
+		self.write_installed_version(&InstalledPackage {
+			desc: pkg.clone(),
+			files,
+		})?;
 		Ok(())
 	}
 
 	/// Installs a new version of the package, removing the previous.
 	///
 	/// Arguments:
-	/// - `pkg` is the package to be updated.
-	/// - `archive_path` is the path to the archive of the new version of the package.
-	pub fn update(&self, _pkg: &Package, archive_path: &Path) -> Result<()> {
+	/// - `pkg` is the package to be updated
+	/// - `archive_path` is the path to the archive of the new version of the package
+	pub fn upgrade(&self, _pkg: &Package, archive_path: &Path) -> Result<()> {
 		// Read archive
 		let _archive = util::read_package_archive(archive_path)?;
 		// TODO Get hooks (pre-update-hook and post-update-hook)
@@ -162,8 +237,7 @@ impl Environment {
 
 impl Drop for Environment {
 	fn drop(&mut self) {
-		let path = self.sysroot.join(LOCKFILE_PATH);
-		lockfile::unlock(&path)
-			.unwrap_or_else(|e| eprintln!("blimp: could not remove lockfile: {e}"));
+		let path = self.sysroot.join(LOCK_PATH);
+		lock::unlock(&path).unwrap_or_else(|e| eprintln!("blimp: could not remove lockfile: {e}"));
 	}
 }
