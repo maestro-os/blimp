@@ -83,6 +83,9 @@ struct BuildArgs {
 	/// compilers)
 	#[arg(long)]
 	target: Option<String>,
+	/// Build in a chroot environment
+	#[arg(long)]
+	chroot: bool,
 
 	/// If set, build files are kept for troubleshooting purpose
 	#[arg(long)]
@@ -145,7 +148,7 @@ fn build(args: BuildArgs) -> Result<()> {
 		.map_err(|e| anyhow!("failed to create destination directory: {e}"))?;
 	println!("[INFO] Jobs: {jobs}; Build: {build}; Host: {host}; Target: {target}");
 	let sysroot = (!args.package).then(|| args.to.clone());
-	let build_process = BuildProcess::new(args.from, sysroot, &args.work_dir)?;
+	let build_process = BuildProcess::new(args.from, sysroot, &args.work_dir, args.chroot)?;
 	let rt = Runtime::new()?;
 	rt.block_on(build_process.fetch_sources())
 		.map_err(|e| anyhow!("cannot fetch sources: {e}"))?;

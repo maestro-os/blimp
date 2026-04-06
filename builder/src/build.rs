@@ -26,9 +26,9 @@ use common::{
 	tar, tokio,
 };
 use std::{
-	fs,
-	fs::File,
+	fs::{self, File},
 	io,
+	os::unix::{fs::chroot, process::CommandExt},
 	path::{Path, PathBuf},
 	process::Command,
 	str,
@@ -52,6 +52,8 @@ pub struct BuildProcess {
 	build_dir: PathBuf,
 	/// The path to the system root in which the package is installed.
 	sysroot: PathBuf,
+	/// Building in chroot environment?
+	chroot: bool,
 }
 
 impl BuildProcess {
@@ -61,7 +63,17 @@ impl BuildProcess {
 	/// - `input_path` is the path to the directory containing information to build the package.
 	/// - `sysroot` is the path to the system root. If `None`, a directory is created.
 	/// - `work_dir` is the directory where build directories are located
-	pub fn new(input_path: PathBuf, sysroot: Option<PathBuf>, work_dir: &Path) -> Result<Self> {
+	/// - `chroot` for building in chroot environment
+	pub fn new(
+		input_path: PathBuf,
+		sysroot: Option<PathBuf>,
+		work_dir: &Path,
+		chroot: bool,
+	) -> Result<Self> {
+		// TODO replace root user check by CAP_SYS_CHROOT when implemented in kernel
+		if chroot && get_euid() != 0 {
+			bail!("--chroot requires root privileges!")
+		}
 		let build_desc_path = input_path.join("metadata.toml");
 		let build_desc = fs::read_to_string(build_desc_path)?;
 		let build_desc = toml::from_str::<BuildDescriptor>(&build_desc)?;
@@ -69,11 +81,11 @@ impl BuildProcess {
 		Ok(Self {
 			input_path,
 			build_desc,
-
 			build_dir: common::util::create_tmp_dir(work_dir)?,
 			sysroot: sysroot
 				.map(fs::canonicalize)
 				.unwrap_or_else(|| common::util::create_tmp_dir(work_dir))?,
+			chroot,
 		})
 	}
 
@@ -117,8 +129,8 @@ impl BuildProcess {
 	pub fn build(&self, jobs: usize, build: &str, host: &str, target: &str) -> io::Result<bool> {
 		let absolute_input = fs::canonicalize(&self.input_path)?;
 		let hook_path = absolute_input.join("build-hook");
-		Command::new(hook_path)
-			.env("DESC_PATH", absolute_input)
+		let mut cmd = Command::new(hook_path);
+		cmd.env("DESC_PATH", absolute_input)
 			.env("BUILD", build)
 			.env("HOST", host)
 			.env("TARGET", target)
@@ -126,8 +138,14 @@ impl BuildProcess {
 			.env("PKG_NAME", &self.build_desc.package.name)
 			.env("PKG_VERSION", self.build_desc.package.version.to_string())
 			.env("PKG_DESC", &self.build_desc.package.description)
-			.env("JOBS", jobs.to_string())
-			.current_dir(&self.build_dir)
+			.env("JOBS", jobs.to_string());
+		if self.chroot {
+			let sysroot = self.sysroot.clone();
+			unsafe {
+				cmd.pre_exec(move || chroot(&sysroot));
+			}
+		}
+		cmd.current_dir(&self.build_dir)
 			.status()
 			.map(|s| s.success())
 	}
