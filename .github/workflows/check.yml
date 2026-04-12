@@ -2,17 +2,17 @@ name: Check
 on: [push, pull_request]
 jobs:
   format:
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - run: cargo fmt --check
   doc:
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - run: cargo doc --all-features --no-deps
   offline:
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Check debug compilation
@@ -24,7 +24,7 @@ jobs:
       - name: Unit tests
         run: cargo test
   online:
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     needs: offline
     steps:
       - name: Check debug compilation
