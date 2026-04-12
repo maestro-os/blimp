@@ -29,8 +29,11 @@ use common::{
 };
 use std::{collections::HashMap, fs};
 
+/// Map of packages with their respective repository
+type PackagesWithRepositoryMap<'r> = HashMap<Package, &'r Repository>;
+
 /// List of packages with their respective repository
-type PackagesWithRepository<'r> = HashMap<Package, &'r Repository>;
+type PackagesWithRepositoryVec<'r> = Vec<(Package, &'r Repository)>;
 
 /// Get the list of packages to install.
 ///
@@ -46,7 +49,7 @@ fn packages_to_install<'r>(
 	names: &[String],
 	repos: &'r [Repository],
 	env: &Environment,
-) -> Result<PackagesWithRepository<'r>> {
+) -> Result<PackagesWithRepositoryMap<'r>> {
 	let mut failed = false;
 	let mut packages = HashMap::<Package, &Repository>::new();
 
@@ -78,10 +81,10 @@ fn packages_to_install<'r>(
 /// - `repos` is repositories to search packages into
 /// - `env` is the environment to install on
 fn packages_with_deps_to_install<'r>(
-	packages: &PackagesWithRepository<'r>,
+	packages: &PackagesWithRepositoryMap<'r>,
 	repos: &'r [Repository],
 	env: &Environment,
-) -> Result<PackagesWithRepository<'r>> {
+) -> Result<PackagesWithRepositoryMap<'r>> {
 	let mut failed = false;
 	// The list of all packages, dependencies included
 	let mut total_packages = packages.clone();
@@ -133,7 +136,7 @@ fn packages_with_deps_to_install<'r>(
 /// - `env` is the environment to install on
 #[cfg(feature = "network")]
 async fn print_download_size<'r>(
-	total_packages: &Vec<(Package, &'r Repository)>,
+	total_packages: &PackagesWithRepositoryVec<'r>,
 	env: &Environment,
 ) -> Result<()> {
 	let mut total_size = 0;
@@ -154,6 +157,64 @@ async fn print_download_size<'r>(
 	println!();
 	println!("Total download size: {}", ByteSize(total_size));
 	println!();
+	Ok(())
+}
+
+/// Download packages and print in case of cache or failure.
+///
+/// Arguments:
+/// - `total_packages` is the whole list of packages to install
+/// - `env` is the environment to install on
+#[cfg(feature = "network")]
+async fn download_packages<'r>(
+	total_packages: &PackagesWithRepositoryVec<'r>,
+	env: &Environment,
+) -> Result<()> {
+	let mut failed = false;
+	let mut futures = Vec::new();
+	// TODO download biggest packages first (sort_unstable by decreasing size)
+	for (pkg, repo) in total_packages {
+		if repo.is_in_cache(env.arch(), &pkg.name, &pkg.version) {
+			println!("`{}` is in cache.", &pkg.name);
+			continue;
+		}
+		if let Some(remote) = repo.get_remote() {
+			// TODO limit the number of packages downloaded concurrently
+			futures.push((
+				&pkg.name,
+				&pkg.version,
+				// TODO spawn task
+				async {
+					use common::download::DownloadTask;
+					use std::fs::File;
+
+					let path = repo.get_archive_path(env.arch(), &pkg.name, &pkg.version);
+					// Ensure the parent directory exists
+					if let Some(parent) = path.parent() {
+						fs::create_dir_all(parent)?;
+					}
+					// Download
+					let file = File::create(path)?;
+					let url = remote.download_url(env, pkg);
+					let mut task = DownloadTask::new(&url, &file).await?;
+					while task.next().await? > 0 {}
+					Ok::<(), common::anyhow::Error>(())
+				},
+			));
+		}
+	}
+	for (name, version, f) in futures {
+		match f.await {
+			Ok(()) => continue,
+			Err(error) => {
+				eprintln!("Failed to download `{name}` version `{version}`: {error}");
+				failed = true;
+			}
+		}
+	}
+	if failed {
+		bail!("installation failed");
+	}
 	Ok(())
 }
 
@@ -188,57 +249,15 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 		println!("Aborting.");
 		return Ok(());
 	}
-	let mut failed = false;
 	#[cfg(feature = "network")]
 	{
 		println!("Downloading packages...");
-		let mut futures = Vec::new();
-		// TODO download biggest packages first (sort_unstable by decreasing size)
-		for (pkg, repo) in &total_packages {
-			if repo.is_in_cache(env.arch(), &pkg.name, &pkg.version) {
-				println!("`{}` is in cache.", &pkg.name);
-				continue;
-			}
-			if let Some(remote) = repo.get_remote() {
-				// TODO limit the number of packages downloaded concurrently
-				futures.push((
-					&pkg.name,
-					&pkg.version,
-					// TODO spawn task
-					async {
-						use common::download::DownloadTask;
-						use std::fs::File;
-
-						let path = repo.get_archive_path(env.arch(), &pkg.name, &pkg.version);
-						// Ensure the parent directory exists
-						if let Some(parent) = path.parent() {
-							fs::create_dir_all(parent)?;
-						}
-						// Download
-						let file = File::create(path)?;
-						let url = remote.download_url(env, pkg);
-						let mut task = DownloadTask::new(&url, &file).await?;
-						while task.next().await? > 0 {}
-						Ok::<(), common::anyhow::Error>(())
-					},
-				));
-			}
-		}
-		for (name, version, f) in futures {
-			match f.await {
-				Ok(()) => continue,
-				Err(error) => {
-					eprintln!("Failed to download `{name}` version `{version}`: {error}");
-				}
-			}
-		}
-		if failed {
-			bail!("installation failed");
-		}
+		download_packages(&total_packages, &env).await?;
 	}
 	println!();
 	println!("Installing packages...");
 	// Install all packages
+	let mut failed = false;
 	for (pkg, repo) in total_packages {
 		println!("Installing `{}`...", pkg.name);
 		let archive_path = repo.get_archive_path(env.arch(), &pkg.name, &pkg.version);
