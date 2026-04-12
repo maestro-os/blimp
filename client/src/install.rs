@@ -56,7 +56,7 @@ fn packages_to_install<'r>(
 	// TODO list all packages for all repo, instead of
 	// reading index for each repo for each package
 	for name in names {
-		let pkg = repository::get_package_with_constraint(&repos, env.arch(), name, None)?;
+		let pkg = repository::get_package_with_constraint(repos, env.arch(), name, None)?;
 		let Some((repo, pkg)) = pkg else {
 			eprintln!("Package `{name}` not found!");
 			failed = true;
@@ -90,13 +90,13 @@ fn packages_with_deps_to_install<'r>(
 	let mut total_packages = packages.clone();
 	// TODO check dependencies for all packages at once to avoid duplicate errors
 	// Resolving dependencies
-	for (package, _) in packages {
+	for package in packages.keys() {
 		let res = package.resolve_dependencies(
 			&mut total_packages,
 			&mut |name, version_constraint| {
 				// TODO yet another call for reading whole repo index
 				let res = repository::get_package_with_constraint(
-					&repos,
+					repos,
 					env.arch(),
 					name,
 					Some(version_constraint),
@@ -231,7 +231,7 @@ fn install_packages<'r>(
 	for (pkg, repo) in total_packages {
 		println!("Installing `{}`...", pkg.name);
 		let archive_path = repo.get_archive_path(env.arch(), &pkg.name, &pkg.version);
-		if let Err(e) = env.install(&pkg, &archive_path) {
+		if let Err(e) = env.install(pkg, &archive_path) {
 			eprintln!("Failed to install `{}`: {e}", &pkg.name);
 			failed = true;
 		}
@@ -252,16 +252,16 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 		bail!("must specify at least one package");
 	}
 	let repos = env.list_repositories()?;
-	let packages = packages_to_install(names, &repos, &env)?;
+	let packages = packages_to_install(names, &repos, env)?;
 
 	println!("Resolving dependencies...");
-	let total_packages = packages_with_deps_to_install(&packages, &repos, &env)?;
+	let total_packages = packages_with_deps_to_install(&packages, &repos, env)?;
 	let mut total_packages: Vec<_> = total_packages.into_iter().collect();
 	total_packages.sort_unstable_by(|(p0, _), (p1, _)| p0.name.cmp(&p1.name));
 
 	println!("Packages to be installed:");
 	#[cfg(feature = "network")]
-	print_download_size(&total_packages, &env).await?;
+	print_download_size(&total_packages, env).await?;
 	#[cfg(not(feature = "network"))]
 	{
 		for pkg in total_packages.keys() {
@@ -275,9 +275,9 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 	#[cfg(feature = "network")]
 	{
 		println!("Downloading packages...");
-		download_packages(&total_packages, &env).await?;
+		download_packages(&total_packages, env).await?;
 	}
 	println!();
 	println!("Installing packages...");
-	install_packages(&total_packages, &env)
+	install_packages(&total_packages, env)
 }
