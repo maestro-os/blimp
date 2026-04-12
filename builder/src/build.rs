@@ -20,7 +20,7 @@
 
 use crate::desc::BuildDescriptor;
 use common::{
-	anyhow::{self, bail, Result},
+	anyhow::{bail, Result},
 	flate2::{write::GzEncoder, Compression},
 	maestro_utils::{fhs, user::get_euid},
 	repository::Repository,
@@ -36,6 +36,12 @@ use std::{
 	str,
 	sync::Arc,
 };
+
+/// Get original build-hook file path
+fn get_build_hook_path(input_path: &Path) -> io::Result<PathBuf> {
+	let absolute_input = fs::canonicalize(input_path)?;
+	Ok(absolute_input.join("build-hook"))
+}
 
 /// A build process is the operation of converting source code into an installable package.
 ///
@@ -88,6 +94,10 @@ impl BuildProcess {
 			if let Err(e) = fhs::create_dirs(&sysroot, false) {
 				bail!("FHS creation failed: {e}");
 			}
+			fs::copy(
+				get_build_hook_path(&input_path)?,
+				sysroot.join("bin/build-hook"),
+			)?;
 			let pkg_dir_name =
 				format!("{}-{}", build_desc.package.name, build_desc.package.version);
 			let build_dir = sysroot.join("usr/src").join(&pkg_dir_name);
@@ -154,8 +164,11 @@ impl BuildProcess {
 	///
 	/// On success, the function returns `true`.
 	pub fn build(&self, jobs: usize, build: &str, host: &str, target: &str) -> io::Result<bool> {
-		let absolute_input = fs::canonicalize(&self.input_path)?;
-		let hook_path = absolute_input.join("build-hook");
+		let hook_path = if self.chroot {
+			PathBuf::from("/bin/build-hook")
+		} else {
+			get_build_hook_path(&self.input_path)?
+		};
 		let mut cmd = Command::new(hook_path);
 		if self.chroot {
 			let sysroot = self.sysroot.clone();
@@ -171,14 +184,8 @@ impl BuildProcess {
 			.env("PKG_NAME", &self.build_desc.package.name)
 			.env("PKG_VERSION", self.build_desc.package.version.to_string())
 			.env("PKG_DESC", &self.build_desc.package.description)
-			.env("JOBS", jobs.to_string());
-		if self.chroot {
-			let install_path = self.install_path.clone();
-			unsafe {
-				cmd.pre_exec(move || chroot(&install_path));
-			}
-		}
-		cmd.current_dir(&self.build_dir)
+			.env("JOBS", jobs.to_string())
+			.current_dir(&self.build_dir)
 			.status()
 			.map(|s| s.success())
 	}
