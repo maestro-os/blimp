@@ -24,7 +24,7 @@ use common::{
 	maestro_utils::util::ByteSize,
 	package::Package,
 	repository,
-	repository::{remote::Remote, Repository},
+	repository::Repository,
 	Environment,
 };
 use std::{collections::HashMap, fs};
@@ -39,23 +39,13 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 	if names.is_empty() {
 		bail!("must specify at least one package");
 	}
-	// The list of repositories
-	let repos = env
-		.local_repos()
-		.iter()
-		.cloned()
-		.map(Repository::local)
-		// Add remote repositories
-		.chain(
-			Remote::load_list(env)?
-				.iter()
-				.map(|r| r.load_repository(env).unwrap()),
-		) // TODO handle error
-		.collect::<Vec<_>>();
+	let repos = env.list_repositories()?;
 	// Tells whether the operation failed
 	let mut failed = false;
 	// The list of packages to install with their respective repository
 	let mut packages = HashMap::<Package, &Repository>::new();
+	// TODO list all packages for all repo, instead of
+	// reading index for each repo for each package
 	for name in names {
 		let pkg = repository::get_package_with_constraint(&repos, env.arch(), name, None)?;
 		let Some((repo, pkg)) = pkg else {
