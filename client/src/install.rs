@@ -29,21 +29,25 @@ use common::{
 };
 use std::{collections::HashMap, fs};
 
-// TODO Clean
-/// Installs the given list of packages.
+/// Get the list of packages to install with their
+/// respective repository, from package names & repositories.
+///
+/// Print if package is missing or already installed.
+///
+/// If at least one package is missing, error out.
 ///
 /// Arguments:
-/// - `names` is the list of packages to install.
-/// - `env` is the blimp environment.
-pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
-	if names.is_empty() {
-		bail!("must specify at least one package");
-	}
-	let repos = env.list_repositories()?;
-	// Tells whether the operation failed
+/// - `names` is packages names to search
+/// - `repos` is repositories to search packages into
+/// - `env` is the environment to install on
+fn packages_to_install<'r>(
+	names: &[String],
+	repos: &'r [Repository],
+	env: &Environment,
+) -> Result<HashMap<Package, &'r Repository>> {
 	let mut failed = false;
-	// The list of packages to install with their respective repository
 	let mut packages = HashMap::<Package, &Repository>::new();
+
 	// TODO list all packages for all repo, instead of
 	// reading index for each repo for each package
 	for name in names {
@@ -62,7 +66,23 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 	if failed {
 		bail!("installation failed");
 	}
+	Ok(packages)
+}
+
+// TODO Clean
+/// Installs the given list of packages.
+///
+/// Arguments:
+/// - `names` is the list of packages to install.
+/// - `env` is the blimp environment.
+pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
+	if names.is_empty() {
+		bail!("must specify at least one package");
+	}
+	let repos = env.list_repositories()?;
+	let packages = packages_to_install(names, &repos, &env)?;
 	println!("Resolving dependencies...");
+	let mut failed = false;
 	// The list of all packages, dependencies included
 	let mut total_packages = packages.clone();
 	// TODO check dependencies for all packages at once to avoid duplicate errors
