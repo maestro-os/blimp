@@ -20,9 +20,9 @@
 
 use crate::desc::BuildDescriptor;
 use common::{
-	anyhow::{bail, Result},
+	anyhow::{self, bail, Result},
 	flate2::{write::GzEncoder, Compression},
-	maestro_utils::user::get_euid,
+	maestro_utils::{fhs, user::get_euid},
 	repository::Repository,
 	tar, tokio,
 	util::create_tmp_dir,
@@ -85,7 +85,9 @@ impl BuildProcess {
 
 		let (build_dir, install_path, sysroot) = if chroot {
 			let sysroot = create_tmp_dir(work_dir)?;
-			// TODO create FHS in sysroot
+			if let Err(e) = fhs::create_dirs(&sysroot, false) {
+				bail!("FHS creation failed: {e}");
+			}
 			let pkg_dir_name =
 				format!("{}-{}", build_desc.package.name, build_desc.package.version);
 			let build_dir = sysroot.join("usr/src").join(&pkg_dir_name);
