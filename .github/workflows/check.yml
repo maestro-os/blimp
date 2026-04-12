@@ -25,7 +25,6 @@ jobs:
         run: cargo test
   online:
     runs-on: ubuntu-latest
-    needs: offline
     steps:
       - name: Check debug compilation
         run: cargo build --features network
