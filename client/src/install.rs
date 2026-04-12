@@ -125,6 +125,38 @@ fn packages_with_deps_to_install<'r>(
 	Ok(total_packages)
 }
 
+/// Print download size for each dependency
+/// and the total download size.
+///
+/// Arguments:
+/// - `total_packages` is the whole list of packages to install
+/// - `env` is the environment to install on
+#[cfg(feature = "network")]
+async fn print_download_size<'r>(
+	total_packages: &Vec<(Package, &'r Repository)>,
+	env: &Environment,
+) -> Result<()> {
+	let mut total_size = 0;
+	for (pkg, repo) in total_packages {
+		let name = &pkg.name;
+		let version = &pkg.version;
+		match repo.get_package(env.arch(), name, version)? {
+			Some(_) => println!("\t- {name} {version} - cached"),
+			None => {
+				// Get package size from remote
+				let remote = repo.get_remote().unwrap();
+				let size = remote.get_size(env, pkg).await?;
+				total_size += size;
+				println!("\t- {name} {version} (download size: {})", ByteSize(size));
+			}
+		}
+	}
+	println!();
+	println!("Total download size: {}", ByteSize(total_size));
+	println!();
+	Ok(())
+}
+
 // TODO Clean
 /// Installs the given list of packages.
 ///
@@ -145,26 +177,7 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 
 	println!("Packages to be installed:");
 	#[cfg(feature = "network")]
-	{
-		let mut total_size = 0;
-		for (pkg, repo) in &total_packages {
-			let name = &pkg.name;
-			let version = &pkg.version;
-			match repo.get_package(env.arch(), name, version)? {
-				Some(_) => println!("\t- {name} {version} - cached"),
-				None => {
-					// Get package size from remote
-					let remote = repo.get_remote().unwrap();
-					let size = remote.get_size(env, pkg).await?;
-					total_size += size;
-					println!("\t- {name} {version} (download size: {})", ByteSize(size));
-				}
-			}
-		}
-		println!();
-		println!("Total download size: {}", ByteSize(total_size));
-		println!();
-	}
+	print_download_size(&total_packages, &env).await?;
 	#[cfg(not(feature = "network"))]
 	{
 		for pkg in total_packages.keys() {
@@ -175,6 +188,7 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 		println!("Aborting.");
 		return Ok(());
 	}
+	let mut failed = false;
 	#[cfg(feature = "network")]
 	{
 		println!("Downloading packages...");
