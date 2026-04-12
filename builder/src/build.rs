@@ -20,10 +20,12 @@
 
 use crate::desc::BuildDescriptor;
 use common::{
-	anyhow::Result,
+	anyhow::{bail, Result},
 	flate2::{write::GzEncoder, Compression},
+	maestro_utils::user::get_euid,
 	repository::Repository,
 	tar, tokio,
+	util::create_tmp_dir,
 };
 use std::{
 	fs::{self, File},
@@ -50,7 +52,9 @@ pub struct BuildProcess {
 
 	/// The path to the build directory.
 	build_dir: PathBuf,
-	/// The path to the system root in which the package is installed.
+	/// The path to the directory in which the package is installed.
+	install_path: PathBuf,
+	/// The path to the system root.
 	sysroot: PathBuf,
 	/// Building in chroot environment?
 	chroot: bool,
@@ -61,30 +65,51 @@ impl BuildProcess {
 	///
 	/// Arguments:
 	/// - `input_path` is the path to the directory containing information to build the package.
-	/// - `sysroot` is the path to the system root. If `None`, a directory is created.
+	/// - `install_path` is the path to the install directory. If `None`, a directory is created.
 	/// - `work_dir` is the directory where build directories are located
 	/// - `chroot` for building in chroot environment
 	pub fn new(
 		input_path: PathBuf,
-		sysroot: Option<PathBuf>,
+		install_path: Option<PathBuf>,
 		work_dir: &Path,
 		chroot: bool,
 	) -> Result<Self> {
 		// TODO replace root user check by CAP_SYS_CHROOT when implemented in kernel
 		if chroot && get_euid() != 0 {
-			bail!("--chroot requires root privileges!")
+			bail!("--chroot requires root privileges!");
 		}
 		let build_desc_path = input_path.join("metadata.toml");
 		let build_desc = fs::read_to_string(build_desc_path)?;
 		let build_desc = toml::from_str::<BuildDescriptor>(&build_desc)?;
 		build_desc.package.validate()?;
+
+		let (build_dir, install_path, sysroot) = if chroot {
+			let sysroot = create_tmp_dir(work_dir)?;
+			// TODO create FHS in sysroot
+			let pkg_dir_name =
+				format!("{}-{}", build_desc.package.name, build_desc.package.version);
+			let build_dir = sysroot.join("usr/src").join(&pkg_dir_name);
+			let install_dir = sysroot.join("var/lib").join(pkg_dir_name);
+			(build_dir, install_dir, sysroot)
+		} else {
+			(
+				create_tmp_dir(work_dir)?,
+				install_path
+					.as_ref()
+					.map(fs::canonicalize)
+					.unwrap_or_else(|| create_tmp_dir(work_dir))?,
+				install_path
+					.map(fs::canonicalize)
+					.unwrap_or_else(|| create_tmp_dir(work_dir))?,
+			)
+		};
+
 		Ok(Self {
 			input_path,
 			build_desc,
-			build_dir: common::util::create_tmp_dir(work_dir)?,
-			sysroot: sysroot
-				.map(fs::canonicalize)
-				.unwrap_or_else(|| common::util::create_tmp_dir(work_dir))?,
+			build_dir,
+			install_path,
+			sysroot,
 			chroot,
 		})
 	}
@@ -94,9 +119,9 @@ impl BuildProcess {
 		&self.build_dir
 	}
 
-	/// Returns the path to the fake system root at which the package is "installed".
-	pub fn get_sysroot(&self) -> &Path {
-		&self.sysroot
+	/// Returns the path at which the package is "installed".
+	pub fn get_install_path(&self) -> &Path {
+		&self.install_path
 	}
 
 	/// Fetches resources required to build the package.
@@ -130,19 +155,25 @@ impl BuildProcess {
 		let absolute_input = fs::canonicalize(&self.input_path)?;
 		let hook_path = absolute_input.join("build-hook");
 		let mut cmd = Command::new(hook_path);
-		cmd.env("DESC_PATH", absolute_input)
-			.env("BUILD", build)
+		if self.chroot {
+			let sysroot = self.sysroot.clone();
+			unsafe {
+				cmd.pre_exec(move || chroot(&sysroot));
+			}
+		}
+		cmd.env("BUILD", build)
 			.env("HOST", host)
 			.env("TARGET", target)
 			.env("SYSROOT", &self.sysroot)
+			.env("INSTALL_PATH", &self.install_path)
 			.env("PKG_NAME", &self.build_desc.package.name)
 			.env("PKG_VERSION", self.build_desc.package.version.to_string())
 			.env("PKG_DESC", &self.build_desc.package.description)
 			.env("JOBS", jobs.to_string());
 		if self.chroot {
-			let sysroot = self.sysroot.clone();
+			let install_path = self.install_path.clone();
 			unsafe {
-				cmd.pre_exec(move || chroot(&sysroot));
+				cmd.pre_exec(move || chroot(&install_path));
 			}
 		}
 		cmd.current_dir(&self.build_dir)
@@ -178,18 +209,18 @@ impl BuildProcess {
 		let mut tar = tar::Builder::new(enc);
 		tar.follow_symlinks(false);
 		tar.append_path_with_name(build_desc_path, "metadata.toml")?;
-		tar.append_dir_all("data", &self.sysroot)?;
+		tar.append_dir_all("data", &self.install_path)?;
 		// TODO add install/update/remove hooks
 		tar.finish()
 	}
 
 	/// Cleans files created by the build process.
 	///
-	/// `sysroot`: if `true`, the sysroot is also deleted.
-	pub fn cleanup(self, sysroot: bool) -> io::Result<()> {
+	/// `is_packaged`: if `true`, the install directory is also deleted.
+	pub fn cleanup(self, is_packaged: bool) -> io::Result<()> {
 		fs::remove_dir_all(self.build_dir)?;
-		if sysroot {
-			fs::remove_dir_all(self.sysroot)?;
+		if is_packaged {
+			fs::remove_dir_all(self.install_path)?;
 		}
 		Ok(())
 	}

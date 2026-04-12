@@ -6,4 +6,4 @@ cd *
 PREFIX="/usr" CC=$HOST-gcc ./configure
 
 make -j${JOBS}
-make DESTDIR="$SYSROOT" install
+make DESTDIR="$INSTALL_PATH" install

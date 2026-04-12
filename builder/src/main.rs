@@ -147,8 +147,8 @@ fn build(args: BuildArgs) -> Result<()> {
 	fs::create_dir_all(&args.to)
 		.map_err(|e| anyhow!("failed to create destination directory: {e}"))?;
 	println!("[INFO] Jobs: {jobs}; Build: {build}; Host: {host}; Target: {target}");
-	let sysroot = (!args.package).then(|| args.to.clone());
-	let build_process = BuildProcess::new(args.from, sysroot, &args.work_dir, args.chroot)?;
+	let pkg_path = (!args.package).then(|| args.to.clone());
+	let build_process = BuildProcess::new(args.from, pkg_path, &args.work_dir, args.chroot)?;
 	let rt = Runtime::new()?;
 	rt.block_on(build_process.fetch_sources())
 		.map_err(|e| anyhow!("cannot fetch sources: {e}"))?;
@@ -172,9 +172,9 @@ fn build(args: BuildArgs) -> Result<()> {
 	}
 	if args.debug {
 		eprintln!(
-			"[DEBUG] Build directory path: {}; Fake sysroot path: {}",
+			"[DEBUG] Build directory path: {}; Install path: {}",
 			build_process.get_build_dir().display(),
-			build_process.get_sysroot().display()
+			build_process.get_install_path().display()
 		);
 	} else {
 		println!("[INFO] Cleaning up...");

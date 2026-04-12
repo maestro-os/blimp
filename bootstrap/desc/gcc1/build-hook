@@ -10,7 +10,7 @@ mkdir build
 cd build
 
 ../configure \
-	--prefix="$SYSROOT/tools" \
+	--prefix="$INSTALL_PATH/tools" \
 	--target="$TARGET" \
 	--with-sysroot="$SYSROOT" \
 	--with-newlib \
@@ -28,7 +28,7 @@ cd build
 	--disable-threads \
 	--disable-vtv
 
-mkdir -p "$SYSROOT/usr/include"
+mkdir -p "$INSTALL_PATH/usr/include"
 
 make -j$JOBS all-gcc
 make install-gcc

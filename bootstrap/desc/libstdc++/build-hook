@@ -16,5 +16,5 @@ cd build
     --with-gxx-include-dir="/tools/$HOST/include/c++/$PKG_VERSION"
 
 make
-make DESTDIR=$SYSROOT install
-rm -fv $SYSROOT/usr/lib/lib{stdc++,stdc++fs,supc++}.la
+make DESTDIR=$INSTALL_PATH install
+rm -fv $INSTALL_PATH/usr/lib/lib{stdc++,stdc++fs,supc++}.la

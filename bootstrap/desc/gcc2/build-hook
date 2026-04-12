@@ -35,10 +35,10 @@ cd build
 	--enable-languages=c,c++
 
 make -j$JOBS all-gcc
-make DESTDIR="$SYSROOT" install-gcc
+make DESTDIR="$INSTALL_PATH" install-gcc
 make -j$JOBS all-target-libgcc
-make DESTDIR="$SYSROOT" install-target-libgcc
+make DESTDIR="$INSTALL_PATH" install-target-libgcc
 make -j$JOBS all-target-libstdc++-v3
-make DESTDIR="$SYSROOT" install-target-libstdc++-v3
+make DESTDIR="$INSTALL_PATH" install-target-libstdc++-v3
 
-ln -fsv gcc "$SYSROOT/usr/bin/cc"
+ln -fsv gcc "$INSTALL_PATH/usr/bin/cc"

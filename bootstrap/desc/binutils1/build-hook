@@ -6,10 +6,10 @@ cd *
 mkdir build
 cd build
 
-mkdir -p "$SYSROOT/tools/$TARGET/bin"
+mkdir -p "$INSTALL_PATH/tools/$TARGET/bin"
 
 ../configure \
-	--prefix="$SYSROOT/tools" \
+	--prefix="$INSTALL_PATH/tools" \
 	--target="$TARGET" \
 	--with-sysroot="$SYSROOT" \
 	--disable-werror \

@@ -12,4 +12,4 @@ cd *
 	--enable-shared
 
 make -j${JOBS}
-make DESTDIR=$SYSROOT install
+make DESTDIR=$INSTALL_PATH install

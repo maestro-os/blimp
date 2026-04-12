@@ -17,5 +17,5 @@ cd build
 	--enable-64-bit-bfd
 
 make -j${JOBS}
-make DESTDIR="$SYSROOT" install -j1
-rm -v "$SYSROOT/usr/lib/lib"{bfd,ctf,ctf-nobfd,opcodes}.{a,la}
+make DESTDIR="$INSTALL_PATH" install -j1
+rm -v "$INSTALL_PATH/usr/lib/lib"{bfd,ctf,ctf-nobfd,opcodes}.{a,la}
