@@ -29,8 +29,10 @@ use common::{
 };
 use std::{collections::HashMap, fs};
 
-/// Get the list of packages to install with their
-/// respective repository, from package names & repositories.
+/// List of packages with their respective repository
+type PackagesWithRepository<'r> = HashMap<Package, &'r Repository>;
+
+/// Get the list of packages to install.
 ///
 /// Print if package is missing or already installed.
 ///
@@ -44,7 +46,7 @@ fn packages_to_install<'r>(
 	names: &[String],
 	repos: &'r [Repository],
 	env: &Environment,
-) -> Result<HashMap<Package, &'r Repository>> {
+) -> Result<PackagesWithRepository<'r>> {
 	let mut failed = false;
 	let mut packages = HashMap::<Package, &Repository>::new();
 
@@ -69,19 +71,17 @@ fn packages_to_install<'r>(
 	Ok(packages)
 }
 
-// TODO Clean
-/// Installs the given list of packages.
+/// Get packages to install with their dependencies.
 ///
 /// Arguments:
-/// - `names` is the list of packages to install.
-/// - `env` is the blimp environment.
-pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
-	if names.is_empty() {
-		bail!("must specify at least one package");
-	}
-	let repos = env.list_repositories()?;
-	let packages = packages_to_install(names, &repos, &env)?;
-	println!("Resolving dependencies...");
+/// - `packages` is package list to install
+/// - `repos` is repositories to search packages into
+/// - `env` is the environment to install on
+fn packages_with_deps_to_install<'r>(
+	packages: &PackagesWithRepository<'r>,
+	repos: &'r [Repository],
+	env: &Environment,
+) -> Result<PackagesWithRepository<'r>> {
 	let mut failed = false;
 	// The list of all packages, dependencies included
 	let mut total_packages = packages.clone();
@@ -91,6 +91,7 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 		let res = package.resolve_dependencies(
 			&mut total_packages,
 			&mut |name, version_constraint| {
+				// TODO yet another call for reading whole repo index
 				let res = repository::get_package_with_constraint(
 					&repos,
 					env.arch(),
@@ -121,9 +122,27 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 	if failed {
 		bail!("installation failed");
 	}
-	// List packages to be installed
+	Ok(total_packages)
+}
+
+// TODO Clean
+/// Installs the given list of packages.
+///
+/// Arguments:
+/// - `names` is the list of packages to install.
+/// - `env` is the blimp environment.
+pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
+	if names.is_empty() {
+		bail!("must specify at least one package");
+	}
+	let repos = env.list_repositories()?;
+	let packages = packages_to_install(names, &repos, &env)?;
+
+	println!("Resolving dependencies...");
+	let total_packages = packages_with_deps_to_install(&packages, &repos, &env)?;
 	let mut total_packages: Vec<_> = total_packages.into_iter().collect();
 	total_packages.sort_unstable_by(|(p0, _), (p1, _)| p0.name.cmp(&p1.name));
+
 	println!("Packages to be installed:");
 	#[cfg(feature = "network")]
 	{
