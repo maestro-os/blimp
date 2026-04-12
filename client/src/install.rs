@@ -218,7 +218,30 @@ async fn download_packages<'r>(
 	Ok(())
 }
 
-// TODO Clean
+/// Install all packages into environment.
+///
+/// Arguments:
+/// - `total_packages` is the whole list of packages to install
+/// - `env` is the environment to install on
+fn install_packages<'r>(
+	total_packages: &PackagesWithRepositoryVec<'r>,
+	env: &Environment,
+) -> Result<()> {
+	let mut failed = false;
+	for (pkg, repo) in total_packages {
+		println!("Installing `{}`...", pkg.name);
+		let archive_path = repo.get_archive_path(env.arch(), &pkg.name, &pkg.version);
+		if let Err(e) = env.install(&pkg, &archive_path) {
+			eprintln!("Failed to install `{}`: {e}", &pkg.name);
+			failed = true;
+		}
+	}
+	if failed {
+		bail!("installation failed");
+	}
+	Ok(())
+}
+
 /// Installs the given list of packages.
 ///
 /// Arguments:
@@ -256,18 +279,5 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 	}
 	println!();
 	println!("Installing packages...");
-	// Install all packages
-	let mut failed = false;
-	for (pkg, repo) in total_packages {
-		println!("Installing `{}`...", pkg.name);
-		let archive_path = repo.get_archive_path(env.arch(), &pkg.name, &pkg.version);
-		if let Err(e) = env.install(&pkg, &archive_path) {
-			eprintln!("Failed to install `{}`: {e}", &pkg.name);
-			failed = true;
-		}
-	}
-	if failed {
-		bail!("installation failed");
-	}
-	Ok(())
+	install_packages(&total_packages, &env)
 }
