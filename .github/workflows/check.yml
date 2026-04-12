@@ -2,36 +2,33 @@ name: Check
 on: [push, pull_request]
 jobs:
   format:
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - run: cargo fmt --check
-  doc:
-    runs-on: [self-hosted, linux]
+  build-debug:
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - run: cargo doc --all-features --no-deps
-  offline:
-    runs-on: [self-hosted, linux]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Check debug compilation
+      - uses: actions/checkout@v6
+      - name: Build (offline-mode)
         run: cargo build
-      - name: Check release compilation
-        run: cargo build --release
-      - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
-      - name: Unit tests
-        run: cargo test
-  online:
-    runs-on: [self-hosted, linux]
-    needs: offline
-    steps:
-      - name: Check debug compilation
+      - name: Build (online-mode)
         run: cargo build --features network
-      - name: Check release compilation
-        run: cargo build --release --features network
-      - name: Clippy
+      - name: Clippy (offline-mode)
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Clippy (online-mode)
         run: cargo clippy --features network --all-targets -- -D warnings
-      - name: Unit tests
+      - name: Unit tests (offline-mode)
+        run: cargo test
+      - name: Unit tests (online-mode)
         run: cargo test --features network --all-targets
+  build-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build (offline-mode)
+        run: cargo build --release
+      - name: Build (online-mode)
+        run: cargo build --release --features network
+      - name: Build documentation
+        run: cargo doc --all-features --no-deps
