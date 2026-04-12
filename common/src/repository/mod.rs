@@ -24,8 +24,8 @@
 pub mod remote;
 
 use crate::{
-	package,
-	package::Package,
+	package::{self, Package},
+	util::current_arch,
 	version::{Version, VersionConstraint},
 };
 use anyhow::{bail, Result};
@@ -130,6 +130,20 @@ impl Repository {
 		}
 		let path = self.get_metadata_path(arch, name, version);
 		Package::from_file(&path)
+	}
+
+	// NOTE: used in maestro-install
+	/// Returns the list of packages with each versions in
+	/// the repository for the current architecture.
+	pub fn list_packages(&self) -> Result<Vec<Package>> {
+		let mut index = self.read_index()?;
+		let arch = current_arch();
+		// Remove to move the object out. We can do this since the index is dropped when the
+		// function returns
+		let Some(index_arch) = index.arch.remove(arch) else {
+			return Ok(vec![]);
+		};
+		Ok(index_arch.package)
 	}
 
 	/// Returns the package with the given name.

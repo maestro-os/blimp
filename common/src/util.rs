@@ -138,7 +138,7 @@ pub fn concat_paths<P0: AsRef<Path>, P1: AsRef<Path>>(base: P0, other: P1) -> Pa
 }
 
 /// Get the current CPU architecture.
-pub fn current_arch() -> &'static str {
+pub const fn current_arch() -> &'static str {
 	#[cfg(target_arch = "x86")]
 	return "x86";
 	#[cfg(target_arch = "x86_64")]
