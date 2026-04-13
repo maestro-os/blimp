@@ -24,40 +24,39 @@ use common::{
 	maestro_utils::util::ByteSize,
 	package::Package,
 	repository,
-	repository::{remote::Remote, Repository},
+	repository::Repository,
 	Environment,
 };
 use std::{collections::HashMap, fs};
 
-// TODO Clean
-/// Installs the given list of packages.
+/// Map of packages with their respective repository
+type PackagesWithRepositoryMap<'r> = HashMap<Package, &'r Repository>;
+
+/// List of packages with their respective repository
+type PackagesWithRepositoryVec<'r> = Vec<(Package, &'r Repository)>;
+
+/// Get the list of packages to install.
+///
+/// Print if package is missing or already installed.
+///
+/// If at least one package is missing, error out.
 ///
 /// Arguments:
-/// - `names` is the list of packages to install.
-/// - `env` is the blimp environment.
-pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
-	if names.is_empty() {
-		bail!("must specify at least one package");
-	}
-	// The list of repositories
-	let repos = env
-		.local_repos()
-		.iter()
-		.cloned()
-		.map(Repository::local)
-		// Add remote repositories
-		.chain(
-			Remote::load_list(env)?
-				.iter()
-				.map(|r| r.load_repository(env).unwrap()),
-		) // TODO handle error
-		.collect::<Vec<_>>();
-	// Tells whether the operation failed
+/// - `names` is packages names to search
+/// - `repos` is repositories to search packages into
+/// - `env` is the environment to install on
+fn packages_to_install<'r>(
+	names: &[String],
+	repos: &'r [Repository],
+	env: &Environment,
+) -> Result<PackagesWithRepositoryMap<'r>> {
 	let mut failed = false;
-	// The list of packages to install with their respective repository
 	let mut packages = HashMap::<Package, &Repository>::new();
+
+	// TODO list all packages for all repo, instead of
+	// reading index for each repo for each package
 	for name in names {
-		let pkg = repository::get_package_with_constraint(&repos, env.arch(), name, None)?;
+		let pkg = repository::get_package_with_constraint(repos, env.arch(), name, None)?;
 		let Some((repo, pkg)) = pkg else {
 			eprintln!("Package `{name}` not found!");
 			failed = true;
@@ -72,17 +71,32 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 	if failed {
 		bail!("installation failed");
 	}
-	println!("Resolving dependencies...");
+	Ok(packages)
+}
+
+/// Get packages to install with their dependencies.
+///
+/// Arguments:
+/// - `packages` is package list to install
+/// - `repos` is repositories to search packages into
+/// - `env` is the environment to install on
+fn packages_with_deps_to_install<'r>(
+	packages: &PackagesWithRepositoryMap<'r>,
+	repos: &'r [Repository],
+	env: &Environment,
+) -> Result<PackagesWithRepositoryMap<'r>> {
+	let mut failed = false;
 	// The list of all packages, dependencies included
 	let mut total_packages = packages.clone();
 	// TODO check dependencies for all packages at once to avoid duplicate errors
 	// Resolving dependencies
-	for (package, _) in packages {
+	for package in packages.keys() {
 		let res = package.resolve_dependencies(
 			&mut total_packages,
 			&mut |name, version_constraint| {
+				// TODO yet another call for reading whole repo index
 				let res = repository::get_package_with_constraint(
-					&repos,
+					repos,
 					env.arch(),
 					name,
 					Some(version_constraint),
@@ -111,31 +125,143 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 	if failed {
 		bail!("installation failed");
 	}
-	// List packages to be installed
-	let mut total_packages: Vec<_> = total_packages.into_iter().collect();
-	total_packages.sort_unstable_by(|(p0, _), (p1, _)| p0.name.cmp(&p1.name));
-	println!("Packages to be installed:");
-	#[cfg(feature = "network")]
-	{
-		let mut total_size = 0;
-		for (pkg, repo) in &total_packages {
-			let name = &pkg.name;
-			let version = &pkg.version;
-			match repo.get_package(env.arch(), name, version)? {
-				Some(_) => println!("\t- {name} {version} - cached"),
-				None => {
-					// Get package size from remote
-					let remote = repo.get_remote().unwrap();
-					let size = remote.get_size(env, pkg).await?;
-					total_size += size;
-					println!("\t- {name} {version} (download size: {})", ByteSize(size));
-				}
+	Ok(total_packages)
+}
+
+/// Print download size for each dependency
+/// and the total download size.
+///
+/// Arguments:
+/// - `total_packages` is the whole list of packages to install
+/// - `env` is the environment to install on
+#[cfg(feature = "network")]
+async fn print_download_size<'r>(
+	total_packages: &PackagesWithRepositoryVec<'r>,
+	env: &Environment,
+) -> Result<()> {
+	let mut total_size = 0;
+	for (pkg, repo) in total_packages {
+		let name = &pkg.name;
+		let version = &pkg.version;
+		match repo.get_package(env.arch(), name, version)? {
+			Some(_) => println!("\t- {name} {version} - cached"),
+			None => {
+				// Get package size from remote
+				let remote = repo.get_remote().unwrap();
+				let size = remote.get_size(env, pkg).await?;
+				total_size += size;
+				println!("\t- {name} {version} (download size: {})", ByteSize(size));
 			}
 		}
-		println!();
-		println!("Total download size: {}", ByteSize(total_size));
-		println!();
 	}
+	println!();
+	println!("Total download size: {}", ByteSize(total_size));
+	println!();
+	Ok(())
+}
+
+/// Download packages and print in case of cache or failure.
+///
+/// Arguments:
+/// - `total_packages` is the whole list of packages to install
+/// - `env` is the environment to install on
+#[cfg(feature = "network")]
+async fn download_packages<'r>(
+	total_packages: &PackagesWithRepositoryVec<'r>,
+	env: &Environment,
+) -> Result<()> {
+	let mut failed = false;
+	let mut futures = Vec::new();
+	// TODO download biggest packages first (sort_unstable by decreasing size)
+	for (pkg, repo) in total_packages {
+		if repo.is_in_cache(env.arch(), &pkg.name, &pkg.version) {
+			println!("`{}` is in cache.", &pkg.name);
+			continue;
+		}
+		if let Some(remote) = repo.get_remote() {
+			// TODO limit the number of packages downloaded concurrently
+			futures.push((
+				&pkg.name,
+				&pkg.version,
+				// TODO spawn task
+				async {
+					use common::download::DownloadTask;
+					use std::fs::File;
+
+					let path = repo.get_archive_path(env.arch(), &pkg.name, &pkg.version);
+					// Ensure the parent directory exists
+					if let Some(parent) = path.parent() {
+						fs::create_dir_all(parent)?;
+					}
+					// Download
+					let file = File::create(path)?;
+					let url = remote.download_url(env, pkg);
+					let mut task = DownloadTask::new(&url, &file).await?;
+					while task.next().await? > 0 {}
+					Ok::<(), common::anyhow::Error>(())
+				},
+			));
+		}
+	}
+	for (name, version, f) in futures {
+		match f.await {
+			Ok(()) => continue,
+			Err(error) => {
+				eprintln!("Failed to download `{name}` version `{version}`: {error}");
+				failed = true;
+			}
+		}
+	}
+	if failed {
+		bail!("installation failed");
+	}
+	Ok(())
+}
+
+/// Install all packages into environment.
+///
+/// Arguments:
+/// - `total_packages` is the whole list of packages to install
+/// - `env` is the environment to install on
+fn install_packages<'r>(
+	total_packages: &PackagesWithRepositoryVec<'r>,
+	env: &Environment,
+) -> Result<()> {
+	let mut failed = false;
+	for (pkg, repo) in total_packages {
+		println!("Installing `{}`...", pkg.name);
+		let archive_path = repo.get_archive_path(env.arch(), &pkg.name, &pkg.version);
+		if let Err(e) = env.install(pkg, &archive_path) {
+			eprintln!("Failed to install `{}`: {e}", &pkg.name);
+			failed = true;
+		}
+	}
+	if failed {
+		bail!("installation failed");
+	}
+	Ok(())
+}
+
+/// Installs the given list of packages.
+///
+/// Arguments:
+/// - `names` is the list of packages to install.
+/// - `env` is the blimp environment.
+pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
+	if names.is_empty() {
+		bail!("must specify at least one package");
+	}
+	let repos = env.list_repositories()?;
+	let packages = packages_to_install(names, &repos, env)?;
+
+	println!("Resolving dependencies...");
+	let total_packages = packages_with_deps_to_install(&packages, &repos, env)?;
+	let mut total_packages: Vec<_> = total_packages.into_iter().collect();
+	total_packages.sort_unstable_by(|(p0, _), (p1, _)| p0.name.cmp(&p1.name));
+
+	println!("Packages to be installed:");
+	#[cfg(feature = "network")]
+	print_download_size(&total_packages, env).await?;
 	#[cfg(not(feature = "network"))]
 	{
 		for pkg in total_packages.keys() {
@@ -149,63 +275,9 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 	#[cfg(feature = "network")]
 	{
 		println!("Downloading packages...");
-		let mut futures = Vec::new();
-		// TODO download biggest packages first (sort_unstable by decreasing size)
-		for (pkg, repo) in &total_packages {
-			if repo.is_in_cache(env.arch(), &pkg.name, &pkg.version) {
-				println!("`{}` is in cache.", &pkg.name);
-				continue;
-			}
-			if let Some(remote) = repo.get_remote() {
-				// TODO limit the number of packages downloaded concurrently
-				futures.push((
-					&pkg.name,
-					&pkg.version,
-					// TODO spawn task
-					async {
-						use common::download::DownloadTask;
-						use std::fs::File;
-
-						let path = repo.get_archive_path(env.arch(), &pkg.name, &pkg.version);
-						// Ensure the parent directory exists
-						if let Some(parent) = path.parent() {
-							fs::create_dir_all(parent)?;
-						}
-						// Download
-						let file = File::create(path)?;
-						let url = remote.download_url(env, pkg);
-						let mut task = DownloadTask::new(&url, &file).await?;
-						while task.next().await? > 0 {}
-						Ok::<(), common::anyhow::Error>(())
-					},
-				));
-			}
-		}
-		for (name, version, f) in futures {
-			match f.await {
-				Ok(()) => continue,
-				Err(error) => {
-					eprintln!("Failed to download `{name}` version `{version}`: {error}");
-				}
-			}
-		}
-		if failed {
-			bail!("installation failed");
-		}
+		download_packages(&total_packages, env).await?;
 	}
 	println!();
 	println!("Installing packages...");
-	// Install all packages
-	for (pkg, repo) in total_packages {
-		println!("Installing `{}`...", pkg.name);
-		let archive_path = repo.get_archive_path(env.arch(), &pkg.name, &pkg.version);
-		if let Err(e) = env.install(&pkg, &archive_path) {
-			eprintln!("Failed to install `{}`: {e}", &pkg.name);
-			failed = true;
-		}
-	}
-	if failed {
-		bail!("installation failed");
-	}
-	Ok(())
+	install_packages(&total_packages, env)
 }

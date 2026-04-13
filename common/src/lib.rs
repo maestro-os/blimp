@@ -33,7 +33,11 @@ pub mod repository;
 pub mod util;
 pub mod version;
 
-use crate::{util::current_arch, version::Version};
+use crate::{
+	repository::{remote::Remote, Repository},
+	util::current_arch,
+	version::Version,
+};
 use anyhow::Result;
 use package::{InstalledPackage, Package};
 use std::{
@@ -96,10 +100,12 @@ impl Environment {
 	}
 
 	/// Returns the sysroot of the current environment.
+	#[inline]
 	pub fn sysroot(&self) -> &Path {
 		&self.sysroot
 	}
 
+	// TODO check if used in an other repo
 	/// Returns the local repositories list
 	#[inline]
 	pub fn local_repos(&self) -> &[PathBuf] {
@@ -110,6 +116,23 @@ impl Environment {
 	#[inline]
 	pub fn arch(&self) -> &str {
 		&self.arch
+	}
+
+	/// List local & remote repositories
+	pub fn list_repositories(&self) -> Result<Vec<Repository>> {
+		let repos = self
+			.local_repos()
+			.iter()
+			.cloned()
+			.map(Repository::local)
+			// Add remote repositories
+			.chain(
+				Remote::load_list(self)?
+					.iter()
+					.map(|r| r.load_repository(self).unwrap()),
+			) // TODO handle error
+			.collect::<Vec<_>>();
+		Ok(repos)
 	}
 
 	/// If installed, returns the version of the package with the given `name`
