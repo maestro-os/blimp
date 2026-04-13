@@ -3,6 +3,8 @@ on: [push, pull_request]
 
 jobs:
   format:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -10,6 +12,8 @@ jobs:
         run: cargo fmt -- --check
 
   build-debug:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -53,6 +57,8 @@ jobs:
         run: cargo test --features network --all-targets
 
   build-release:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
