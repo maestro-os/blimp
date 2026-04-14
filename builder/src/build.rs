@@ -20,12 +20,18 @@
 
 use crate::desc::BuildDescriptor;
 use common::{
-	anyhow::{bail, Result},
+	anyhow::{anyhow, bail, Result},
 	flate2::{write::GzEncoder, Compression},
 	maestro_utils::{fhs, user::get_euid},
-	repository::Repository,
+	package::Package,
+	repository::{
+		get_package_with_constraint, get_recursive_dependencies,
+		remote::{download_packages, Remote},
+		PackagesWithRepositoryMap, Repository,
+	},
 	tar, tokio,
-	util::create_tmp_dir,
+	util::{create_tmp_dir, current_arch},
+	Environment,
 };
 use std::{
 	fs::{self, File},
@@ -66,6 +72,57 @@ pub struct BuildProcess {
 	chroot: bool,
 }
 
+/// Creates the chroot environment for building the package.
+///
+/// Arguments:
+/// - `work_dir` is the directory where build directories are located
+/// - `input_path` is the path to the directory containing information to build the package
+/// - `package` is the package to build
+///
+/// Returns: the path to the system root.
+async fn create_chroot_environment(
+	work_dir: &Path,
+	input_path: &Path,
+	package: &Package,
+) -> Result<PathBuf> {
+	let sysroot = create_tmp_dir(work_dir)?;
+	if let Err(e) = fhs::create_dirs(&sysroot, false) {
+		bail!("FHS creation failed: {e}");
+	}
+	fs::copy(
+		get_build_hook_path(input_path)?,
+		sysroot.join("bin/build-hook"),
+	)?;
+
+	let arch = current_arch();
+	let mut env = Environment::acquire(&sysroot, arch)?.expect("unexpected environment lock");
+	// TODO don't hardcode it
+	Remote::save_list(
+		&env,
+		[Remote {
+			host: "pkg.maestro-os.org".to_owned(),
+		}]
+		.into_iter(),
+	)?;
+	let repos = env.list_repositories()?;
+	let pkgs: PackagesWithRepositoryMap = package
+		.build_dep
+		.iter()
+		.map(|dep| {
+			get_package_with_constraint(&repos, arch, &dep.name, Some(&dep.version_constraint))?
+				.map(|p| (p.1, p.0))
+				.ok_or_else(|| anyhow!("dependency `{}` not found in repositories", dep.name))
+		})
+		.collect::<Result<_>>()?;
+	let deps = get_recursive_dependencies(&pkgs, &repos, arch)?
+		.into_iter()
+		.collect();
+	download_packages(&deps, &env).await?;
+	env.install_packages(&deps)?;
+
+	Ok(sysroot)
+}
+
 impl BuildProcess {
 	/// Creates a new instance.
 	///
@@ -74,7 +131,7 @@ impl BuildProcess {
 	/// - `install_path` is the path to the install directory. If `None`, a directory is created.
 	/// - `work_dir` is the directory where build directories are located
 	/// - `chroot` for building in chroot environment
-	pub fn new(
+	pub async fn new(
 		input_path: PathBuf,
 		install_path: Option<PathBuf>,
 		work_dir: &Path,
@@ -90,14 +147,8 @@ impl BuildProcess {
 		build_desc.package.validate()?;
 
 		let (build_dir, install_path, sysroot) = if chroot {
-			let sysroot = create_tmp_dir(work_dir)?;
-			if let Err(e) = fhs::create_dirs(&sysroot, false) {
-				bail!("FHS creation failed: {e}");
-			}
-			fs::copy(
-				get_build_hook_path(&input_path)?,
-				sysroot.join("bin/build-hook"),
-			)?;
+			let sysroot =
+				create_chroot_environment(work_dir, &input_path, &build_desc.package).await?;
 			let pkg_dir_name =
 				format!("{}-{}", build_desc.package.name, build_desc.package.version);
 			let build_dir = sysroot.join("usr/src").join(&pkg_dir_name);

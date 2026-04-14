@@ -29,7 +29,9 @@ mod update;
 use clap::{Args, Parser, Subcommand};
 use common::{
 	anyhow::{anyhow, Result},
-	tokio, Environment,
+	tokio,
+	util::current_arch,
+	Environment,
 };
 use install::install;
 use remove::remove;
@@ -90,10 +92,7 @@ async fn main_impl() -> Result<()> {
 	let sysroot = env::var_os("SYSROOT")
 		.map(PathBuf::from)
 		.unwrap_or(PathBuf::from("/"));
-	let local_repos = env::var("LOCAL_REPO") // TODO var_os
-		.map(|s| s.split(':').map(PathBuf::from).collect())
-		.unwrap_or_default();
-	let mut env = Environment::acquire(&sysroot, local_repos, args.arch)?
+	let mut env = Environment::acquire(&sysroot, args.arch.as_deref().unwrap_or(current_arch()))?
 		.ok_or_else(|| anyhow!("failed to acquire lockfile"))?;
 	match args.action {
 		#[cfg(feature = "network")]

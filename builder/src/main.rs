@@ -30,7 +30,7 @@ use crate::{
 };
 use clap::{Args, Parser, Subcommand};
 use common::{
-	anyhow::{anyhow, bail, Result},
+	anyhow::{self, anyhow, bail, Result},
 	repository::{Index, IndexArch, Repository},
 	tokio::runtime::Runtime,
 };
@@ -148,9 +148,14 @@ fn build(args: BuildArgs) -> Result<()> {
 		.map_err(|e| anyhow!("failed to create destination directory: {e}"))?;
 	println!("[INFO] Jobs: {jobs}; Build: {build}; Host: {host}; Target: {target}");
 	let pkg_path = (!args.package).then(|| args.to.clone());
-	let build_process = BuildProcess::new(args.from, pkg_path, &args.work_dir, args.chroot)?;
 	let rt = Runtime::new()?;
-	rt.block_on(build_process.fetch_sources())
+	let build_process = rt
+		.block_on(async {
+			let build_process =
+				BuildProcess::new(args.from, pkg_path, &args.work_dir, args.chroot).await?;
+			build_process.fetch_sources().await?;
+			Ok::<_, anyhow::Error>(build_process)
+		})
 		.map_err(|e| anyhow!("cannot fetch sources: {e}"))?;
 	println!("[INFO] Compilation...");
 	let success = build_process
