@@ -1,34 +1,84 @@
 name: Check
 on: [push, pull_request]
+
 jobs:
   format:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - run: cargo fmt --check
+      - name: Check formatting
+        run: cargo fmt -- --check
+
   build-debug:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+
+      - &cache-registry
+        name: Cache cargo registry
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Cache target/debug
+        uses: actions/cache@v5
+        with:
+          path: target/debug
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}-debug
+          restore-keys: |
+            ${{ runner.os }}-cargo-target-
+            ${{ runner.os }}-
+
       - name: Build (offline-mode)
         run: cargo build
+
       - name: Build (online-mode)
         run: cargo build --features network
+
       - name: Clippy (offline-mode)
         run: cargo clippy --all-targets -- -D warnings
+
       - name: Clippy (online-mode)
         run: cargo clippy --features network --all-targets -- -D warnings
+
       - name: Unit tests (offline-mode)
         run: cargo test
+
       - name: Unit tests (online-mode)
         run: cargo test --features network --all-targets
+
   build-release:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+
+      - *cache-registry
+
+      - name: Cache target/release
+        uses: actions/cache@v5
+        with:
+          path: target/release
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}-release
+          restore-keys: |
+            ${{ runner.os }}-cargo-target-
+            ${{ runner.os }}-
+
       - name: Build (offline-mode)
         run: cargo build --release
+
       - name: Build (online-mode)
         run: cargo build --release --features network
+
       - name: Build documentation
         run: cargo doc --all-features --no-deps
