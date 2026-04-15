@@ -97,13 +97,11 @@ async fn create_chroot_environment(
 	let arch = current_arch();
 	let mut env = Environment::acquire(&sysroot, arch)?.expect("unexpected environment lock");
 	// TODO don't hardcode it
-	Remote::save_list(
-		&env,
-		[Remote {
-			host: "pkg.maestro-os.org".to_owned(),
-		}]
-		.into_iter(),
-	)?;
+	let remote = Remote {
+		host: "pkg.maestro-os.org".to_owned(),
+	};
+	remote.fetch_index(&env).await?;
+	Remote::save_list(&mut env, [remote].into_iter())?;
 	let repos = env.list_repositories()?;
 	let pkgs: PackagesWithRepositoryMap = package
 		.build_dep
