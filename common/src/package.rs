@@ -28,8 +28,8 @@ use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use std::{
 	collections::HashMap,
-	fmt, fs, io,
-	io::ErrorKind,
+	fmt, fs,
+	io::{self, ErrorKind},
 	path::{Path, PathBuf},
 };
 
@@ -95,9 +95,29 @@ impl fmt::Display for ResolveError {
 	}
 }
 
+/// The type of dependency.
+#[derive(Clone, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub enum DependencyType {
+	#[serde(rename = "build")]
+	Build,
+	#[serde(rename = "run")]
+	Run,
+	#[serde(rename = "build-and-run")]
+	BuildAndRun,
+}
+
+impl Default for DependencyType {
+	fn default() -> Self {
+		Self::Run
+	}
+}
+
 /// A package dependency.
 #[derive(Clone, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Dependency {
+	/// The type of the dependency
+	#[serde(rename = "type")]
+	pub dep_type: DependencyType,
 	/// The dependency's name.
 	pub name: String,
 	/// The dependency's version constraints.
@@ -123,12 +143,9 @@ pub struct Package {
 	/// The package's description
 	pub description: String,
 
-	/// Dependencies required to build the package
-	#[serde(default, skip_serializing_if = "Vec::is_empty")]
-	pub build_dep: Vec<Dependency>,
-	/// Dependencies required to run the package
-	#[serde(default, skip_serializing_if = "Vec::is_empty")]
-	pub run_dep: Vec<Dependency>,
+	/// Dependencies required to build/run the package
+	#[serde(default, skip_serializing_if = "Vec::is_empty", rename = "dep")]
+	pub deps: Vec<Dependency>,
 }
 
 impl Package {
@@ -148,12 +165,7 @@ impl Package {
 		if !is_valid_name(&self.name) {
 			bail!("invalid package name: {}", self.name);
 		}
-		for d in &self.build_dep {
-			if !is_valid_name(&d.name) {
-				bail!("invalid dependency name: {}", d.name);
-			}
-		}
-		for d in &self.run_dep {
+		for d in &self.deps {
 			if !is_valid_name(&d.name) {
 				bail!("invalid dependency name: {}", d.name);
 			}
@@ -181,8 +193,11 @@ impl Package {
 	{
 		let mut errors = vec![];
 
-		// TODO Add support for build dependencies
-		for d in &self.run_dep {
+		for d in &self.deps {
+			// TODO Add support for build dependencies
+			if d.dep_type == DependencyType::Build {
+				continue;
+			}
 			// TODO check already installed packages
 			// Get package in the installation list
 			let pkg = packages.keys().find(|p| p.name == d.name);
@@ -243,12 +258,14 @@ pub fn list_unmatched_dependencies(
 	pkgs.iter()
 		.flat_map(|(_, pkg)| {
 			pkg.desc
-				.run_dep
+				.deps
 				.iter()
 				.filter(|dep| {
-					pkgs.get(&dep.name)
-						.map(|p| dep.version_constraint.is_valid(&p.desc.version))
-						.unwrap_or(false)
+					dep.dep_type != DependencyType::Build
+						&& pkgs
+							.get(&dep.name)
+							.map(|p| dep.version_constraint.is_valid(&p.desc.version))
+							.unwrap_or(false)
 				})
 				.map(move |dep| (pkg, dep))
 		})

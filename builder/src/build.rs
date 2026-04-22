@@ -101,10 +101,10 @@ async fn create_chroot_environment(
 		host: "pkg.maestro-os.org".to_owned(),
 	};
 	remote.fetch_index(&env).await?;
-	Remote::save_list(&mut env, [remote].into_iter())?;
+	Remote::save_list(&env, [remote].into_iter())?;
 	let repos = env.list_repositories()?;
 	let pkgs: PackagesWithRepositoryMap = package
-		.build_dep
+		.deps
 		.iter()
 		.map(|dep| {
 			get_package_with_constraint(&repos, arch, &dep.name, Some(&dep.version_constraint))?

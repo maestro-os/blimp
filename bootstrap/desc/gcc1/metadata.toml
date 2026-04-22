@@ -7,6 +7,7 @@ description = "Stage 1 gcc for bootstrapping"
 location = "/"
 url = "https://ftp.gnu.org/gnu/gcc/gcc-15.2.0/gcc-15.2.0.tar.gz"
 
-[[package.build_dep]]
+[[package.dep]]
+type = "build"
 name = "bootstrap-binutils"
 version = "*"
