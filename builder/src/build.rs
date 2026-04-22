@@ -23,7 +23,7 @@ use common::{
 	anyhow::{anyhow, bail, Result},
 	flate2::{write::GzEncoder, Compression},
 	maestro_utils::{fhs, user::get_euid},
-	package::Package,
+	package::{DependencyType, Package},
 	repository::{
 		get_package_with_constraint, get_recursive_dependencies,
 		remote::{download_packages, Remote},
@@ -112,7 +112,7 @@ async fn create_chroot_environment(
 				.ok_or_else(|| anyhow!("dependency `{}` not found in repositories", dep.name))
 		})
 		.collect::<Result<_>>()?;
-	let deps = get_recursive_dependencies(&pkgs, &repos, arch)?
+	let deps = get_recursive_dependencies(&pkgs, &repos, DependencyType::Build, arch)?
 		.into_iter()
 		.collect();
 	download_packages(&deps, &env).await?;

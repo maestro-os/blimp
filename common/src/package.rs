@@ -177,6 +177,7 @@ impl Package {
 	///
 	/// Arguments:
 	/// - `packages` is the `HashMap` which associates packages with their respective repository.
+	/// - `dep_type` is the type of dependencies to resolve. `BuildAndRun` resolves everything.
 	/// - `f` is a function used to get a package from its name and version.
 	///
 	/// The function makes use of packages that are already in the `HashMap` and those which are
@@ -186,6 +187,7 @@ impl Package {
 	pub fn resolve_dependencies<'r, F>(
 		&self,
 		packages: &mut HashMap<Self, &'r Repository>,
+		dep_type: DependencyType,
 		f: &mut F,
 	) -> io::Result<Result<(), Vec<ResolveError>>>
 	where
@@ -194,8 +196,13 @@ impl Package {
 		let mut errors = vec![];
 
 		for d in &self.deps {
-			// TODO Add support for build dependencies
-			if d.dep_type == DependencyType::Build {
+			// if filter by build & run, get all deps
+			if dep_type != DependencyType::BuildAndRun
+			    // if dep is build & run, we need it anyway
+				&& d.dep_type != DependencyType::BuildAndRun
+				// apply filter
+				&& d.dep_type != dep_type
+			{
 				continue;
 			}
 			// TODO check already installed packages
@@ -206,7 +213,6 @@ impl Package {
 				if !d.version_constraint.is_valid(&pkg.version) {
 					errors.push(ResolveError::VersionConflict {
 						name: d.name.clone(),
-
 						required_version: d.version_constraint.clone(),
 						other_version: pkg.version.clone(),
 					});
@@ -219,7 +225,9 @@ impl Package {
 			if let Some((p, repo)) = f(&d.name, &d.version_constraint) {
 				// TODO Check for dependency cycles
 				// FIXME Possible stack overflow
-				let res = p.resolve_dependencies(packages, f)?;
+				// At this point, we should only need run dependencies, as we are past the build
+				// step.
+				let res = p.resolve_dependencies(packages, DependencyType::Run, f)?;
 				if let Err(e) = res {
 					return Ok(Err(e));
 				}

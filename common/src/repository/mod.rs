@@ -24,7 +24,7 @@
 pub mod remote;
 
 use crate::{
-	package::{self, Package},
+	package::{self, DependencyType, Package},
 	util::current_arch,
 	version::{Version, VersionConstraint},
 };
@@ -250,10 +250,12 @@ pub fn get_package_with_constraint<'a>(
 /// Arguments:
 /// - `packages` is top level packages to resolve dependencies for.
 /// - `repos` is repositories to search packages into.
+/// - `dep_type` is the type of dependencies to resolve. `BuildAndRun` resolves everything.
 /// - `arch` is the architecture to use.
 pub fn get_recursive_dependencies<'r>(
 	packages: &PackagesWithRepositoryMap<'r>,
 	repos: &'r [Repository],
+	dep_type: DependencyType,
 	arch: &str,
 ) -> Result<PackagesWithRepositoryMap<'r>> {
 	let mut failed = false;
@@ -264,6 +266,7 @@ pub fn get_recursive_dependencies<'r>(
 	for package in packages.keys() {
 		let res = package.resolve_dependencies(
 			&mut total_packages,
+			dep_type.clone(),
 			&mut |name, version_constraint| {
 				// TODO yet another call for reading whole repo index
 				let res = get_package_with_constraint(repos, arch, name, Some(version_constraint));

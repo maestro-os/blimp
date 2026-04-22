@@ -22,7 +22,7 @@ use crate::confirm;
 use common::{
 	anyhow::{bail, Result},
 	maestro_utils::util::ByteSize,
-	package::Package,
+	package::{DependencyType, Package},
 	repository::{
 		self, get_recursive_dependencies, PackagesWithRepositoryMap, PackagesWithRepositoryVec,
 		Repository,
@@ -115,7 +115,8 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 	let packages = packages_to_install(names, &repos, env)?;
 
 	println!("Resolving dependencies...");
-	let total_packages = get_recursive_dependencies(&packages, &repos, env.arch())?;
+	let total_packages =
+		get_recursive_dependencies(&packages, &repos, DependencyType::Run, env.arch())?;
 	let mut total_packages: Vec<_> = total_packages.into_iter().collect();
 	total_packages.sort_unstable_by(|(p0, _), (p1, _)| p0.name.cmp(&p1.name));
 
