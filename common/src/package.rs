@@ -116,7 +116,7 @@ impl Default for DependencyType {
 #[derive(Clone, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Dependency {
 	/// The type of the dependency
-	#[serde(rename = "type")]
+	#[serde(rename = "type", default = "DependencyType::default")]
 	pub dep_type: DependencyType,
 	/// The dependency's name.
 	pub name: String,
