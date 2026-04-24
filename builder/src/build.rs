@@ -25,8 +25,7 @@ use common::{
 	maestro_utils::{fhs, user::get_euid},
 	package::{DependencyType, Package},
 	repository::{
-		get_package_with_constraint, get_recursive_dependencies,
-		remote::{download_packages, Remote},
+		get_package_with_constraint, get_recursive_dependencies, remote::download_packages,
 		PackagesWithRepositoryMap, Repository,
 	},
 	tar, tokio,
@@ -88,14 +87,14 @@ async fn create_sysroot(sysroot: &Path, input_path: &Path, package: &Package) ->
 	)?;
 
 	let arch = current_arch();
-	let mut env = Environment::acquire(sysroot, arch)?.expect("unexpected environment lock");
-	// TODO don't hardcode it
-	let remote = Remote {
-		host: "pkg.maestro-os.org".to_owned(),
-	};
-	remote.fetch_index(&env).await?;
-	Remote::save_list(&env, [remote].into_iter())?;
-	let repos = env.list_repositories()?;
+	let host_env =
+		Environment::acquire(Path::new("/"), arch)?.expect("unexpected environment lock");
+	let repos = host_env.list_repositories()?;
+	for r in &repos {
+		if let Some(remote) = r.get_remote() {
+			remote.fetch_index(&host_env).await?;
+		}
+	}
 	let pkgs: PackagesWithRepositoryMap = package
 		.deps
 		.iter()
@@ -108,8 +107,11 @@ async fn create_sysroot(sysroot: &Path, input_path: &Path, package: &Package) ->
 	let deps = get_recursive_dependencies(&pkgs, &repos, DependencyType::Build, arch)?
 		.into_iter()
 		.collect();
-	download_packages(&deps, &env).await?;
-	env.install_packages(&deps)?;
+	download_packages(&deps, arch).await?;
+	drop(host_env);
+	let mut target_env =
+		Environment::acquire(sysroot, arch)?.expect("unexpected environment lock");
+	target_env.install_packages(&deps)?;
 	Ok(())
 }
 

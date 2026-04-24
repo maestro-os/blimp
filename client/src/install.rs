@@ -75,22 +75,22 @@ fn packages_to_install<'r>(
 ///
 /// Arguments:
 /// - `total_packages` is the whole list of packages to install
-/// - `env` is the environment to install on
+/// - `arch` is the environment's architecture
 #[cfg(feature = "network")]
 async fn print_download_size<'r>(
 	total_packages: &PackagesWithRepositoryVec<'r>,
-	env: &Environment,
+	arch: &str,
 ) -> Result<()> {
 	let mut total_size = 0;
 	for (pkg, repo) in total_packages {
 		let name = &pkg.name;
 		let version = &pkg.version;
-		match repo.get_package(env.arch(), name, version)? {
+		match repo.get_package(arch, name, version)? {
 			Some(_) => println!("\t- {name} {version} - cached"),
 			None => {
 				// Get package size from remote
 				let remote = repo.get_remote().unwrap();
-				let size = remote.get_size(env, pkg).await?;
+				let size = remote.get_size(arch, pkg).await?;
 				total_size += size;
 				println!("\t- {name} {version} (download size: {})", ByteSize(size));
 			}
@@ -122,7 +122,7 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 
 	println!("Packages to be installed:");
 	#[cfg(feature = "network")]
-	print_download_size(&total_packages, env).await?;
+	print_download_size(&total_packages, env.arch()).await?;
 	#[cfg(not(feature = "network"))]
 	{
 		for pkg in total_packages.keys() {
@@ -138,7 +138,7 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 		use common::repository::remote::download_packages;
 
 		println!("Downloading packages...");
-		download_packages(&total_packages, env).await?;
+		download_packages(&total_packages, env.arch()).await?;
 	}
 	println!();
 	println!("Installing packages...");

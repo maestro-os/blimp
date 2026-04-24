@@ -118,8 +118,7 @@ impl Repository {
 
 	/// Tells whether the **archive** of a package is present in the repository.
 	pub fn is_in_cache(&self, arch: &str, name: &str, version: &Version) -> bool {
-		self.get_metadata_path(arch, name, version).exists()
-			&& self.get_archive_path(arch, name, version).exists()
+		self.get_archive_path(arch, name, version).exists()
 	}
 
 	/// Returns a package in the repository
