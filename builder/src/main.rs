@@ -153,6 +153,14 @@ fn build(args: BuildArgs) -> Result<()> {
 		.block_on(async {
 			let build_process =
 				BuildProcess::new(args.from, pkg_path, &args.work_dir, args.chroot).await?;
+			if args.debug {
+				eprintln!(
+					"[DEBUG] Build directory path: {}; Install path: {}; Sysroot: {}",
+					build_process.build_dir.display(),
+					build_process.install_path.display(),
+					build_process.sysroot.display()
+				);
+			}
 			build_process.fetch_sources().await?;
 			Ok::<_, anyhow::Error>(build_process)
 		})
@@ -175,13 +183,7 @@ fn build(args: BuildArgs) -> Result<()> {
 			.create_archive(&repo, arch)
 			.map_err(|e| anyhow!("failed to create package archive: {e}"))?;
 	}
-	if args.debug {
-		eprintln!(
-			"[DEBUG] Build directory path: {}; Install path: {}",
-			build_process.get_build_dir().display(),
-			build_process.get_install_path().display()
-		);
-	} else {
+	if !args.debug {
 		println!("[INFO] Cleaning up...");
 		build_process.cleanup(args.package)?;
 	}

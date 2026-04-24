@@ -3,7 +3,7 @@
 set -e
 cd *
 
-# TODO use `sources` in `package.json`
+# TODO use `source` in `metadata.toml`
 ./contrib/download_prerequisites
 
 mkdir build
@@ -28,7 +28,7 @@ cd build
 	--disable-threads \
 	--disable-vtv
 
-mkdir -p "$INSTALL_PATH/usr/include"
+mkdir -p "$SYSROOT/usr/include"
 
 make -j$JOBS all-gcc
 make install-gcc

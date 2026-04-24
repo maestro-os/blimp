@@ -63,30 +63,23 @@ pub struct BuildProcess {
 	build_desc: BuildDescriptor,
 
 	/// The path to the build directory.
-	build_dir: PathBuf,
+	pub(crate) build_dir: PathBuf,
 	/// The path to the directory in which the package is installed.
-	install_path: PathBuf,
+	pub(crate) install_path: PathBuf,
 	/// The path to the system root.
-	sysroot: PathBuf,
+	pub(crate) sysroot: PathBuf,
 	/// Building in chroot environment?
 	chroot: bool,
 }
 
-/// Creates the chroot environment for building the package.
+/// Creates a sysroot for building the package, with its dependencies installed.
 ///
 /// Arguments:
-/// - `work_dir` is the directory where build directories are located
+/// - `sysroot` the path to the system root
 /// - `input_path` is the path to the directory containing information to build the package
 /// - `package` is the package to build
-///
-/// Returns: the path to the system root.
-async fn create_chroot_environment(
-	work_dir: &Path,
-	input_path: &Path,
-	package: &Package,
-) -> Result<PathBuf> {
-	let sysroot = create_tmp_dir(work_dir)?;
-	if let Err(e) = fhs::create_dirs(&sysroot, false) {
+async fn create_sysroot(sysroot: &Path, input_path: &Path, package: &Package) -> Result<()> {
+	if let Err(e) = fhs::create_dirs(sysroot, false) {
 		bail!("FHS creation failed: {e}");
 	}
 	fs::copy(
@@ -95,7 +88,7 @@ async fn create_chroot_environment(
 	)?;
 
 	let arch = current_arch();
-	let mut env = Environment::acquire(&sysroot, arch)?.expect("unexpected environment lock");
+	let mut env = Environment::acquire(sysroot, arch)?.expect("unexpected environment lock");
 	// TODO don't hardcode it
 	let remote = Remote {
 		host: "pkg.maestro-os.org".to_owned(),
@@ -117,8 +110,7 @@ async fn create_chroot_environment(
 		.collect();
 	download_packages(&deps, &env).await?;
 	env.install_packages(&deps)?;
-
-	Ok(sysroot)
+	Ok(())
 }
 
 impl BuildProcess {
@@ -144,9 +136,9 @@ impl BuildProcess {
 		let build_desc = toml::from_str::<BuildDescriptor>(&build_desc)?;
 		build_desc.package.validate()?;
 
+		let sysroot_exists = install_path.is_some();
 		let (build_dir, install_path, sysroot) = if chroot {
-			let sysroot =
-				create_chroot_environment(work_dir, &input_path, &build_desc.package).await?;
+			let sysroot = create_tmp_dir(work_dir)?;
 			let pkg_dir_name =
 				format!("{}-{}", build_desc.package.name, build_desc.package.version);
 			let build_dir = sysroot.join("usr/src").join(&pkg_dir_name);
@@ -164,6 +156,9 @@ impl BuildProcess {
 					.unwrap_or_else(|| create_tmp_dir(work_dir))?,
 			)
 		};
+		if !sysroot_exists {
+			create_sysroot(&sysroot, &input_path, &build_desc.package).await?;
+		}
 
 		Ok(Self {
 			input_path,
@@ -173,16 +168,6 @@ impl BuildProcess {
 			sysroot,
 			chroot,
 		})
-	}
-
-	/// Returns the path to the build directory.
-	pub fn get_build_dir(&self) -> &Path {
-		&self.build_dir
-	}
-
-	/// Returns the path at which the package is "installed".
-	pub fn get_install_path(&self) -> &Path {
-		&self.install_path
 	}
 
 	/// Fetches resources required to build the package.
