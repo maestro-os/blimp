@@ -3,7 +3,6 @@
 set -e
 cd *
 
-# TODO use `source` in `metadata.toml`
 ./contrib/download_prerequisites
 
 mkdir build

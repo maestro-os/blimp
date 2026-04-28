@@ -9,5 +9,5 @@ url = "https://musl.libc.org/releases/musl-1.2.5.tar.gz"
 
 [[package.dep]]
 type = "build"
-name = "bootstrap-gcc1"
+name = "bootstrap-gcc"
 version = "*"
