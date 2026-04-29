@@ -11,6 +11,22 @@ jobs:
       - name: Check formatting
         run: cargo fmt -- --check
 
+  sonarcloud:
+    permissions:
+      pull-requests: read # to decorate PRs with analysis results
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+      - name: Analyze with SonarCloud
+        uses: SonarSource/sonarcloud-github-action@4006f663ecaf1f8093e8e4abb9227f6041f52216 # v2.2.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args:
+            -Dsonar.projectKey=maestro-os_blimp
+            -Dsonar.organization=maestro-os
+
   build-debug:
     permissions:
       contents: read
