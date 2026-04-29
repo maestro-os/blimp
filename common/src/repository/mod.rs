@@ -24,7 +24,7 @@
 pub mod remote;
 
 use crate::{
-	package::{self, Package},
+	package::{self, DependencyType, Package},
 	util::current_arch,
 	version::{Version, VersionConstraint},
 };
@@ -37,6 +37,12 @@ use std::{
 	fs,
 	path::{Path, PathBuf},
 };
+
+/// Map of packages with their respective repository
+pub type PackagesWithRepositoryMap<'r> = HashMap<Package, &'r Repository>;
+
+/// List of packages with their respective repository
+pub type PackagesWithRepositoryVec<'r> = Vec<(Package, &'r Repository)>;
 
 /// Packages for an architecture in an index
 #[derive(Default, Deserialize, Serialize)]
@@ -112,8 +118,7 @@ impl Repository {
 
 	/// Tells whether the **archive** of a package is present in the repository.
 	pub fn is_in_cache(&self, arch: &str, name: &str, version: &Version) -> bool {
-		self.get_metadata_path(arch, name, version).exists()
-			&& self.get_archive_path(arch, name, version).exists()
+		self.get_archive_path(arch, name, version).exists()
 	}
 
 	/// Returns a package in the repository
@@ -237,4 +242,57 @@ pub fn get_package_with_constraint<'a>(
 			}
 		})
 		.max_by(|(_, p0), (_, p1)| p0.version.cmp(&p1.version)))
+}
+
+/// Appends recursive dependencies to given packages.
+///
+/// Arguments:
+/// - `packages` is top level packages to resolve dependencies for.
+/// - `repos` is repositories to search packages into.
+/// - `dep_type` is the type of dependencies to resolve. `BuildAndRun` resolves everything.
+/// - `arch` is the architecture to use.
+pub fn get_recursive_dependencies<'r>(
+	packages: &PackagesWithRepositoryMap<'r>,
+	repos: &'r [Repository],
+	dep_type: DependencyType,
+	arch: &str,
+) -> Result<PackagesWithRepositoryMap<'r>> {
+	let mut failed = false;
+	// The list of all packages, dependencies included
+	let mut total_packages = packages.clone();
+	// TODO check dependencies for all packages at once to avoid duplicate errors
+	// Resolving dependencies
+	for package in packages.keys() {
+		let res = package.resolve_dependencies(
+			&mut total_packages,
+			dep_type.clone(),
+			&mut |name, version_constraint| {
+				// TODO yet another call for reading whole repo index
+				let res = get_package_with_constraint(repos, arch, name, Some(version_constraint));
+				let pkg = match res {
+					Ok(p) => p,
+					Err(e) => {
+						eprintln!("error: {e}");
+						return None;
+					}
+				};
+				match pkg {
+					Some((repo, pkg)) => Some((pkg, repo)),
+					// If not present, check on remote
+					None => todo!(),
+				}
+			},
+		)?;
+		if let Err(errs) = res {
+			for e in errs {
+				eprintln!("{e}");
+			}
+			failed = true;
+		}
+	}
+	if failed {
+		// TODO better exception handling
+		bail!("installation failed");
+	}
+	Ok(total_packages)
 }

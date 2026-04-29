@@ -1,0 +1,23 @@
+[package]
+name = "bootstrap-gcc-libgcc"
+version = "15.2.0"
+description = "Rebuilds stage 1 libgcc with shared support, now that musl is available"
+
+[[source]]
+location = "/"
+url = "https://ftp.gnu.org/gnu/gcc/gcc-15.2.0/gcc-15.2.0.tar.gz"
+
+[[package.dep]]
+type = "build"
+name = "bootstrap-binutils"
+version = "*"
+
+[[package.dep]]
+type = "build"
+name = "bootstrap-gcc"
+version = "*"
+
+[[package.dep]]
+type = "build"
+name = "bootstrap-musl"
+version = "*"

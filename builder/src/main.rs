@@ -30,7 +30,7 @@ use crate::{
 };
 use clap::{Args, Parser, Subcommand};
 use common::{
-	anyhow::{anyhow, bail, Result},
+	anyhow::{self, anyhow, bail, Result},
 	repository::{Index, IndexArch, Repository},
 	tokio::runtime::Runtime,
 };
@@ -83,6 +83,9 @@ struct BuildArgs {
 	/// compilers)
 	#[arg(long)]
 	target: Option<String>,
+	/// Build in a chroot environment
+	#[arg(long)]
+	chroot: bool,
 
 	/// If set, build files are kept for troubleshooting purpose
 	#[arg(long)]
@@ -144,10 +147,23 @@ fn build(args: BuildArgs) -> Result<()> {
 	fs::create_dir_all(&args.to)
 		.map_err(|e| anyhow!("failed to create destination directory: {e}"))?;
 	println!("[INFO] Jobs: {jobs}; Build: {build}; Host: {host}; Target: {target}");
-	let sysroot = (!args.package).then(|| args.to.clone());
-	let build_process = BuildProcess::new(args.from, sysroot, &args.work_dir)?;
+	let pkg_path = (!args.package).then(|| args.to.clone());
 	let rt = Runtime::new()?;
-	rt.block_on(build_process.fetch_sources())
+	let build_process = rt
+		.block_on(async {
+			let build_process =
+				BuildProcess::new(args.from, pkg_path, &args.work_dir, args.chroot).await?;
+			if args.debug {
+				eprintln!(
+					"[DEBUG] Build directory path: {}; Install path: {}; Sysroot: {}",
+					build_process.build_dir.display(),
+					build_process.install_path.display(),
+					build_process.sysroot.display()
+				);
+			}
+			build_process.fetch_sources().await?;
+			Ok::<_, anyhow::Error>(build_process)
+		})
 		.map_err(|e| anyhow!("cannot fetch sources: {e}"))?;
 	println!("[INFO] Compilation...");
 	let success = build_process
@@ -167,13 +183,7 @@ fn build(args: BuildArgs) -> Result<()> {
 			.create_archive(&repo, arch)
 			.map_err(|e| anyhow!("failed to create package archive: {e}"))?;
 	}
-	if args.debug {
-		eprintln!(
-			"[DEBUG] Build directory path: {}; Fake sysroot path: {}",
-			build_process.get_build_dir().display(),
-			build_process.get_sysroot().display()
-		);
-	} else {
+	if !args.debug {
 		println!("[INFO] Cleaning up...");
 		build_process.cleanup(args.package)?;
 	}

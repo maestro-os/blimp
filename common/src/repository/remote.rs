@@ -20,7 +20,7 @@
 
 use crate::{
 	package::Package,
-	repository::{Index, Repository},
+	repository::{Index, PackagesWithRepositoryVec, Repository},
 	Environment, REMOTES, REMOTES_LIST, USER_AGENT,
 };
 use anyhow::{anyhow, bail, Result};
@@ -141,22 +141,79 @@ impl Remote {
 	}
 
 	/// Returns the download URL for the given `package`.
-	pub fn download_url(&self, env: &Environment, package: &Package) -> String {
+	pub fn download_url(&self, arch: &str, package: &Package) -> String {
 		format!(
 			"https://{}/dist/{}/{}_{}.tar.gz",
-			self.host, env.arch, package.name, package.version
+			self.host, arch, package.name, package.version
 		)
 	}
 
 	/// Returns the download size of the package `package` in bytes.
-	pub async fn get_size(&self, env: &Environment, package: &Package) -> Result<u64> {
+	pub async fn get_size(&self, arch: &str, package: &Package) -> Result<u64> {
 		let client = reqwest::Client::new();
 		client
-			.head(self.download_url(env, package))
+			.head(self.download_url(arch, package))
 			.header("User-Agent", USER_AGENT)
 			.send()
 			.await?
 			.content_length()
 			.ok_or_else(|| anyhow!("Content-Length field not present in response"))
 	}
+}
+
+/// Download packages and print in case of cache or failure.
+///
+/// Arguments:
+/// - `total_packages` is the whole list of packages to install
+/// - `arch` is the environment to install on
+pub async fn download_packages<'r>(
+	total_packages: &PackagesWithRepositoryVec<'r>,
+	arch: &str,
+) -> Result<()> {
+	let mut failed = false;
+	let mut futures = Vec::new();
+	// TODO download biggest packages first (sort_unstable by decreasing size)
+	for (pkg, repo) in total_packages {
+		if repo.is_in_cache(arch, &pkg.name, &pkg.version) {
+			println!("`{}` is in cache.", &pkg.name);
+			continue;
+		}
+		if let Some(remote) = repo.get_remote() {
+			// TODO limit the number of packages downloaded concurrently
+			futures.push((
+				&pkg.name,
+				&pkg.version,
+				// TODO spawn task
+				async {
+					use crate::download::DownloadTask;
+					use std::fs::File;
+
+					let path = repo.get_archive_path(arch, &pkg.name, &pkg.version);
+					// Ensure the parent directory exists
+					if let Some(parent) = path.parent() {
+						fs::create_dir_all(parent)?;
+					}
+					// Download
+					let file = File::create(path)?;
+					let url = remote.download_url(arch, pkg);
+					let mut task = DownloadTask::new(&url, &file).await?;
+					while task.next().await? > 0 {}
+					Ok::<(), anyhow::Error>(())
+				},
+			));
+		}
+	}
+	for (name, version, f) in futures {
+		match f.await {
+			Ok(()) => continue,
+			Err(error) => {
+				eprintln!("Failed to download `{name}` version `{version}`: {error}");
+				failed = true;
+			}
+		}
+	}
+	if failed {
+		bail!("installation failed");
+	}
+	Ok(())
 }

@@ -1,0 +1,28 @@
+#!/bin/bash
+
+set -e
+cd *
+
+./contrib/download_prerequisites
+
+mkdir build
+cd build
+
+../configure \
+	--prefix="$INSTALL_PATH/tools" \
+	--target="$TARGET" \
+	--with-sysroot="$SYSROOT" \
+	--enable-languages=c,c++ \
+	--disable-libatomic \
+	--disable-libgomp \
+	--disable-libquadmath \
+	--disable-libsanitizer \
+	--disable-libssp \
+	--disable-multilib \
+	--disable-nls \
+	--disable-vtv
+
+make -j$JOBS all-gcc
+make install-gcc
+make -j$JOBS all-target-libgcc
+make install-target-libgcc

@@ -7,6 +7,7 @@ description = "musl for bootstrapping"
 location = "/"
 url = "https://musl.libc.org/releases/musl-1.2.5.tar.gz"
 
-[[package.build_dep]]
-name = "bootstrap-gcc1"
+[[package.dep]]
+type = "build"
+name = "bootstrap-gcc"
 version = "*"

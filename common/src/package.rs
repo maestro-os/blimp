@@ -28,8 +28,8 @@ use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use std::{
 	collections::HashMap,
-	fmt, fs, io,
-	io::ErrorKind,
+	fmt, fs,
+	io::{self, ErrorKind},
 	path::{Path, PathBuf},
 };
 
@@ -95,9 +95,29 @@ impl fmt::Display for ResolveError {
 	}
 }
 
+/// The type of dependency.
+#[derive(Clone, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub enum DependencyType {
+	#[serde(rename = "build")]
+	Build,
+	#[serde(rename = "run")]
+	Run,
+	#[serde(rename = "build-and-run")]
+	BuildAndRun,
+}
+
+impl Default for DependencyType {
+	fn default() -> Self {
+		Self::Run
+	}
+}
+
 /// A package dependency.
 #[derive(Clone, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Dependency {
+	/// The type of the dependency
+	#[serde(rename = "type", default = "DependencyType::default")]
+	pub dep_type: DependencyType,
 	/// The dependency's name.
 	pub name: String,
 	/// The dependency's version constraints.
@@ -123,12 +143,9 @@ pub struct Package {
 	/// The package's description
 	pub description: String,
 
-	/// Dependencies required to build the package
-	#[serde(default, skip_serializing_if = "Vec::is_empty")]
-	pub build_dep: Vec<Dependency>,
-	/// Dependencies required to run the package
-	#[serde(default, skip_serializing_if = "Vec::is_empty")]
-	pub run_dep: Vec<Dependency>,
+	/// Dependencies required to build/run the package
+	#[serde(default, skip_serializing_if = "Vec::is_empty", rename = "dep")]
+	pub deps: Vec<Dependency>,
 }
 
 impl Package {
@@ -148,12 +165,7 @@ impl Package {
 		if !is_valid_name(&self.name) {
 			bail!("invalid package name: {}", self.name);
 		}
-		for d in &self.build_dep {
-			if !is_valid_name(&d.name) {
-				bail!("invalid dependency name: {}", d.name);
-			}
-		}
-		for d in &self.run_dep {
+		for d in &self.deps {
 			if !is_valid_name(&d.name) {
 				bail!("invalid dependency name: {}", d.name);
 			}
@@ -165,6 +177,7 @@ impl Package {
 	///
 	/// Arguments:
 	/// - `packages` is the `HashMap` which associates packages with their respective repository.
+	/// - `dep_type` is the type of dependencies to resolve. `BuildAndRun` resolves everything.
 	/// - `f` is a function used to get a package from its name and version.
 	///
 	/// The function makes use of packages that are already in the `HashMap` and those which are
@@ -174,6 +187,7 @@ impl Package {
 	pub fn resolve_dependencies<'r, F>(
 		&self,
 		packages: &mut HashMap<Self, &'r Repository>,
+		dep_type: DependencyType,
 		f: &mut F,
 	) -> io::Result<Result<(), Vec<ResolveError>>>
 	where
@@ -181,8 +195,16 @@ impl Package {
 	{
 		let mut errors = vec![];
 
-		// TODO Add support for build dependencies
-		for d in &self.run_dep {
+		for d in &self.deps {
+			// if filter by build & run, get all deps
+			if dep_type != DependencyType::BuildAndRun
+			    // if dep is build & run, we need it anyway
+				&& d.dep_type != DependencyType::BuildAndRun
+				// apply filter
+				&& d.dep_type != dep_type
+			{
+				continue;
+			}
 			// TODO check already installed packages
 			// Get package in the installation list
 			let pkg = packages.keys().find(|p| p.name == d.name);
@@ -191,7 +213,6 @@ impl Package {
 				if !d.version_constraint.is_valid(&pkg.version) {
 					errors.push(ResolveError::VersionConflict {
 						name: d.name.clone(),
-
 						required_version: d.version_constraint.clone(),
 						other_version: pkg.version.clone(),
 					});
@@ -204,7 +225,9 @@ impl Package {
 			if let Some((p, repo)) = f(&d.name, &d.version_constraint) {
 				// TODO Check for dependency cycles
 				// FIXME Possible stack overflow
-				let res = p.resolve_dependencies(packages, f)?;
+				// At this point, we should only need run dependencies, as we are past the build
+				// step.
+				let res = p.resolve_dependencies(packages, DependencyType::Run, f)?;
 				if let Err(e) = res {
 					return Ok(Err(e));
 				}
@@ -243,12 +266,14 @@ pub fn list_unmatched_dependencies(
 	pkgs.iter()
 		.flat_map(|(_, pkg)| {
 			pkg.desc
-				.run_dep
+				.deps
 				.iter()
 				.filter(|dep| {
-					pkgs.get(&dep.name)
-						.map(|p| dep.version_constraint.is_valid(&p.desc.version))
-						.unwrap_or(false)
+					dep.dep_type != DependencyType::Build
+						&& pkgs
+							.get(&dep.name)
+							.map(|p| dep.version_constraint.is_valid(&p.desc.version))
+							.unwrap_or(false)
 				})
 				.map(move |dep| (pkg, dep))
 		})

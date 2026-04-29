@@ -34,16 +34,16 @@ pub mod util;
 pub mod version;
 
 use crate::{
-	repository::{remote::Remote, Repository},
-	util::current_arch,
+	repository::{remote::Remote, PackagesWithRepositoryVec, Repository},
 	version::Version,
 };
-use anyhow::Result;
+use anyhow::{bail, Result};
 use package::{InstalledPackage, Package};
 use std::{
+	env,
 	error::Error,
-	fs, io,
-	io::ErrorKind,
+	fs,
+	io::{self, ErrorKind},
 	path::{Path, PathBuf},
 };
 
@@ -78,24 +78,26 @@ impl Environment {
 	/// Tries to lock the environment at `sysroot` so that no other instance can access it at the
 	/// same time.
 	///
+	/// Note: the function gets the list of local repositories from the `LOCAL_REPO` environment
+	/// variable, if set. The variable should contain a colon-separated list of paths to local
+	/// repositories.
+	///
 	/// Arguments:
 	/// - `sysroot` is the root directory of the system to lock
-	/// - `local_repos` is the list of local repositories, if any
-	/// - `arch` is the architecture to use. Defaults to the current
+	/// - `arch` is the architecture to use
 	///
 	/// If the environment is already locked, the function returns `None`.
-	pub fn acquire(
-		sysroot: &Path,
-		local_repos: Vec<PathBuf>,
-		arch: Option<String>,
-	) -> io::Result<Option<Self>> {
+	pub fn acquire(sysroot: &Path, arch: &str) -> io::Result<Option<Self>> {
 		let sysroot = sysroot.canonicalize()?;
 		let path = sysroot.join(LOCK_PATH);
 		let acquired = lock::lock(&path)?;
+		let local_repos = env::var("LOCAL_REPO") // TODO var_os
+			.map(|s| s.split(':').map(PathBuf::from).collect())
+			.unwrap_or_default();
 		Ok(acquired.then(|| Self {
 			sysroot,
 			local_repos,
-			arch: arch.unwrap_or_else(|| current_arch().to_owned()),
+			arch: arch.to_owned(),
 		}))
 	}
 
@@ -172,7 +174,7 @@ impl Environment {
 	///
 	/// The function does not resolve dependencies. It is the caller's responsibility to install
 	/// them beforehand.
-	pub fn install(&self, pkg: &Package, archive_path: &Path) -> Result<(), Box<dyn Error>> {
+	pub fn install(&mut self, pkg: &Package, archive_path: &Path) -> Result<(), Box<dyn Error>> {
 		// Read archive
 		let mut archive = util::read_package_archive(archive_path)?;
 		// TODO Get hooks (pre-install-hook and post-install-hook)
@@ -188,6 +190,12 @@ impl Environment {
 				continue;
 			};
 			let dst = self.sysroot.join(path);
+			// Skip directory entries whose target already exists. Required because the
+			// FHS layout pre-creates symlinks (e.g. `/lib` -> `/usr/lib`) that would
+			// otherwise collide with directory entries from the archive.
+			if e.header().entry_type().is_dir() && fs::symlink_metadata(&dst).is_ok() {
+				continue;
+			}
 			// Create parent directories
 			if let Some(parent) = dst.parent() {
 				fs::create_dir_all(parent)?;
@@ -204,12 +212,35 @@ impl Environment {
 		Ok(())
 	}
 
+	/// Install all packages into environment.
+	///
+	/// Arguments:
+	/// - `total_packages` is the whole list of packages to install
+	pub fn install_packages<'r>(
+		&mut self,
+		total_packages: &PackagesWithRepositoryVec<'r>,
+	) -> Result<()> {
+		let mut failed = false;
+		for (pkg, repo) in total_packages {
+			println!("Installing `{}`...", pkg.name);
+			let archive_path = repo.get_archive_path(self.arch(), &pkg.name, &pkg.version);
+			if let Err(e) = self.install(pkg, &archive_path) {
+				eprintln!("Failed to install `{}`: {e}", &pkg.name);
+				failed = true;
+			}
+		}
+		if failed {
+			bail!("installation failed");
+		}
+		Ok(())
+	}
+
 	/// Installs a new version of the package, removing the previous.
 	///
 	/// Arguments:
 	/// - `pkg` is the package to be updated
 	/// - `archive_path` is the path to the archive of the new version of the package
-	pub fn upgrade(&self, _pkg: &Package, archive_path: &Path) -> Result<()> {
+	pub fn upgrade(&mut self, _pkg: &Package, archive_path: &Path) -> Result<()> {
 		// Read archive
 		let _archive = util::read_package_archive(archive_path)?;
 		// TODO Get hooks (pre-update-hook and post-update-hook)
@@ -224,7 +255,7 @@ impl Environment {
 	///
 	/// This function does not check dependency breakage. It is the caller's responsibility to
 	/// ensure no other package depend on the package to be removed.
-	pub fn remove(&self, pkg: &InstalledPackage) -> Result<()> {
+	pub fn remove(&mut self, pkg: &InstalledPackage) -> Result<()> {
 		// TODO Get hooks (pre-remove-hook and post-remove-hook. Copy at installation?)
 		// TODO Execute pre-remove-hook
 		// Remove the package's files

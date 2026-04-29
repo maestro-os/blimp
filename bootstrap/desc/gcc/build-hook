@@ -3,14 +3,13 @@
 set -e
 cd *
 
-# TODO use `sources` in `package.json`
 ./contrib/download_prerequisites
 
 mkdir build
 cd build
 
 ../configure \
-	--prefix="$SYSROOT/tools" \
+	--prefix="$INSTALL_PATH/tools" \
 	--target="$TARGET" \
 	--with-sysroot="$SYSROOT" \
 	--with-newlib \
