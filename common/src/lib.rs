@@ -190,6 +190,12 @@ impl Environment {
 				continue;
 			};
 			let dst = self.sysroot.join(path);
+			// Skip directory entries whose target already exists. Required because the
+			// FHS layout pre-creates symlinks (e.g. `/lib` -> `/usr/lib`) that would
+			// otherwise collide with directory entries from the archive.
+			if e.header().entry_type().is_dir() && fs::symlink_metadata(&dst).is_ok() {
+				continue;
+			}
 			// Create parent directories
 			if let Some(parent) = dst.parent() {
 				fs::create_dir_all(parent)?;

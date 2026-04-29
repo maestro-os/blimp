@@ -33,9 +33,10 @@ use common::{
 	Environment,
 };
 use std::{
+	ffi::CString,
 	fs::{self, File},
 	io,
-	os::unix::{fs::chroot, process::CommandExt},
+	os::unix::{ffi::OsStrExt, fs::chroot, process::CommandExt},
 	path::{Path, PathBuf},
 	process::Command,
 	str,
@@ -46,6 +47,37 @@ use std::{
 fn get_build_hook_path(input_path: &Path) -> io::Result<PathBuf> {
 	let absolute_input = fs::canonicalize(input_path)?;
 	Ok(absolute_input.join("build-hook"))
+}
+
+/// Populates `sysroot/dev/` with the basic character device nodes that build hooks expect. Without
+/// these, redirections like `>/dev/null` create regular files that accumulate output and corrupt
+/// later reads.
+fn create_dev_nodes(sysroot: &Path) -> io::Result<()> {
+	let nodes: &[(&str, u32, u32)] = &[
+		("dev/null", 1, 3),
+		("dev/zero", 1, 5),
+		("dev/full", 1, 7),
+		("dev/random", 1, 8),
+		("dev/urandom", 1, 9),
+		("dev/tty", 5, 0),
+	];
+	for (rel, major, minor) in nodes {
+		let path = sysroot.join(rel);
+		match fs::remove_file(&path) {
+			Ok(_) => {}
+			Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+			Err(e) => return Err(e),
+		}
+		let cpath = CString::new(path.as_os_str().as_bytes())
+			.map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
+		let mode = libc::S_IFCHR | 0o666;
+		let dev = libc::makedev(*major, *minor);
+		let rc = unsafe { libc::mknod(cpath.as_ptr(), mode, dev) };
+		if rc != 0 {
+			return Err(io::Error::last_os_error());
+		}
+	}
+	Ok(())
 }
 
 /// A build process is the operation of converting source code into an installable package.
@@ -81,6 +113,7 @@ async fn create_sysroot(sysroot: &Path, input_path: &Path, package: &Package) ->
 	if let Err(e) = fhs::create_dirs(sysroot, false) {
 		bail!("FHS creation failed: {e}");
 	}
+	create_dev_nodes(sysroot)?;
 	fs::copy(
 		get_build_hook_path(input_path)?,
 		sysroot.join("bin/build-hook"),
@@ -129,7 +162,7 @@ impl BuildProcess {
 		work_dir: &Path,
 		chroot: bool,
 	) -> Result<Self> {
-		// TODO replace root user check by CAP_SYS_CHROOT when implemented in kernel
+		// TODO replace root user check by CAP_SYS_CHROOT and CAP_MKNOD when implemented in kernel
 		if chroot && get_euid() != 0 {
 			bail!("--chroot requires root privileges!");
 		}
@@ -205,6 +238,20 @@ impl BuildProcess {
 		} else {
 			get_build_hook_path(&self.input_path)?
 		};
+		// TODO refactor
+		// In chroot mode, paths exposed to the build hook must be relative to the
+		// chroot root
+		let (sysroot_env, install_path_env): (PathBuf, PathBuf) = if self.chroot {
+			let sysroot = PathBuf::from("/");
+			let install_path = Path::new("/").join(
+				self.install_path
+					.strip_prefix(&self.sysroot)
+					.unwrap_or(&self.install_path),
+			);
+			(sysroot, install_path)
+		} else {
+			(self.sysroot.clone(), self.install_path.clone())
+		};
 		let mut cmd = Command::new(hook_path);
 		if self.chroot {
 			let sysroot = self.sysroot.clone();
@@ -215,8 +262,8 @@ impl BuildProcess {
 		cmd.env("BUILD", build)
 			.env("HOST", host)
 			.env("TARGET", target)
-			.env("SYSROOT", &self.sysroot)
-			.env("INSTALL_PATH", &self.install_path)
+			.env("SYSROOT", &sysroot_env)
+			.env("INSTALL_PATH", &install_path_env)
 			.env("PKG_NAME", &self.build_desc.package.name)
 			.env("PKG_VERSION", self.build_desc.package.version.to_string())
 			.env("PKG_DESC", &self.build_desc.package.description)
