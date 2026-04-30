@@ -18,14 +18,26 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # required for SonarCloud blame and PR decoration
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2.75.26
+        with:
+          tool: cargo-llvm-cov
+
+      - name: Generate code coverage
+        run: cargo llvm-cov --workspace --all-features --lcov --output-path lcov.info
+
       - name: Analyze with SonarCloud
         uses: SonarSource/sonarcloud-github-action@4006f663ecaf1f8093e8e4abb9227f6041f52216 # v2.2.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
-          args:
+          args: >-
             -Dsonar.projectKey=maestro-os_blimp
             -Dsonar.organization=maestro-os
+            -Dsonar.rust.lcov.reportPaths=lcov.info
 
   build-debug:
     permissions:
