@@ -29,6 +29,12 @@ jobs:
       - name: Generate code coverage
         run: cargo llvm-cov --workspace --all-features --lcov --output-path lcov.info
 
+      - name: Fix LCOV paths for SonarCloud container
+        run: sed -i "s|$(pwd)|/github/workspace|g" lcov.info
+
+      - name: Generate Clippy report
+        run: cargo clippy --workspace --all-features --message-format=json 2>/dev/null > clippy-report.json || true
+
       - name: Analyze with SonarCloud
         uses: SonarSource/sonarcloud-github-action@4006f663ecaf1f8093e8e4abb9227f6041f52216 # v2.2.0
         env:
@@ -38,6 +44,7 @@ jobs:
             -Dsonar.projectKey=maestro-os_blimp
             -Dsonar.organization=maestro-os
             -Dsonar.rust.lcov.reportPaths=lcov.info
+            -Dsonar.rust.clippy.reportPaths=clippy-report.json
 
   build-debug:
     permissions:
