@@ -25,7 +25,7 @@ jobs:
           fetch-depth: 0 # required for SonarCloud blame and PR decoration
 
       - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@v2.75.26
+        uses: taiki-e/install-action@b651345a718c8f44efa2460560b3dbf29cbd7ee1 # v2.75.26
         with:
           tool: cargo-llvm-cov
 
