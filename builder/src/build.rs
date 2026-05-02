@@ -131,13 +131,14 @@ async fn create_sysroot(sysroot: &Path, input_path: &Path, package: &Package) ->
 	let pkgs: PackagesWithRepositoryMap = package
 		.deps
 		.iter()
+		.filter(|dep| dep.dep_type != DependencyType::Run)
 		.map(|dep| {
 			get_package_with_constraint(&repos, arch, &dep.name, Some(&dep.version_constraint))?
 				.map(|p| (p.1, p.0))
 				.ok_or_else(|| anyhow!("dependency `{}` not found in repositories", dep.name))
 		})
 		.collect::<Result<_>>()?;
-	let deps = get_recursive_dependencies(&pkgs, &repos, DependencyType::Build, arch)?
+	let deps = get_recursive_dependencies(&pkgs, &repos, DependencyType::Run, arch)?
 		.into_iter()
 		.collect();
 	download_packages(&deps, arch).await?;
