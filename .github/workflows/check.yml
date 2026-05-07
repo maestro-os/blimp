@@ -85,10 +85,10 @@ jobs:
             ${{ runner.os }}-
 
       - name: Build (offline-mode)
-        run: cargo build
+        run: cargo build --locked
 
       - name: Build (online-mode)
-        run: cargo build --features network
+        run: cargo build --locked --features network
 
       - name: Clippy (offline-mode)
         run: cargo clippy --all-targets -- -D warnings
@@ -121,10 +121,10 @@ jobs:
             ${{ runner.os }}-
 
       - name: Build (offline-mode)
-        run: cargo build --release
+        run: cargo build --locked --release
 
       - name: Build (online-mode)
-        run: cargo build --release --features network
+        run: cargo build --locked --release --features network
 
       - name: Build documentation
         run: cargo doc --all-features --no-deps
