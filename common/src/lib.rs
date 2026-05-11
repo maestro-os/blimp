@@ -27,6 +27,7 @@ pub use utils as maestro_utils;
 
 #[cfg(feature = "network")]
 pub mod download;
+pub mod fhs;
 pub mod lock;
 pub mod package;
 pub mod repository;
