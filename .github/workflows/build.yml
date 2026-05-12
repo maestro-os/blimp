@@ -20,19 +20,14 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-registry-
+          key: cargo-registry-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
 
       - &cache-debug
         name: Cache target/debug
         uses: actions/cache@v5
         with:
           path: target/debug
-          key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}-debug
-          restore-keys: |
-            ${{ runner.os }}-cargo-target-
-            ${{ runner.os }}-
+          key: cargo-target-debug-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Check formatting
         run: cargo fmt -- --check
@@ -68,10 +63,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: target/release
-          key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}-release
-          restore-keys: |
-            ${{ runner.os }}-cargo-target-
-            ${{ runner.os }}-
+          key: cargo-target-release-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build (offline-mode)
         run: cargo build --locked --release

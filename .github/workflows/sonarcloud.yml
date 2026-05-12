@@ -20,17 +20,13 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.cargo/bin/cargo-llvm-cov
-          key: ${{ runner.os }}-cargo-llvm-cov-0.8.5
+          key: cargo-llvm-cov-0.8.5-${{ runner.os }}
 
       - name: Cache target/llvm-cov-target
-        id: cache-llvm-cov-target
         uses: actions/cache@v5
         with:
           path: target/llvm-cov-target
-          key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}-llvm-cov
-          restore-keys: |
-            ${{ runner.os }}-cargo-target-
-            ${{ runner.os }}-
+          key: cargo-target-llvm-cov-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Install cargo-llvm-cov
         if: steps.cache-llvm-cov.outputs.cache-hit != 'true'
