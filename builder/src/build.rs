@@ -73,7 +73,7 @@ fn create_dev_nodes(sysroot: &Path) -> io::Result<()> {
 		let cpath = CString::new(path.as_os_str().as_bytes())
 			.map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
 		let mode = libc::S_IFCHR | 0o666;
-		let dev = libc::makedev(*major, *minor);
+		let dev = libc::makedev(*major as _, *minor as _);
 		let rc = unsafe { libc::mknod(cpath.as_ptr(), mode, dev) };
 		if rc != 0 {
 			return Err(io::Error::last_os_error());

@@ -9,11 +9,18 @@
 
 [![AGPL-3.0 license](https://img.shields.io/badge/license-AGPL--3.0-blue.svg?style=for-the-badge&logo=book)](./COPYING)
 ![Version](https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmaestro-os%2Fblimp%2Fmaster%2Fclient%2FCargo.toml&query=%24.package.version&style=for-the-badge&label=version)
-![Continuous integration](https://img.shields.io/github/actions/workflow/status/maestro-os/blimp/check.yml?style=for-the-badge&logo=github)
+![Continuous integration](https://img.shields.io/github/actions/workflow/status/maestro-os/blimp/build.yml?style=for-the-badge&logo=github)
+![Discord](https://img.shields.io/discord/971452040821760080?style=for-the-badge&link=https%3A%2F%2Fdiscord.gg%2F4JMBN3YPAk)
 
 # About
 
 Blimp is a simple package manager for Unix-like operating systems, more specifically for [Maestro](https://github.com/maestro-os/maestro).
+
+> [!IMPORTANT]
+> Blimp is currently in early development, and is not yet ready for production use. Expect breaking changes and instability.
+
+> [!CAUTION]
+> macOS is currently supported for development purposes only. Use with caution as your system integrity is not guaranteed.
 
 This repository contains the following components:
 - `blimp`: The package manager itself
@@ -81,7 +88,8 @@ The command builds the package according to the descriptor, then installs it in 
 
 The `--package` flag can be used to write the resulting package into an archive instead of installing it. In which case, the output directory is considered as a repository instead of a system root.
 
-> **Note**: the structure of package descriptors and output packages are not yet documented as they are unstable
+> [!NOTE]
+> The structure of package descriptors and output packages are not yet documented as they are unstable.
 
 ### Bootstrapping
 
