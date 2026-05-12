@@ -15,6 +15,12 @@
 
 Blimp is a simple package manager for Unix-like operating systems, more specifically for [Maestro](https://github.com/maestro-os/maestro).
 
+> [!IMPORTANT]
+> Blimp is currently in early development, and is not yet ready for production use. Expect breaking changes and instability.
+
+> [!CAUTION]
+> macOS is currently supported for development purposes only. Use with caution as your system integrity is not guaranteed.
+
 This repository contains the following components:
 - `blimp`: The package manager itself
 - `blimp-builder`: An utility to build packages
@@ -81,7 +87,8 @@ The command builds the package according to the descriptor, then installs it in 
 
 The `--package` flag can be used to write the resulting package into an archive instead of installing it. In which case, the output directory is considered as a repository instead of a system root.
 
-> **Note**: the structure of package descriptors and output packages are not yet documented as they are unstable
+> [!NOTE]
+> The structure of package descriptors and output packages are not yet documented as they are unstable.
 
 ### Bootstrapping
 
