@@ -19,14 +19,16 @@
 //! Implementation of the package building procedure.
 
 use crate::desc::BuildDescriptor;
+#[cfg(feature = "network")]
+use common::repository::remote::download_packages;
 use common::{
 	anyhow::{anyhow, bail, Result},
 	flate2::{write::GzEncoder, Compression},
 	maestro_utils::{fhs, user::get_euid},
 	package::{DependencyType, Package},
 	repository::{
-		get_package_with_constraint, get_recursive_dependencies, remote::download_packages,
-		PackagesWithRepositoryMap, Repository,
+		get_package_with_constraint, get_recursive_dependencies, PackagesWithRepositoryMap,
+		Repository,
 	},
 	tar, tokio,
 	util::{create_tmp_dir, current_arch},
@@ -123,11 +125,14 @@ async fn create_sysroot(sysroot: &Path, input_path: &Path, package: &Package) ->
 	let host_env =
 		Environment::acquire(Path::new("/"), arch)?.expect("unexpected environment lock");
 	let repos = host_env.list_repositories()?;
+
+	#[cfg(feature = "network")]
 	for r in &repos {
 		if let Some(remote) = r.get_remote() {
 			remote.fetch_index(&host_env).await?;
 		}
 	}
+
 	let pkgs: PackagesWithRepositoryMap = package
 		.deps
 		.iter()
@@ -141,7 +146,10 @@ async fn create_sysroot(sysroot: &Path, input_path: &Path, package: &Package) ->
 	let deps = get_recursive_dependencies(&pkgs, &repos, DependencyType::Run, arch)?
 		.into_iter()
 		.collect();
+
+	#[cfg(feature = "network")]
 	download_packages(&deps, arch).await?;
+
 	drop(host_env);
 	let mut target_env =
 		Environment::acquire(sysroot, arch)?.expect("unexpected environment lock");

@@ -19,14 +19,14 @@
 //! This module handles package installation.
 
 use crate::confirm;
+#[cfg(feature = "network")]
+use common::maestro_utils::util::ByteSize;
+#[cfg(feature = "network")]
+use common::repository::PackagesWithRepositoryVec;
 use common::{
 	anyhow::{bail, Result},
-	maestro_utils::util::ByteSize,
 	package::{DependencyType, Package},
-	repository::{
-		self, get_recursive_dependencies, PackagesWithRepositoryMap, PackagesWithRepositoryVec,
-		Repository,
-	},
+	repository::{self, get_recursive_dependencies, PackagesWithRepositoryMap, Repository},
 	Environment,
 };
 use std::collections::HashMap;
@@ -125,7 +125,7 @@ pub async fn install(names: &[String], env: &mut Environment) -> Result<()> {
 	print_download_size(&total_packages, env.arch()).await?;
 	#[cfg(not(feature = "network"))]
 	{
-		for pkg in total_packages.keys() {
+		for (pkg, _) in total_packages.iter() {
 			println!("\t- {} {} - cached", pkg.name, pkg.version);
 		}
 	}

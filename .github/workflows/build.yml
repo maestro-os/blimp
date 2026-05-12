@@ -1,0 +1,83 @@
+name: Build
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  build-debug:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    name: Build Debug & Checks
+    steps:
+      - uses: actions/checkout@v6
+
+      - &cache-registry
+        name: Cache cargo registry
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-registry-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - &cache-debug
+        name: Cache target/debug
+        uses: actions/cache@v5
+        with:
+          path: target/debug
+          key: cargo-target-debug-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Check formatting
+        run: cargo fmt -- --check
+
+      - name: Clippy (offline-mode)
+        run: cargo clippy --no-default-features --all-targets -- -D warnings
+
+      - name: Clippy (online-mode)
+        run: cargo clippy --features network --all-targets -- -D warnings
+
+      - name: Build (offline-mode)
+        run: cargo build --locked --no-default-features --all-targets
+
+      - name: Build (online-mode)
+        run: cargo build --locked --features network --all-targets
+
+      - name: Unit tests (offline-mode)
+        run: cargo test --no-default-features --all-targets
+
+      - name: Unit tests (online-mode)
+        run: cargo test --features network --all-targets
+
+  build-release:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    name: Build Release
+    steps:
+      - uses: actions/checkout@v6
+      - *cache-registry
+
+      - name: Cache target/release
+        uses: actions/cache@v5
+        with:
+          path: target/release
+          key: cargo-target-release-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build (offline-mode)
+        run: cargo build --locked --release --no-default-features --all-targets
+
+      - name: Build (online-mode)
+        run: cargo build --locked --release --features network --all-targets
+
+  build-doc:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    name: Build Documentation
+    steps:
+      - uses: actions/checkout@v6
+      - *cache-registry
+      - *cache-debug
+      - run: cargo doc --all-features --no-deps

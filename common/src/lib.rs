@@ -33,8 +33,10 @@ pub mod repository;
 pub mod util;
 pub mod version;
 
+#[cfg(feature = "network")]
+use crate::repository::remote::Remote;
 use crate::{
-	repository::{remote::Remote, PackagesWithRepositoryVec, Repository},
+	repository::{PackagesWithRepositoryVec, Repository},
 	version::Version,
 };
 use anyhow::{bail, Result};
@@ -51,9 +53,12 @@ use std::{
 const LOCK_PATH: &str = "var/lib/blimp/.lock";
 /// Directory storing information about installed packages
 const INSTALLED_DB: &str = "var/lib/blimp/installed";
+
 /// The file which contains the list of remotes
+#[cfg(feature = "network")]
 const REMOTES_LIST: &str = "var/lib/blimp/remotes-list";
 /// Directory containing remote repositories
+#[cfg(feature = "network")]
 const REMOTES: &str = "var/lib/blimp/remotes";
 
 /// The user agent for HTTP requests.
@@ -122,18 +127,23 @@ impl Environment {
 
 	/// List local & remote repositories
 	pub fn list_repositories(&self) -> Result<Vec<Repository>> {
-		let repos = self
+		#[allow(unused_mut)]
+		let mut repos = self
 			.local_repos()
 			.iter()
 			.cloned()
 			.map(Repository::local)
-			// Add remote repositories
-			.chain(
-				Remote::load_list(self)?
-					.iter()
-					.map(|r| r.load_repository(self).unwrap()),
-			) // TODO handle error
 			.collect::<Vec<_>>();
+
+		// Add remote repositories
+		// TODO handle error
+		#[cfg(feature = "network")]
+		repos.extend(
+			Remote::load_list(self)?
+				.iter()
+				.map(|r| r.load_repository(self).unwrap()),
+		);
+
 		Ok(repos)
 	}
 
