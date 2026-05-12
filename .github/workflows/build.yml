@@ -8,7 +8,10 @@ jobs:
   build-debug:
     permissions:
       contents: read
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     name: Build Debug & Checks
     steps:
       - uses: actions/checkout@v6
@@ -53,7 +56,10 @@ jobs:
   build-release:
     permissions:
       contents: read
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     name: Build Release
     steps:
       - uses: actions/checkout@v6
