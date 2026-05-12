@@ -45,16 +45,6 @@ use std::{
 	sync::Arc,
 };
 
-#[cfg(target_os = "linux")]
-fn makedev(major: u32, minor: u32) -> libc::dev_t {
-	libc::makedev(major, minor)
-}
-
-#[cfg(target_os = "macos")]
-fn makedev(major: u32, minor: u32) -> libc::dev_t {
-	libc::makedev(major as i32, minor as i32)
-}
-
 /// Get original build-hook file path
 fn get_build_hook_path(input_path: &Path) -> io::Result<PathBuf> {
 	let absolute_input = fs::canonicalize(input_path)?;
@@ -83,7 +73,7 @@ fn create_dev_nodes(sysroot: &Path) -> io::Result<()> {
 		let cpath = CString::new(path.as_os_str().as_bytes())
 			.map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
 		let mode = libc::S_IFCHR | 0o666;
-		let dev = makedev(*major, *minor);
+		let dev = libc::makedev(*major as _, *minor as _);
 		let rc = unsafe { libc::mknod(cpath.as_ptr(), mode, dev) };
 		if rc != 0 {
 			return Err(io::Error::last_os_error());
