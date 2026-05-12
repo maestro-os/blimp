@@ -5,15 +5,6 @@ on:
   pull_request:
 
 jobs:
-  format:
-    permissions:
-      contents: read
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - name: Check formatting
-        run: cargo fmt -- --check
-
   sonarcloud:
     permissions:
       pull-requests: read # to decorate PRs with analysis results
@@ -61,6 +52,7 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-latest
+    name: build-debug & checks
     steps:
       - uses: actions/checkout@v6
 
@@ -75,7 +67,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-registry-
 
-      - name: Cache target/debug
+      - &cache-debug
+        name: Cache target/debug
         uses: actions/cache@v5
         with:
           path: target/debug
@@ -84,17 +77,20 @@ jobs:
             ${{ runner.os }}-cargo-target-
             ${{ runner.os }}-
 
-      - name: Build (offline-mode)
-        run: cargo build --locked
-
-      - name: Build (online-mode)
-        run: cargo build --locked --features network
+      - name: Check formatting
+        run: cargo fmt -- --check
 
       - name: Clippy (offline-mode)
         run: cargo clippy --all-targets -- -D warnings
 
       - name: Clippy (online-mode)
         run: cargo clippy --features network --all-targets -- -D warnings
+
+      - name: Build (offline-mode)
+        run: cargo build --locked
+
+      - name: Build (online-mode)
+        run: cargo build --locked --features network
 
       - name: Unit tests (offline-mode)
         run: cargo test
@@ -126,5 +122,13 @@ jobs:
       - name: Build (online-mode)
         run: cargo build --locked --release --features network
 
+  build-doc:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - *cache-registry
+      - *cache-debug
       - name: Build documentation
         run: cargo doc --all-features --no-deps
