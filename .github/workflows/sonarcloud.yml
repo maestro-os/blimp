@@ -1,0 +1,59 @@
+name: SonarCloud
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  analyze:
+    permissions:
+      pull-requests: read # to decorate PRs with analysis results
+    runs-on: ubuntu-latest
+    name: Analyze
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # required for SonarCloud blame and PR decoration
+
+      - name: Cache cargo-llvm-cov binary
+        id: cache-llvm-cov
+        uses: actions/cache@v5
+        with:
+          path: ~/.cargo/bin/cargo-llvm-cov
+          key: ${{ runner.os }}-cargo-llvm-cov-0.8.5
+
+      - name: Cache target/llvm-cov-target
+        id: cache-llvm-cov-target
+        uses: actions/cache@v5
+        with:
+          path: target/llvm-cov-target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}-llvm-cov
+          restore-keys: |
+            ${{ runner.os }}-cargo-target-
+            ${{ runner.os }}-
+
+      - name: Install cargo-llvm-cov
+        if: steps.cache-llvm-cov.outputs.cache-hit != 'true'
+        uses: taiki-e/install-action@b651345a718c8f44efa2460560b3dbf29cbd7ee1 # v2.75.26
+        with:
+          tool: cargo-llvm-cov@0.8.5
+
+      - name: Generate code coverage
+        run: cargo llvm-cov --workspace --all-features --lcov --output-path lcov.info
+
+      - name: Fix LCOV paths for SonarCloud container
+        run: sed -i "s|$(pwd)|/github/workspace|g" lcov.info
+
+      - name: Generate Clippy report
+        run: cargo clippy --workspace --all-features --message-format=json 2>/dev/null > clippy-report.json || true
+
+      - name: Analyze with SonarCloud
+        uses: SonarSource/sonarcloud-github-action@4006f663ecaf1f8093e8e4abb9227f6041f52216 # v2.2.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >-
+            -Dsonar.projectKey=maestro-os_blimp
+            -Dsonar.organization=maestro-os
+            -Dsonar.rust.lcov.reportPaths=lcov.info
+            -Dsonar.rust.clippy.reportPaths=clippy-report.json
