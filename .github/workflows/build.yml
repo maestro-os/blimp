@@ -33,19 +33,19 @@ jobs:
         run: cargo fmt -- --check
 
       - name: Clippy (offline-mode)
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --no-default-features --all-targets -- -D warnings
 
       - name: Clippy (online-mode)
         run: cargo clippy --features network --all-targets -- -D warnings
 
       - name: Build (offline-mode)
-        run: cargo build --locked
+        run: cargo build --locked --no-default-features --all-targets
 
       - name: Build (online-mode)
-        run: cargo build --locked --features network
+        run: cargo build --locked --features network --all-targets
 
       - name: Unit tests (offline-mode)
-        run: cargo test
+        run: cargo test --no-default-features --all-targets
 
       - name: Unit tests (online-mode)
         run: cargo test --features network --all-targets
@@ -66,10 +66,10 @@ jobs:
           key: cargo-target-release-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build (offline-mode)
-        run: cargo build --locked --release
+        run: cargo build --locked --release --no-default-features --all-targets
 
       - name: Build (online-mode)
-        run: cargo build --locked --release --features network
+        run: cargo build --locked --release --features network --all-targets
 
   build-doc:
     permissions:
