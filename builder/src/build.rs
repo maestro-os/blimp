@@ -24,7 +24,7 @@ use common::repository::remote::download_packages;
 use common::{
 	anyhow::{anyhow, bail, Result},
 	flate2::{write::GzEncoder, Compression},
-	maestro_utils::{fhs, user::get_euid},
+	maestro_utils::user::get_euid,
 	package::{DependencyType, Package},
 	repository::{
 		get_package_with_constraint, get_recursive_dependencies, PackagesWithRepositoryMap,
@@ -112,7 +112,7 @@ pub struct BuildProcess {
 /// - `input_path` is the path to the directory containing information to build the package
 /// - `package` is the package to build
 async fn create_sysroot(sysroot: &Path, input_path: &Path, package: &Package) -> Result<()> {
-	if let Err(e) = fhs::create_dirs(sysroot, false) {
+	if let Err(e) = common::fhs::create_dirs(sysroot, false) {
 		bail!("FHS creation failed: {e}");
 	}
 	create_dev_nodes(sysroot)?;
