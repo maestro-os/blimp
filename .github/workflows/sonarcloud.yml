@@ -20,7 +20,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.cargo/bin/cargo-llvm-cov
-          key: cargo-llvm-cov-0.8.5-${{ runner.os }}
+          key: cargo-llvm-cov-0.8.7-${{ runner.os }}
 
       - name: Cache target/llvm-cov-target
         uses: actions/cache@v5
@@ -30,9 +30,7 @@ jobs:
 
       - name: Install cargo-llvm-cov
         if: steps.cache-llvm-cov.outputs.cache-hit != 'true'
-        uses: taiki-e/install-action@b651345a718c8f44efa2460560b3dbf29cbd7ee1 # v2.75.26
-        with:
-          tool: cargo-llvm-cov@0.8.5
+        run: cargo +stable install cargo-llvm-cov@0.8.7
 
       - name: Generate code coverage
         run: cargo llvm-cov --workspace --all-features --lcov --output-path lcov.info
