@@ -241,7 +241,13 @@ pub fn get_package_with_constraint<'a>(
 				_ => None,
 			}
 		})
-		.max_by(|(_, p0), (_, p1)| p0.version.cmp(&p1.version)))
+		.reduce(|acc, cur| {
+			if cur.1.version > acc.1.version {
+				cur
+			} else {
+				acc
+			}
+		}))
 }
 
 /// Appends recursive dependencies to given packages.

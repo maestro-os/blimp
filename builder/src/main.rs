@@ -83,6 +83,10 @@ struct BuildArgs {
 	/// compilers)
 	#[arg(long)]
 	target: Option<String>,
+	/// System root to build against. Dependencies are installed into it.
+	/// If unset, a throwaway system root is created for each package.
+	#[arg(long)]
+	sysroot: Option<PathBuf>,
 	/// Build in a chroot environment
 	#[arg(long)]
 	chroot: bool,
@@ -151,8 +155,15 @@ fn build(args: BuildArgs) -> Result<()> {
 	let rt = Runtime::new()?;
 	let build_process = rt
 		.block_on(async {
-			let build_process =
-				BuildProcess::new(args.from, pkg_path, &args.work_dir, args.chroot).await?;
+			let build_process = BuildProcess::new(
+				args.from,
+				pkg_path,
+				&args.work_dir,
+				arch,
+				args.sysroot.clone(),
+				args.chroot,
+			)
+			.await?;
 			if args.debug {
 				eprintln!(
 					"[DEBUG] Build directory path: {}; Install path: {}; Sysroot: {}",

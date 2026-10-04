@@ -8,7 +8,12 @@ cd *
 mkdir build
 cd build
 
-../configure \
+# GCC 15's libcody assumes `u8""` literals are `char` arrays, which stopped
+# being true in C++20, so it fails to build under host compilers defaulting to
+# gnu++20 or later (GCC 16+). Drop `char8_t` rather than pinning the dialect:
+# libcody's configure demands `__cplusplus` be exactly 201103 and retries with
+# `-std=c++11`, which an explicit `-std=` here would override.
+CXXFLAGS="-g -O2 -fno-char8_t" ../configure \
 	--prefix="$INSTALL_PATH/tools" \
 	--target="$TARGET" \
 	--with-sysroot="$SYSROOT" \

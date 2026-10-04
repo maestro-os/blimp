@@ -71,7 +71,7 @@ impl Ord for Version {
 		let len = max(self.components.len(), other.components.len());
 		for i in 0..len {
 			let left = self.components.get(i).unwrap_or(&0);
-			let right = self.components.get(i).unwrap_or(&0);
+			let right = other.components.get(i).unwrap_or(&0);
 			let cmp = left.cmp(right);
 			if cmp != Ordering::Equal {
 				return cmp;

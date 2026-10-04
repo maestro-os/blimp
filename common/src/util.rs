@@ -22,11 +22,10 @@ use bzip2::read::BzDecoder;
 use flate2::read::GzDecoder;
 use rand::{distr::Alphanumeric, rng, RngExt};
 use std::{
-	fs,
-	fs::{File, OpenOptions},
-	io,
-	io::{Read, Seek, SeekFrom},
-	os::{unix, unix::fs::FileExt},
+	env,
+	fs::{self, File, OpenOptions},
+	io::{self, Read, Seek, SeekFrom},
+	os::unix::{self, fs::FileExt},
 	path::{Path, PathBuf},
 };
 use tar::Archive;
@@ -147,4 +146,12 @@ pub const fn current_arch() -> &'static str {
 	return "aarch64";
 	#[cfg(not(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64")))]
 	compile_error!("Unsupported architecture");
+}
+
+/// Returns blimp's cache directory.
+///
+/// If the `HOME` envrionment variable is not set, the function returns `None`.
+pub fn cache_dir() -> Option<PathBuf> {
+	let home = env::var_os("HOME")?;
+	Some(Path::new(&home).join(".cache/blimp"))
 }

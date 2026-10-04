@@ -31,7 +31,7 @@ use common::{
 		Repository,
 	},
 	tar, tokio,
-	util::{create_tmp_dir, current_arch},
+	util::{cache_dir, create_tmp_dir},
 	Environment,
 };
 use std::{
@@ -111,19 +111,28 @@ pub struct BuildProcess {
 /// - `sysroot` the path to the system root
 /// - `input_path` is the path to the directory containing information to build the package
 /// - `package` is the package to build
-async fn create_sysroot(sysroot: &Path, input_path: &Path, package: &Package) -> Result<()> {
+/// - `arch` is the architecture the package is built for
+/// - `chroot` for building in chroot environment
+async fn create_sysroot(
+	sysroot: &Path,
+	input_path: &Path,
+	package: &Package,
+	arch: &str,
+	chroot: bool,
+) -> Result<()> {
 	if let Err(e) = common::fhs::create_dirs(sysroot, false) {
 		bail!("FHS creation failed: {e}");
 	}
-	create_dev_nodes(sysroot)?;
+	if chroot {
+		create_dev_nodes(sysroot)?;
+	}
 	fs::copy(
 		get_build_hook_path(input_path)?,
 		sysroot.join("bin/build-hook"),
 	)?;
 
-	let arch = current_arch();
-	let host_env =
-		Environment::acquire(Path::new("/"), arch)?.expect("unexpected environment lock");
+	let env_path = cache_dir().expect("HOME environment variable not set");
+	let host_env = Environment::acquire(&env_path, arch)?.expect("unexpected environment lock");
 	let repos = host_env.list_repositories()?;
 
 	#[cfg(feature = "network")]
@@ -164,11 +173,17 @@ impl BuildProcess {
 	/// - `input_path` is the path to the directory containing information to build the package.
 	/// - `install_path` is the path to the install directory. If `None`, a directory is created.
 	/// - `work_dir` is the directory where build directories are located
+	/// - `arch` is the architecture the package is built for
+	/// - `sysroot` is the system root to build against. If `None`, a throwaway one is created.
+	///   Pass the sysroot the cross toolchain was configured with so that dependencies land on its
+	///   default search paths.
 	/// - `chroot` for building in chroot environment
 	pub async fn new(
 		input_path: PathBuf,
 		install_path: Option<PathBuf>,
 		work_dir: &Path,
+		arch: &str,
+		sysroot: Option<PathBuf>,
 		chroot: bool,
 	) -> Result<Self> {
 		// TODO replace root user check by CAP_SYS_CHROOT and CAP_MKNOD when implemented in kernel
@@ -181,8 +196,17 @@ impl BuildProcess {
 		build_desc.package.validate()?;
 
 		let sysroot_exists = install_path.is_some();
+		let shared_sysroot = sysroot
+			.map(|p| {
+				fs::create_dir_all(&p)?;
+				fs::canonicalize(p)
+			})
+			.transpose()?;
 		let (build_dir, install_path, sysroot) = if chroot {
-			let sysroot = create_tmp_dir(work_dir)?;
+			let sysroot = match shared_sysroot {
+				Some(p) => p,
+				None => create_tmp_dir(work_dir)?,
+			};
 			let pkg_dir_name =
 				format!("{}-{}", build_desc.package.name, build_desc.package.version);
 			let build_dir = sysroot.join("usr/src").join(&pkg_dir_name);
@@ -195,13 +219,15 @@ impl BuildProcess {
 					.as_ref()
 					.map(fs::canonicalize)
 					.unwrap_or_else(|| create_tmp_dir(work_dir))?,
-				install_path
-					.map(fs::canonicalize)
-					.unwrap_or_else(|| create_tmp_dir(work_dir))?,
+				match (install_path, shared_sysroot) {
+					(Some(p), _) => fs::canonicalize(p)?,
+					(None, Some(p)) => p,
+					(None, None) => create_tmp_dir(work_dir)?,
+				},
 			)
 		};
 		if !sysroot_exists {
-			create_sysroot(&sysroot, &input_path, &build_desc.package).await?;
+			create_sysroot(&sysroot, &input_path, &build_desc.package, arch, chroot).await?;
 		}
 
 		Ok(Self {
